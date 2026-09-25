@@ -10,6 +10,8 @@ create account -> create business -> upload sales data -> validate and clean -> 
 
 The current slice focuses on reliable data ingestion. Revenue analytics, dashboards, predefined business questions, automated insights, LLM features, and RAG are follow-on slices.
 
+For the authoritative implementation status, evidence, risks, and next done condition, see [MVP_PROGRESS.md](MVP_PROGRESS.md).
+
 ## Current capabilities
 
 - Create an account and initial business workspace.
