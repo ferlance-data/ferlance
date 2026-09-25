@@ -1,0 +1,4 @@
+transaction_id,transaction_date,amount,product,customer,quantity
+sale-1,2026-01-02,"1,250.50",Rice,Customer A,2
+sale-2,2026-01-03,850,Rice,Customer B,1
+sale-3,2026-01-03,500,Beans,Customer A,3

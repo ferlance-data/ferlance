@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ferlance | Dataset workspace</title>
+  <style>
+    :root { color-scheme: light; font-family: Georgia, 'Times New Roman', serif; color: #1d2924; background: #f1eee5; }
+    body { margin: 0; min-height: 100vh; background: radial-gradient(circle at 85% 10%, #d9e7d6 0 18%, transparent 38%), #f1eee5; }
+    main { width: min(960px, calc(100% - 40px)); margin: 0 auto; padding: 48px 0 72px; }
+    header { display: flex; justify-content: space-between; gap: 24px; align-items: end; border-bottom: 1px solid #aab8aa; padding-bottom: 24px; }
+    h1 { font-size: clamp(2.4rem, 7vw, 5.4rem); line-height: .92; margin: 0; max-width: 540px; letter-spacing: 0; font-weight: 500; }
+    .eyebrow { color: #2e705a; font: 700 .75rem/1.2 system-ui, sans-serif; letter-spacing: .12em; text-transform: uppercase; }
+    .intro { max-width: 330px; font: 1rem/1.5 system-ui, sans-serif; }
+    section { margin-top: 32px; background: #fffdf8; border: 1px solid #c8d0c4; padding: 24px; box-shadow: 8px 8px 0 #d9e1d3; }
+    h2 { margin: 0 0 18px; font-size: 1.5rem; font-weight: 500; }
+    form { display: grid; gap: 14px; max-width: 560px; }
+    label { font: 700 .78rem/1.2 system-ui, sans-serif; text-transform: uppercase; letter-spacing: .08em; }
+    input, button { font: 1rem system-ui, sans-serif; border: 1px solid #829486; padding: 12px 14px; background: #fffdf8; }
+    button { cursor: pointer; background: #235b49; color: #fffdf8; border-color: #235b49; font-weight: 700; }
+    button:hover { background: #173e32; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    .status { min-height: 24px; font: .92rem/1.4 system-ui, sans-serif; }
+    .error { color: #a22e28; }
+    .dataset { border-top: 1px solid #d6ddd1; padding: 14px 0; font: .9rem/1.45 system-ui, sans-serif; display: flex; justify-content: space-between; gap: 18px; }
+    @media (max-width: 680px) { main { width: min(100% - 24px, 960px); padding-top: 28px; } header, .grid { display: block; } .intro { margin-top: 18px; } section { padding: 18px; } }
+  </style>
+</head>
+<body>
+<main>
+  <header><div><div class="eyebrow">Ferlance / data workspace</div><h1>Make your business records useful.</h1></div><p class="intro">Start with one sales file. Ferlance validates it, cleans it, and keeps a clear record of what happened.</p></header>
+  <section id="auth-section">
+    <h2>Open your workspace</h2>
+    <form id="auth-form"><div class="grid"><div><label for="email">Email</label><input id="email" type="email" required placeholder="you@business.com"></div><div><label for="password">Password</label><input id="password" type="password" required minlength="8" placeholder="8+ characters"></div></div><div><label for="business">Business name</label><input id="business" required placeholder="Your shop or company"></div><button>Create account and business</button><div id="auth-status" class="status"></div></form>
+  </section>
+  <section id="upload-section" hidden>
+    <h2>Upload sales records</h2>
+    <form id="upload-form"><label for="dataset">CSV or Excel file</label><input id="dataset" type="file" accept=".csv,.xlsx" required><button>Process dataset</button><div id="upload-status" class="status"></div></form>
+    <div id="history"></div>
+  </section>
+</main>
+<script>
+const state = { token: null, businessId: null };
+const status = (id, message, error = false) => { const el = document.getElementById(id); el.textContent = message; el.className = `status${error ? ' error' : ''}`; };
+async function api(path, options = {}) { const headers = options.headers || {}; if (state.token) headers.Authorization = `Bearer ${state.token}`; const response = await fetch(path, { ...options, headers }); const body = await response.json().catch(() => ({})); if (!response.ok) throw new Error(body.detail || 'Request failed'); return body; }
+document.getElementById('auth-form').addEventListener('submit', async (event) => { event.preventDefault(); status('auth-status', 'Creating your workspace...'); const form = new FormData(event.target); try { const auth = await api('/api/auth/signup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: form.get('email'), password: form.get('password'), business_name: form.get('business') }) }); state.token = auth.access_token; state.businessId = auth.business.id; document.getElementById('auth-section').hidden = true; document.getElementById('upload-section').hidden = false; await loadHistory(); } catch (error) { status('auth-status', error.message, true); } });
+document.getElementById('upload-form').addEventListener('submit', async (event) => { event.preventDefault(); status('upload-status', 'Processing your file...'); const body = new FormData(); body.append('file', document.getElementById('dataset').files[0]); try { const result = await api(`/api/businesses/${state.businessId}/datasets`, { method: 'POST', body }); status('upload-status', `${result.status}: ${result.accepted_rows} accepted, ${result.rejected_rows} rejected.`); await loadHistory(); } catch (error) { status('upload-status', error.message, true); } });
+async function loadHistory() { const datasets = await api(`/api/businesses/${state.businessId}/datasets`); document.getElementById('history').innerHTML = `<h2>Dataset history</h2>${datasets.map(item => `<div class="dataset"><span><strong>${item.filename}</strong><br>${item.status} · ${item.accepted_rows} accepted · ${item.rejected_rows} rejected</span><span>${new Date(item.created_at).toLocaleDateString()}</span></div>`).join('') || '<p>No datasets yet.</p>'; }
+</script>
+</body>
+</html>

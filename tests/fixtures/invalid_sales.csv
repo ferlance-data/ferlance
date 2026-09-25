@@ -1,0 +1,4 @@
+transaction_id,transaction_date,amount,product
+sale-1,not-a-date,not-money,Rice
+sale-2,2026-01-03,850,Beans
+sale-2,2026-01-03,850,Beans

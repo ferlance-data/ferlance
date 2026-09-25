@@ -1,0 +1,11 @@
+.github/
+*.csv
+*docx
+backend/__pycache__/
+tests/__pycache__/
+backend/migrations/
+frontend/node_modules/
+docs/
+.venv/
+data/**
+.pytest_cache/
