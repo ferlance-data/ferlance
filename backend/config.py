@@ -8,6 +8,10 @@ RAW_DIR = DATA_DIR / "raw"
 PROCESSED_DIR = DATA_DIR / "processed"
 SECRET_KEY = os.getenv("FERLANCE_SECRET_KEY", "development-only-change-me")
 MAX_UPLOAD_BYTES = int(os.getenv("FERLANCE_MAX_UPLOAD_BYTES", str(10 * 1024 * 1024)))
+ACCESS_TOKEN_SECONDS = int(os.getenv("FERLANCE_ACCESS_TOKEN_SECONDS", "900"))
+REFRESH_TOKEN_SECONDS = int(os.getenv("FERLANCE_REFRESH_TOKEN_SECONDS", "2592000"))
+COOKIE_SECURE = os.getenv("FERLANCE_COOKIE_SECURE", "false").lower() == "true"
+DEFAULT_CURRENCY = os.getenv("FERLANCE_DEFAULT_CURRENCY", "GHS")
 
 
 def ensure_storage() -> None:

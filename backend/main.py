@@ -1,22 +1,25 @@
 import json
 import shutil
 import uuid
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, File, Header, HTTPException, Query, UploadFile
+from fastapi import Cookie, Depends, FastAPI, File, Header, HTTPException, Query, Response, UploadFile
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import db
 from .analytics import analyze
-from .config import DB_PATH, MAX_UPLOAD_BYTES, PROCESSED_DIR, RAW_DIR, ensure_storage
+from .config import COOKIE_SECURE, DB_PATH, MAX_UPLOAD_BYTES, PROCESSED_DIR, RAW_DIR, SECRET_KEY, ensure_storage
+from .insights import QUESTION_NAMES, answer_question, generate_insights
 from .processor import process_file
-from .security import create_token, hash_password, read_token, verify_password
+from .security import create_access_token, create_refresh_token, hash_password, read_access_token, token_hash, verify_password
 
 ensure_storage()
 db.initialize(DB_PATH)
 app = FastAPI(title="Ferlance MVP", version="0.1.0")
+app.mount("/assets", StaticFiles(directory=Path(__file__).parent.parent / "frontend" / "assets"), name="assets")
 DATASET_FIELDS = (
     "id",
     "filename",
@@ -45,7 +48,7 @@ class LoginRequest(BaseModel):
 def user_from_auth(authorization: str | None = Header(default=None)) -> dict:
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(401, "Authentication required.")
-    user_id = read_token(authorization.split(" ", 1)[1])
+    user_id = read_access_token(authorization.split(" ", 1)[1])
     user = db.one(DB_PATH, "SELECT id, email FROM users WHERE id = ?", (user_id or "",))
     if not user:
         raise HTTPException(401, "Invalid or expired token.")
@@ -75,8 +78,26 @@ def read_processed_records(dataset: dict) -> list[dict]:
         raise HTTPException(503, "Processed records are temporarily unavailable.")
 
 
+def issue_session(user_id: str, response: Response) -> dict:
+    refresh_token, expires_at = create_refresh_token()
+    db.insert(DB_PATH, "INSERT INTO refresh_sessions VALUES (?, ?, ?, ?, ?, ?)", (str(uuid.uuid4()), user_id, token_hash(refresh_token), expires_at.isoformat(), None, db.now()))
+    response.set_cookie("ferlance_refresh", refresh_token, httponly=True, secure=COOKIE_SECURE, samesite="lax", max_age=int((expires_at - datetime.now(timezone.utc)).total_seconds()), path="/api/auth")
+    return {"access_token": create_access_token(user_id), "token_type": "bearer"}
+
+
+def auth_response(user_id: str, business: dict | None, response: Response) -> dict:
+    session = issue_session(user_id, response)
+    session["business"] = business
+    return session
+
+
 @app.get("/", response_class=FileResponse)
 def frontend() -> Path:
+    return Path(__file__).parent.parent / "frontend" / "landing.html"
+
+
+@app.get("/app", response_class=FileResponse)
+def application() -> Path:
     return Path(__file__).parent.parent / "frontend" / "index.html"
 
 
@@ -86,22 +107,48 @@ def health() -> dict[str, str]:
 
 
 @app.post("/api/auth/signup")
-def signup(payload: SignupRequest) -> dict:
-    if db.one(DB_PATH, "SELECT id FROM users WHERE email = ?", (payload.email.lower(),)):
+def signup(payload: SignupRequest, response: Response) -> dict:
+    email = payload.email.strip().lower()
+    if db.one(DB_PATH, "SELECT id FROM users WHERE email = ?", (email,)):
         raise HTTPException(409, "An account with that email already exists.")
     user_id, business_id = str(uuid.uuid4()), str(uuid.uuid4())
-    db.insert(DB_PATH, "INSERT INTO users VALUES (?, ?, ?, ?)", (user_id, payload.email.lower(), hash_password(payload.password), db.now()))
+    db.insert(DB_PATH, "INSERT INTO users VALUES (?, ?, ?, ?)", (user_id, email, hash_password(payload.password), db.now()))
     db.insert(DB_PATH, "INSERT INTO businesses VALUES (?, ?, ?, ?)", (business_id, user_id, payload.business_name.strip(), db.now()))
-    return {"access_token": create_token(user_id), "token_type": "bearer", "business": {"id": business_id, "name": payload.business_name.strip()}}
+    return auth_response(user_id, {"id": business_id, "name": payload.business_name.strip()}, response)
 
 
 @app.post("/api/auth/login")
-def login(payload: LoginRequest) -> dict:
-    user = db.one(DB_PATH, "SELECT * FROM users WHERE email = ?", (payload.email.lower(),))
+def login(payload: LoginRequest, response: Response) -> dict:
+    user = db.one(DB_PATH, "SELECT * FROM users WHERE email = ?", (payload.email.strip().lower(),))
     if not user or not verify_password(payload.password, user["password_hash"]):
         raise HTTPException(401, "Invalid email or password.")
     business = db.one(DB_PATH, "SELECT id, name FROM businesses WHERE user_id = ? ORDER BY created_at LIMIT 1", (user["id"],))
-    return {"access_token": create_token(user["id"]), "token_type": "bearer", "business": business}
+    return auth_response(user["id"], business, response)
+
+
+@app.get("/api/auth/me")
+def me(user: dict = Depends(user_from_auth)) -> dict:
+    business = db.one(DB_PATH, "SELECT id, name FROM businesses WHERE user_id = ? ORDER BY created_at LIMIT 1", (user["id"],))
+    return {"user": user, "business": business}
+
+
+@app.post("/api/auth/refresh")
+def refresh(response: Response, refresh_token: str | None = Cookie(default=None, alias="ferlance_refresh")) -> dict:
+    if not refresh_token:
+        raise HTTPException(401, "Refresh session is required.")
+    session = db.one(DB_PATH, "SELECT * FROM refresh_sessions WHERE token_hash = ? AND revoked_at IS NULL", (token_hash(refresh_token),))
+    if not session or datetime.fromisoformat(session["expires_at"]) <= datetime.now(timezone.utc):
+        raise HTTPException(401, "Refresh session is invalid or expired.")
+    db.insert(DB_PATH, "UPDATE refresh_sessions SET revoked_at = ? WHERE id = ?", (db.now(), session["id"]))
+    return auth_response(session["user_id"], db.one(DB_PATH, "SELECT id, name FROM businesses WHERE user_id = ? ORDER BY created_at LIMIT 1", (session["user_id"],)), response)
+
+
+@app.post("/api/auth/logout")
+def logout(response: Response, refresh_token: str | None = Cookie(default=None, alias="ferlance_refresh")) -> dict[str, str]:
+    if refresh_token:
+        db.insert(DB_PATH, "UPDATE refresh_sessions SET revoked_at = ? WHERE token_hash = ? AND revoked_at IS NULL", (db.now(), token_hash(refresh_token)))
+    response.delete_cookie("ferlance_refresh", path="/api/auth")
+    return {"status": "signed_out"}
 
 
 @app.post("/api/businesses/{business_id}/datasets")
@@ -176,3 +223,50 @@ def dataset_analytics(
         raise HTTPException(400, str(error))
     metrics["dataset"] = dataset_response(dataset)
     return metrics
+
+
+def selected_records(business_id: str, dataset_id: str | None, user: dict) -> tuple[dict, list[dict]]:
+    business_for_user(business_id, user)
+    dataset = db.one(
+        DB_PATH,
+        "SELECT * FROM datasets WHERE business_id = ? AND (? IS NULL OR id = ?) ORDER BY created_at DESC LIMIT 1",
+        (business_id, dataset_id, dataset_id),
+    )
+    if not dataset:
+        raise HTTPException(404, "Dataset not found.")
+    if dataset["status"] == "failed":
+        raise HTTPException(409, "This dataset failed processing and has no insights.")
+    return dataset, read_processed_records(dataset)
+
+
+@app.get("/api/businesses/{business_id}/insights")
+def dataset_insights(
+    business_id: str,
+    dataset_id: str | None = None,
+    from_date: date | None = Query(default=None, alias="from"),
+    to_date: date | None = Query(default=None, alias="to"),
+    user: dict = Depends(user_from_auth),
+) -> dict:
+    if from_date and to_date and from_date > to_date:
+        raise HTTPException(400, "The from date must be on or before the to date.")
+    dataset, records = selected_records(business_id, dataset_id, user)
+    result = generate_insights(records, from_date, to_date)
+    result["dataset"] = dataset_response(dataset)
+    return result
+
+
+@app.get("/api/businesses/{business_id}/questions/{question}")
+def business_question(
+    business_id: str,
+    question: str,
+    dataset_id: str | None = None,
+    from_date: date | None = Query(default=None, alias="from"),
+    to_date: date | None = Query(default=None, alias="to"),
+    user: dict = Depends(user_from_auth),
+) -> dict:
+    if question not in QUESTION_NAMES:
+        raise HTTPException(404, "That business question is not available.")
+    if from_date and to_date and from_date > to_date:
+        raise HTTPException(400, "The from date must be on or before the to date.")
+    _, records = selected_records(business_id, dataset_id, user)
+    return answer_question(question, records, from_date, to_date)

@@ -12,7 +12,7 @@ def test_analyze_groups_revenue_by_day_week_and_month():
     result = analyze(records)
 
     assert result["revenue"]["total"] == 300.0
-    assert result["summary"] == "Revenue was 300.00 across 2 transactions."
+    assert result["summary"] == "Revenue was GHS 300.00 across 2 transactions."
     assert result["trend"]["weekly"] == [{"period": "2026-W01", "revenue": 300.0, "transactions": 2}]
     assert result["trend"]["monthly"] == [
         {"period": "2025-12", "revenue": 100.0, "transactions": 1},
