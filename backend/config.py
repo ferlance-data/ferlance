@@ -7,6 +7,7 @@ DB_PATH = DATA_DIR / "ferlance.sqlite3"
 RAW_DIR = DATA_DIR / "raw"
 PROCESSED_DIR = DATA_DIR / "processed"
 SECRET_KEY = os.getenv("FERLANCE_SECRET_KEY", "development-only-change-me")
+MAX_UPLOAD_BYTES = int(os.getenv("FERLANCE_MAX_UPLOAD_BYTES", str(10 * 1024 * 1024)))
 
 
 def ensure_storage() -> None:

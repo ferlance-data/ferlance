@@ -2,12 +2,14 @@ import csv
 import hashlib
 import json
 import re
+import zipfile
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from openpyxl import load_workbook
+from openpyxl.utils.exceptions import InvalidFileException
 
 REQUIRED_ALIASES = {
     "transaction_date": {"transaction_date", "date", "sale_date", "transactiondate"},
@@ -83,7 +85,12 @@ def _date(value: Any) -> str:
 
 
 def process_file(path: Path, extension: str) -> ProcessingResult:
-    rows = _read_rows(path, extension)
+    try:
+        rows = _read_rows(path, extension)
+    except (InvalidFileException, OSError, ValueError, zipfile.BadZipFile):
+        if extension == ".xlsx":
+            return ProcessingResult([], 0, 0, errors=["The XLSX file is malformed or unreadable."])
+        raise
     if not rows:
         return ProcessingResult([], 0, 0, errors=["The file is empty or has no data rows."])
     columns = _columns(rows)
