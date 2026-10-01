@@ -146,3 +146,77 @@ def test_partial_upload_reports_rejected_rows(tmp_path, monkeypatch):
     assert upload.json()["rejected_rows"] == 2
     records = client.get(f"/api/businesses/{business_id}/datasets/{upload.json()['id']}/records", headers=headers)
     assert records.json()["count"] == upload.json()["accepted_rows"]
+
+
+def test_analytics_returns_filtered_metrics_and_unavailable_states(tmp_path, monkeypatch):
+    monkeypatch.setattr(main, "DB_PATH", tmp_path / "test.sqlite3")
+    monkeypatch.setattr(main, "RAW_DIR", tmp_path / "raw")
+    monkeypatch.setattr(main, "PROCESSED_DIR", tmp_path / "processed")
+    main.RAW_DIR.mkdir()
+    main.PROCESSED_DIR.mkdir()
+    main.db.initialize(main.DB_PATH)
+    client = TestClient(main.app)
+    signup = client.post("/api/auth/signup", json={"email": "analytics@example.com", "password": "password123", "business_name": "Ama Retail"})
+    headers = {"Authorization": f"Bearer {signup.json()['access_token']}"}
+    business_id = signup.json()["business"]["id"]
+    fixture = Path(__file__).parent / "fixtures" / "valid_sales.csv"
+    upload = client.post(f"/api/businesses/{business_id}/datasets", headers=headers, files={"file": ("sales.csv", fixture.read_bytes(), "text/csv")})
+
+    response = client.get(
+        f"/api/businesses/{business_id}/analytics",
+        headers=headers,
+        params={"dataset_id": upload.json()["id"], "from": "2026-01-03", "to": "2026-01-03"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["revenue"] == {"total": 1350.0, "currency": None, "transactions": 2, "average_sale": 675.0}
+    assert body["trend"]["daily"] == [{"period": "2026-01-03", "revenue": 1350.0, "transactions": 2}]
+    assert body["products"]["items"][0]["product"] == "Rice"
+    assert body["customers"]["number_of_customers"] == 2
+    assert body["customers"]["repeat_customers"] == 0
+    assert body["profit"]["available"] is False
+    assert body["inventory"]["available"] is False
+    assert body["kpis"]["top_product"] == "Rice"
+
+
+def test_analytics_rejects_invalid_date_range_and_failed_dataset(tmp_path, monkeypatch):
+    monkeypatch.setattr(main, "DB_PATH", tmp_path / "test.sqlite3")
+    monkeypatch.setattr(main, "RAW_DIR", tmp_path / "raw")
+    monkeypatch.setattr(main, "PROCESSED_DIR", tmp_path / "processed")
+    main.RAW_DIR.mkdir()
+    main.PROCESSED_DIR.mkdir()
+    main.db.initialize(main.DB_PATH)
+    client = TestClient(main.app)
+    signup = client.post("/api/auth/signup", json={"email": "analytics-errors@example.com", "password": "password123", "business_name": "Ama Retail"})
+    headers = {"Authorization": f"Bearer {signup.json()['access_token']}"}
+    business_id = signup.json()["business"]["id"]
+    upload = client.post(f"/api/businesses/{business_id}/datasets", headers=headers, files={"file": ("empty.csv", b"", "text/csv")})
+
+    invalid_range = client.get(f"/api/businesses/{business_id}/analytics", headers=headers, params={"from": "2026-02-01", "to": "2026-01-01"})
+    failed = client.get(f"/api/businesses/{business_id}/analytics", headers=headers, params={"dataset_id": upload.json()["id"]})
+
+    assert invalid_range.status_code == 400
+    assert failed.status_code == 409
+
+
+def test_analytics_is_tenant_scoped(tmp_path, monkeypatch):
+    monkeypatch.setattr(main, "DB_PATH", tmp_path / "test.sqlite3")
+    monkeypatch.setattr(main, "RAW_DIR", tmp_path / "raw")
+    monkeypatch.setattr(main, "PROCESSED_DIR", tmp_path / "processed")
+    main.RAW_DIR.mkdir()
+    main.PROCESSED_DIR.mkdir()
+    main.db.initialize(main.DB_PATH)
+    client = TestClient(main.app)
+    first = client.post("/api/auth/signup", json={"email": "analytics-first@example.com", "password": "password123", "business_name": "First"})
+    second = client.post("/api/auth/signup", json={"email": "analytics-second@example.com", "password": "password123", "business_name": "Second"})
+    first_headers = {"Authorization": f"Bearer {first.json()['access_token']}"}
+    second_headers = {"Authorization": f"Bearer {second.json()['access_token']}"}
+    first_business = first.json()["business"]["id"]
+    second_business = second.json()["business"]["id"]
+    fixture = Path(__file__).parent / "fixtures" / "valid_sales.csv"
+    upload = client.post(f"/api/businesses/{first_business}/datasets", headers=first_headers, files={"file": ("sales.csv", fixture.read_bytes(), "text/csv")})
+
+    response = client.get(f"/api/businesses/{second_business}/analytics", headers=second_headers, params={"dataset_id": upload.json()["id"]})
+
+    assert response.status_code == 404

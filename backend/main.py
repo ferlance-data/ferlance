@@ -1,13 +1,15 @@
 import json
 import shutil
 import uuid
+from datetime import date
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, File, Header, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Header, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from . import db
+from .analytics import analyze
 from .config import DB_PATH, MAX_UPLOAD_BYTES, PROCESSED_DIR, RAW_DIR, ensure_storage
 from .processor import process_file
 from .security import create_token, hash_password, read_token, verify_password
@@ -61,6 +63,16 @@ def dataset_response(item: dict) -> dict:
     for field in ("warnings", "errors"):
         item[field] = json.loads(item[field])
     return {field: item[field] for field in DATASET_FIELDS}
+
+
+def read_processed_records(dataset: dict) -> list[dict]:
+    if not dataset["processed_path"]:
+        return []
+    try:
+        with Path(dataset["processed_path"]).open("r", encoding="utf-8") as source:
+            return [json.loads(line) for line in source if line.strip()]
+    except (OSError, json.JSONDecodeError):
+        raise HTTPException(503, "Processed records are temporarily unavailable.")
 
 
 @app.get("/", response_class=FileResponse)
@@ -133,11 +145,34 @@ def dataset_records(business_id: str, dataset_id: str, user: dict = Depends(user
     dataset = db.one(DB_PATH, "SELECT * FROM datasets WHERE id = ? AND business_id = ?", (dataset_id, business_id))
     if not dataset:
         raise HTTPException(404, "Dataset not found.")
-    records: list[dict] = []
-    if dataset["processed_path"]:
-        try:
-            with Path(dataset["processed_path"]).open("r", encoding="utf-8") as source:
-                records = [json.loads(line) for line in source if line.strip()]
-        except (OSError, json.JSONDecodeError):
-            raise HTTPException(503, "Processed records are temporarily unavailable.")
+    records = read_processed_records(dataset)
     return {"dataset_id": dataset_id, "status": dataset["status"], "count": len(records), "records": records}
+
+
+@app.get("/api/businesses/{business_id}/analytics")
+def dataset_analytics(
+    business_id: str,
+    dataset_id: str | None = None,
+    from_date: date | None = Query(default=None, alias="from"),
+    to_date: date | None = Query(default=None, alias="to"),
+    user: dict = Depends(user_from_auth),
+) -> dict:
+    business_for_user(business_id, user)
+    if from_date and to_date and from_date > to_date:
+        raise HTTPException(400, "The from date must be on or before the to date.")
+    dataset = db.one(
+        DB_PATH,
+        "SELECT * FROM datasets WHERE business_id = ? AND (? IS NULL OR id = ?) ORDER BY created_at DESC LIMIT 1",
+        (business_id, dataset_id, dataset_id),
+    )
+    if not dataset:
+        raise HTTPException(404, "Dataset not found.")
+    if dataset["status"] == "failed":
+        raise HTTPException(409, "This dataset failed processing and has no analytics.")
+    records = read_processed_records(dataset)
+    try:
+        metrics = analyze(records, from_date, to_date)
+    except ValueError as error:
+        raise HTTPException(400, str(error))
+    metrics["dataset"] = dataset_response(dataset)
+    return metrics

@@ -2,13 +2,13 @@
 
 Ferlance is a business intelligence platform for African SMEs, initially focused on Ghana.
 
-This repository contains the first post-research MVP slice, aligned with Sprint 3:
+This repository contains the first post-research MVP slices, aligned with completed Sprint 3 and Sprint 4:
 
 ```text
 create account -> create business -> upload sales data -> validate and clean -> inspect dataset history
 ```
 
-The current slice focuses on reliable data ingestion. Revenue analytics, dashboards, predefined business questions, automated insights, LLM features, and RAG are follow-on slices.
+The current slice includes reliable ingestion, deterministic revenue analytics, and a filtered dashboard. Predefined business questions, automated insights, LLM features, and RAG are follow-on slices.
 
 For the authoritative implementation status, evidence, risks, and next done condition, see [MVP_PROGRESS.md](MVP_PROGRESS.md).
 
@@ -23,6 +23,7 @@ For the authoritative implementation status, evidence, risks, and next done cond
 - Record dataset status, row counts, warnings, and errors.
 - View dataset history for the authenticated business.
 - Read accepted normalized records for an uploaded dataset.
+- View filtered revenue, trend, product, customer, and KPI analytics.
 - Use the browser interface at the root URL.
 
 ## Run locally
@@ -119,7 +120,8 @@ This is an MVP development foundation, not a production deployment:
 - The default signing secret is for development and must be replaced before deployment.
 - Logout/revocation, richer business profiles, upload limits, and stronger production security controls remain follow-up work.
 - Processed JSONL remains an internal storage artifact; normalized records are exposed through the tenant-scoped dataset records API.
-- The frontend is an ingestion workspace, not the final analytics dashboard.
+- Profit and inventory analytics remain unavailable unless future input schemas provide the required source fields.
+- Predefined questions, automated insights, LLM features, and RAG remain future slices.
 
 ## Product principles
 

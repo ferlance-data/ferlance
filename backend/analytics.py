@@ -1,0 +1,107 @@
+from collections import defaultdict
+from datetime import date
+from typing import Any
+
+
+def _periods(records: list[dict[str, Any]], key) -> list[dict[str, Any]]:
+    grouped: dict[str, dict[str, float | int]] = defaultdict(lambda: {"revenue": 0.0, "transactions": 0})
+    for record in records:
+        period = key(date.fromisoformat(record["transaction_date"]))
+        grouped[period]["revenue"] += record["amount"]
+        grouped[period]["transactions"] += 1
+    return [
+        {"period": period, "revenue": round(values["revenue"], 2), "transactions": values["transactions"]}
+        for period, values in sorted(grouped.items())
+    ]
+
+
+def _product_metrics(records: list[dict[str, Any]]) -> dict[str, Any]:
+    products: dict[str, dict[str, Any]] = {}
+    product_records = [record for record in records if record.get("product")]
+    if not product_records:
+        return {"available": False, "reason": "No product field is present in the accepted records."}
+    quantity_available = all("quantity" in record for record in product_records)
+    for record in product_records:
+        name = record["product"]
+        item = products.setdefault(name, {"product": name, "revenue": 0.0, "units_sold": 0.0, "transactions": 0})
+        item["revenue"] += record["amount"]
+        item["transactions"] += 1
+        if quantity_available:
+            item["units_sold"] += record["quantity"]
+    items = []
+    for item in products.values():
+        item["revenue"] = round(item["revenue"], 2)
+        if quantity_available:
+            item["units_sold"] = int(item["units_sold"]) if item["units_sold"].is_integer() else round(item["units_sold"], 2)
+        else:
+            item.pop("units_sold")
+        items.append(item)
+    return {
+        "available": True,
+        "quantity_available": quantity_available,
+        "items": sorted(items, key=lambda item: (-item["revenue"], item["product"])),
+        "best_sellers": sorted(items, key=lambda item: (-item["revenue"], item["product"])),
+        "worst_sellers": sorted(items, key=lambda item: (item["revenue"], item["product"])),
+    }
+
+
+def _customer_metrics(records: list[dict[str, Any]]) -> dict[str, Any]:
+    customer_records = [record for record in records if record.get("customer")]
+    if not customer_records:
+        return {"available": False, "reason": "No customer field is present in the accepted records."}
+    customers: dict[str, dict[str, Any]] = {}
+    for record in customer_records:
+        name = record["customer"]
+        item = customers.setdefault(name, {"customer": name, "revenue": 0.0, "transactions": 0})
+        item["revenue"] += record["amount"]
+        item["transactions"] += 1
+    items = sorted(
+        ({**item, "revenue": round(item["revenue"], 2)} for item in customers.values()),
+        key=lambda item: (-item["revenue"], item["customer"]),
+    )
+    return {
+        "available": True,
+        "number_of_customers": len(customers),
+        "repeat_customers": sum(item["transactions"] >= 2 for item in items),
+        "top_customers": items,
+    }
+
+
+def analyze(records: list[dict[str, Any]], from_date: date | None = None, to_date: date | None = None) -> dict[str, Any]:
+    if from_date and to_date and from_date > to_date:
+        raise ValueError("The from date must be on or before the to date.")
+    available_dates = [date.fromisoformat(record["transaction_date"]) for record in records]
+    start = from_date or (min(available_dates) if available_dates else None)
+    end = to_date or (max(available_dates) if available_dates else None)
+    filtered = [
+        record for record in records
+        if (start is None or record["transaction_date"] >= start.isoformat())
+        and (end is None or record["transaction_date"] <= end.isoformat())
+    ]
+    total = sum(record["amount"] for record in filtered)
+    transactions = len(filtered)
+    products = _product_metrics(filtered)
+    top_product = products["items"][0]["product"] if products["available"] and products["items"] else None
+    warnings = []
+    if filtered and any(not record.get("product") for record in filtered):
+        warnings.append("Some accepted records have no product field and are excluded from product metrics.")
+    if filtered and any(not record.get("customer") for record in filtered):
+        warnings.append("Some accepted records have no customer field and are excluded from customer metrics.")
+    if products.get("available") and not products.get("quantity_available"):
+        warnings.append("Units sold are unavailable because quantity is missing from some product records.")
+    return {
+        "period": {"from": start.isoformat() if start else None, "to": end.isoformat() if end else None},
+        "summary": f"Revenue was {total:.2f} across {transactions} transaction{'s' if transactions != 1 else ''}." if transactions else "No accepted sales records fall within this period.",
+        "revenue": {"total": round(total, 2), "currency": None, "transactions": transactions, "average_sale": round(total / transactions, 2) if transactions else 0.0},
+        "trend": {
+            "daily": _periods(filtered, lambda value: value.isoformat()),
+            "weekly": _periods(filtered, lambda value: f"{value.isocalendar().year}-W{value.isocalendar().week:02d}"),
+            "monthly": _periods(filtered, lambda value: value.strftime("%Y-%m")),
+        },
+        "products": products,
+        "customers": _customer_metrics(filtered),
+        "profit": {"available": False, "reason": "Accepted records contain revenue but no cost or expense fields."},
+        "inventory": {"available": False, "reason": "No inventory snapshot or stock movement data is present."},
+        "kpis": {"total_revenue": round(total, 2), "transactions": transactions, "average_sale": round(total / transactions, 2) if transactions else 0.0, "top_product": top_product},
+        "warnings": warnings,
+    }
