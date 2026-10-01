@@ -190,7 +190,7 @@ def test_analytics_returns_filtered_metrics_and_unavailable_states(tmp_path, mon
 
     assert response.status_code == 200
     body = response.json()
-    assert body["revenue"] == {"total": 1350.0, "currency": None, "transactions": 2, "average_sale": 675.0}
+    assert body["revenue"] == {"total": 1350.0, "currency": "GHS", "transactions": 2, "average_sale": 675.0}
     assert body["trend"]["daily"] == [{"period": "2026-01-03", "revenue": 1350.0, "transactions": 2}]
     assert body["products"]["items"][0]["product"] == "Rice"
     assert body["customers"]["number_of_customers"] == 2

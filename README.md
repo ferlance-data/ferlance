@@ -25,6 +25,7 @@ For the authoritative implementation status, evidence, risks, and next done cond
 - Read accepted normalized records for an uploaded dataset.
 - View filtered revenue, trend, product, customer, and KPI analytics.
 - View grounded comparison insights and six predefined business questions.
+- Display financial values in Ghanaian cedi (`GHS`) using the Ghana locale.
 - Use the browser interface at the root URL.
 
 ## Run locally

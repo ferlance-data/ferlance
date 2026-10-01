@@ -7,7 +7,7 @@ const pages = {
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 const cell = (tag, text) => { const element = document.createElement(tag); element.textContent = text; return element; };
-const money = (value) => Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const money = (value) => new Intl.NumberFormat('en-GH', { style: 'currency', currency: 'GHS', currencyDisplay: 'narrowSymbol', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value));
 const status = (selector, message, error = false) => { const element = $(selector); element.textContent = message; element.className = `${element.className.replace(' error', '')}${error ? ' error' : ''}`; };
 
 async function request(path, options = {}) {
@@ -83,7 +83,7 @@ async function loadInsights() {
     const header = document.createElement('div'); header.className = 'insight-header'; header.append(cell('h3', item.title), cell('span', item.type));
     card.append(header, cell('p', item.message));
     const evidence = document.createElement('div'); evidence.className = 'insight-evidence'; evidence.append(cell('span', 'Based on this period'));
-    Object.entries(item.supporting_metric || {}).filter(([, value]) => value !== null && value !== undefined).forEach(([key, value]) => { const metric = document.createElement('span'); metric.className = 'evidence-metric'; metric.append(cell('small', key.replaceAll('_', ' ')), cell('strong', typeof value === 'number' ? value.toLocaleString(undefined, { maximumFractionDigits: 2 }) : String(value))); evidence.append(metric); });
+    Object.entries(item.supporting_metric || {}).filter(([, value]) => value !== null && value !== undefined).forEach(([key, value]) => { const metric = document.createElement('span'); metric.className = 'evidence-metric'; const displayValue = typeof value === 'number' && ['total', 'revenue', 'current', 'previous', 'average_sale'].includes(key) ? money(value) : typeof value === 'number' ? value.toLocaleString(undefined, { maximumFractionDigits: 2 }) : String(value); metric.append(cell('small', key.replaceAll('_', ' ')), cell('strong', displayValue)); evidence.append(metric); });
     card.append(evidence);
     if (item.limitations?.length) { const limitation = cell('small', `Note: ${item.limitations.join(' ')}`); limitation.className = 'insight-note'; card.append(limitation); }
     list.append(card);

@@ -2,6 +2,8 @@ from collections import defaultdict
 from datetime import date
 from typing import Any
 
+from .config import DEFAULT_CURRENCY
+
 
 def _periods(records: list[dict[str, Any]], key) -> list[dict[str, Any]]:
     grouped: dict[str, dict[str, float | int]] = defaultdict(lambda: {"revenue": 0.0, "transactions": 0})
@@ -91,8 +93,8 @@ def analyze(records: list[dict[str, Any]], from_date: date | None = None, to_dat
         warnings.append("Units sold are unavailable because quantity is missing from some product records.")
     return {
         "period": {"from": start.isoformat() if start else None, "to": end.isoformat() if end else None},
-        "summary": f"Revenue was {total:.2f} across {transactions} transaction{'s' if transactions != 1 else ''}." if transactions else "No accepted sales records fall within this period.",
-        "revenue": {"total": round(total, 2), "currency": None, "transactions": transactions, "average_sale": round(total / transactions, 2) if transactions else 0.0},
+        "summary": f"Revenue was {DEFAULT_CURRENCY} {total:.2f} across {transactions} transaction{'s' if transactions != 1 else ''}." if transactions else "No accepted sales records fall within this period.",
+        "revenue": {"total": round(total, 2), "currency": DEFAULT_CURRENCY, "transactions": transactions, "average_sale": round(total / transactions, 2) if transactions else 0.0},
         "trend": {
             "daily": _periods(filtered, lambda value: value.isoformat()),
             "weekly": _periods(filtered, lambda value: f"{value.isocalendar().year}-W{value.isocalendar().week:02d}"),
