@@ -78,7 +78,16 @@ async function loadDashboard() {
 async function loadInsights() {
   if (!selectedDataset()) return; const result = await request(`/api/businesses/${state.businessId}/insights?${filterParams()}`); status('#insight-status', `${result.dataset.filename} · ${result.period.from || 'all dates'} to ${result.period.to || 'all dates'} · grounded in accepted records.`);
   const list = $('#insights-list'); list.replaceChildren(); if (!result.insights.length) list.append(cell('p', 'There are not enough accepted records to generate an insight for this period.'));
-  result.insights.forEach((item) => { const card = cell('div', `${item.title}: ${item.message}`); card.className = 'insight'; card.append(document.createElement('br'), cell('small', `Evidence: ${JSON.stringify(item.supporting_metric)}${item.limitations.length ? ` Limitation: ${item.limitations.join(' ')}` : ''}`)); list.append(card); });
+  result.insights.forEach((item) => {
+    const card = document.createElement('article'); card.className = `insight insight-${item.severity || 'info'}`;
+    const header = document.createElement('div'); header.className = 'insight-header'; header.append(cell('h3', item.title), cell('span', item.type));
+    card.append(header, cell('p', item.message));
+    const evidence = document.createElement('div'); evidence.className = 'insight-evidence'; evidence.append(cell('span', 'Based on this period'));
+    Object.entries(item.supporting_metric || {}).filter(([, value]) => value !== null && value !== undefined).forEach(([key, value]) => { const metric = document.createElement('span'); metric.className = 'evidence-metric'; metric.append(cell('small', key.replaceAll('_', ' ')), cell('strong', typeof value === 'number' ? value.toLocaleString(undefined, { maximumFractionDigits: 2 }) : String(value))); evidence.append(metric); });
+    card.append(evidence);
+    if (item.limitations?.length) { const limitation = cell('small', `Note: ${item.limitations.join(' ')}`); limitation.className = 'insight-note'; card.append(limitation); }
+    list.append(card);
+  });
 }
 
 async function refreshViews() {

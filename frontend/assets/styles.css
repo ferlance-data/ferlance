@@ -63,8 +63,19 @@ h1 { max-width: 780px; margin: 0; font-size: clamp(3.2rem, 8vw, 7.2rem); font-we
 .data-table th, .data-table td { padding: 9px 4px; border-bottom: 1px solid var(--line); text-align: left; }
 .data-table th { color: var(--muted); font-size: .7rem; text-transform: uppercase; }
 pre { max-width: 100%; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: .78rem/1.4 system-ui, sans-serif; }
-.insight { margin-top: 10px; padding: 12px; border-left: 4px solid var(--green); background: var(--soft); font: .88rem/1.45 system-ui, sans-serif; overflow-wrap: anywhere; }
-.insight small { color: var(--muted); }
+.insight { margin-top: 12px; padding: 16px; border: 1px solid var(--line); border-left: 4px solid var(--green); background: var(--soft); font: .88rem/1.45 system-ui, sans-serif; overflow-wrap: anywhere; }
+.insight-attention { border-left-color: #b2761e; }
+.insight-positive { border-left-color: var(--green); }
+.insight-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.insight-header h3 { margin: 0; font-size: 1.05rem; font-weight: 500; }
+.insight-header span { color: var(--muted); font: 700 .65rem system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase; }
+.insight p { margin: 8px 0 14px; color: var(--ink); }
+.insight-evidence { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-top: 12px; border-top: 1px solid var(--line); }
+.insight-evidence > span:first-child { width: 100%; color: var(--muted); font: .7rem system-ui, sans-serif; text-transform: uppercase; letter-spacing: .06em; }
+.evidence-metric { display: inline-flex; flex-direction: column; gap: 3px; min-width: 92px; padding: 8px 10px; background: var(--paper); border: 1px solid var(--line); }
+.evidence-metric small { color: var(--muted); font: .68rem system-ui, sans-serif; text-transform: capitalize; }
+.evidence-metric strong { font: 700 .9rem system-ui, sans-serif; }
+.insight-note { display: block; margin-top: 12px; color: #705319; font: .78rem/1.4 system-ui, sans-serif; }
 .question-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
 .question-grid button { color: var(--green); background: var(--paper); border-color: var(--line); text-align: left; }
 .warning { margin-top: 8px; padding: 10px; color: #705319; background: var(--warning); font: .83rem/1.4 system-ui, sans-serif; }
