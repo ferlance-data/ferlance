@@ -23,7 +23,23 @@
     .status { min-height: 24px; font: .92rem/1.4 system-ui, sans-serif; }
     .error { color: #a22e28; }
     .dataset { border-top: 1px solid #d6ddd1; padding: 14px 0; font: .9rem/1.45 system-ui, sans-serif; display: flex; justify-content: space-between; gap: 18px; }
-    @media (max-width: 680px) { main { width: min(100% - 24px, 960px); padding-top: 28px; } header, .grid { display: block; } .intro { margin-top: 18px; } section { padding: 18px; } }
+    .dashboard { display: grid; gap: 18px; }
+    .controls { display: grid; grid-template-columns: 1.5fr 1fr 1fr auto; gap: 12px; align-items: end; }
+    .controls label { display: grid; gap: 7px; }
+    .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+    .kpi, .metric-panel { border: 1px solid #c8d0c4; padding: 16px; background: #f7f5ec; }
+    .kpi strong { display: block; font: 700 1.55rem/1.1 system-ui, sans-serif; margin-top: 8px; }
+    .kpi span, .metric-panel p, table { font: .88rem/1.45 system-ui, sans-serif; }
+    .metric-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; border-bottom: 1px solid #d6ddd1; padding: 8px 4px; }
+    .muted { color: #607268; }
+    .chart { display: grid; gap: 8px; }
+    .bar-row { display: grid; grid-template-columns: 76px 1fr 90px; gap: 8px; align-items: center; font: .8rem/1.2 system-ui, sans-serif; }
+    .bar-track { height: 16px; background: #dce5d9; }
+    .bar { height: 100%; background: #2e705a; }
+    .warning { color: #7a581d; background: #f8edcf; padding: 10px; font: .88rem/1.4 system-ui, sans-serif; }
+    @media (max-width: 680px) { main { width: min(100% - 24px, 960px); padding-top: 28px; } header, .grid, .controls, .kpis, .metric-grid { display: block; } .intro { margin-top: 18px; } section { padding: 18px; } .controls label, .controls button, .kpi, .metric-panel { display: block; margin-top: 12px; width: auto; } .bar-row { grid-template-columns: 64px 1fr 76px; } }
   </style>
 </head>
 <body>
@@ -31,21 +47,53 @@
   <header><div><div class="eyebrow">Ferlance / data workspace</div><h1>Make your business records useful.</h1></div><p class="intro">Start with one sales file. Ferlance validates it, cleans it, and keeps a clear record of what happened.</p></header>
   <section id="auth-section">
     <h2>Open your workspace</h2>
-    <form id="auth-form"><div class="grid"><div><label for="email">Email</label><input id="email" type="email" required placeholder="you@business.com"></div><div><label for="password">Password</label><input id="password" type="password" required minlength="8" placeholder="8+ characters"></div></div><div><label for="business">Business name</label><input id="business" required placeholder="Your shop or company"></div><button>Create account and business</button><div id="auth-status" class="status"></div></form>
+    <form id="auth-form"><div class="grid"><div><label for="email">Email</label><input id="email" name="email" type="email" required placeholder="you@business.com"></div><div><label for="password">Password</label><input id="password" name="password" type="password" required minlength="8" placeholder="8+ characters"></div></div><div><label for="business">Business name</label><input id="business" name="business" required placeholder="Your shop or company"></div><button>Create account and business</button><div id="auth-status" class="status"></div></form>
   </section>
   <section id="upload-section" hidden>
     <h2>Upload sales records</h2>
     <form id="upload-form"><label for="dataset">CSV or Excel file</label><input id="dataset" type="file" accept=".csv,.xlsx" required><button>Process dataset</button><div id="upload-status" class="status"></div></form>
     <div id="history"></div>
   </section>
+  <section id="dashboard-section" hidden>
+    <div class="dashboard">
+      <h2>Business dashboard</h2>
+      <div class="controls">
+        <label>Dataset<select id="dataset-select"></select></label>
+        <label>Range<select id="date-preset"><option value="all">All dates</option><option value="today">Today</option><option value="7">Last 7 days</option><option value="30">Last 30 days</option><option value="quarter">Quarter</option><option value="custom">Custom</option></select></label>
+        <label>From<input id="from-date" type="date"></label>
+        <label>To<input id="to-date" type="date"></label>
+        <button id="refresh-dashboard" type="button">Update</button>
+      </div>
+      <div id="dashboard-status" class="status"></div><div id="dashboard-warnings"></div>
+      <div id="summary" class="metric-panel"></div>
+      <div id="kpis" class="kpis"></div>
+      <div class="metric-grid">
+        <div class="metric-panel"><h3>Revenue trend</h3><div id="trend"></div></div>
+        <div class="metric-panel"><h3>Products</h3><div id="products"></div></div>
+        <div class="metric-panel"><h3>Customers</h3><div id="customers"></div></div>
+        <div class="metric-panel"><h3>Conditional metrics</h3><div id="conditional"></div></div>
+      </div>
+    </div>
+  </section>
 </main>
 <script>
 const state = { token: null, businessId: null };
 const status = (id, message, error = false) => { const el = document.getElementById(id); el.textContent = message; el.className = `status${error ? ' error' : ''}`; };
 async function api(path, options = {}) { const headers = options.headers || {}; if (state.token) headers.Authorization = `Bearer ${state.token}`; const response = await fetch(path, { ...options, headers }); const body = await response.json().catch(() => ({})); if (!response.ok) throw new Error(body.detail || 'Request failed'); return body; }
-document.getElementById('auth-form').addEventListener('submit', async (event) => { event.preventDefault(); status('auth-status', 'Creating your workspace...'); const form = new FormData(event.target); try { const auth = await api('/api/auth/signup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: form.get('email'), password: form.get('password'), business_name: form.get('business') }) }); state.token = auth.access_token; state.businessId = auth.business.id; document.getElementById('auth-section').hidden = true; document.getElementById('upload-section').hidden = false; await loadHistory(); } catch (error) { status('auth-status', error.message, true); } });
+const money = value => Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const cell = (tag, text) => { const element = document.createElement(tag); element.textContent = text; return element; };
+document.getElementById('auth-form').addEventListener('submit', async (event) => { event.preventDefault(); status('auth-status', 'Creating your workspace...'); const form = new FormData(event.target); try { const auth = await api('/api/auth/signup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: form.get('email'), password: form.get('password'), business_name: form.get('business') }) }); state.token = auth.access_token; state.businessId = auth.business.id; document.getElementById('auth-section').hidden = true; document.getElementById('upload-section').hidden = false; document.getElementById('dashboard-section').hidden = false; await loadHistory(); } catch (error) { status('auth-status', error.message, true); } });
 document.getElementById('upload-form').addEventListener('submit', async (event) => { event.preventDefault(); status('upload-status', 'Processing your file...'); const body = new FormData(); body.append('file', document.getElementById('dataset').files[0]); try { const result = await api(`/api/businesses/${state.businessId}/datasets`, { method: 'POST', body }); status('upload-status', `${result.status}: ${result.accepted_rows} accepted, ${result.rejected_rows} rejected.`); await loadHistory(); } catch (error) { status('upload-status', error.message, true); } });
-async function loadHistory() { const datasets = await api(`/api/businesses/${state.businessId}/datasets`); document.getElementById('history').innerHTML = `<h2>Dataset history</h2>${datasets.map(item => `<div class="dataset"><span><strong>${item.filename}</strong><br>${item.status} · ${item.accepted_rows} accepted · ${item.rejected_rows} rejected</span><span>${new Date(item.created_at).toLocaleDateString()}</span></div>`).join('') || '<p>No datasets yet.</p>'; }
+async function loadHistory() { const datasets = await api(`/api/businesses/${state.businessId}/datasets`); const history = document.getElementById('history'); const select = document.getElementById('dataset-select'); history.replaceChildren(); select.replaceChildren(); const heading = document.createElement('h2'); heading.textContent = 'Dataset history'; history.append(heading); datasets.forEach(item => { const row = document.createElement('div'); row.className = 'dataset'; const details = document.createElement('span'); const filename = document.createElement('strong'); filename.textContent = item.filename; details.append(filename, document.createElement('br')); details.append(document.createTextNode(`${item.status} · ${item.accepted_rows} accepted · ${item.rejected_rows} rejected`)); const created = document.createElement('span'); created.textContent = new Date(item.created_at).toLocaleDateString(); row.append(details, created); history.append(row); if (item.status !== 'failed') { const option = document.createElement('option'); option.value = item.id; option.textContent = `${item.filename} (${item.status})`; select.append(option); } }); if (!datasets.length) { const empty = document.createElement('p'); empty.textContent = 'Upload a processed dataset to see your dashboard.'; history.append(empty); } if (select.options.length) await loadDashboard(); }
+function renderTable(targetId, headers, rows) { const target = document.getElementById(targetId); target.replaceChildren(); if (!rows.length) { target.append(cell('p', 'No data for this period.')); return; } const table = document.createElement('table'); const head = document.createElement('tr'); headers.forEach(header => head.append(cell('th', header))); table.append(head); rows.forEach(row => { const line = document.createElement('tr'); row.forEach(value => line.append(cell('td', value))); table.append(line); }); target.append(table); }
+async function loadDashboard() { const select = document.getElementById('dataset-select'); if (!select.value) { status('dashboard-status', 'Upload a processed dataset to activate analytics.'); return; } status('dashboard-status', 'Calculating metrics...'); const params = new URLSearchParams({ dataset_id: select.value }); const preset = document.getElementById('date-preset').value; const today = new Date(); const iso = value => value.toISOString().slice(0, 10); if (preset === 'today') { params.set('from', iso(today)); params.set('to', iso(today)); } if (preset === '7' || preset === '30') { const start = new Date(today); start.setDate(start.getDate() - Number(preset) + 1); params.set('from', iso(start)); params.set('to', iso(today)); } if (preset === 'quarter') { const start = new Date(today.getFullYear(), Math.floor(today.getMonth() / 3) * 3, 1); params.set('from', iso(start)); params.set('to', iso(today)); } if (preset === 'custom') { const from = document.getElementById('from-date').value; const to = document.getElementById('to-date').value; if (from) params.set('from', from); if (to) params.set('to', to); } try { const result = await api(`/api/businesses/${state.businessId}/analytics?${params}`); const quality = result.dataset.rejected_rows ? ` Data quality: ${result.dataset.rejected_rows} rows rejected.` : ''; status('dashboard-status', `${result.dataset.filename} · ${result.period.from || 'no dates'} to ${result.period.to || 'no dates'}.${quality}`); document.getElementById('summary').replaceChildren(cell('p', result.summary)); const warningBox = document.getElementById('dashboard-warnings'); warningBox.replaceChildren(); result.warnings.forEach(warning => { const item = cell('div', warning); item.className = 'warning'; warningBox.append(item); }); const kpis = document.getElementById('kpis'); kpis.replaceChildren(); [['Total revenue', money(result.kpis.total_revenue)], ['Transactions', result.kpis.transactions], ['Average sale', money(result.kpis.average_sale)], ['Top product', result.kpis.top_product || 'Unavailable']].forEach(([label, value]) => { const card = document.createElement('div'); card.className = 'kpi'; card.append(cell('span', label), cell('strong', String(value))); kpis.append(card); }); renderChart(result.trend.daily); if (result.products.available) renderProductMetrics(result.products); else document.getElementById('products').replaceChildren(cell('p', result.products.reason)); if (result.customers.available) renderTable('customers', ['Customer', 'Revenue', 'Transactions'], result.customers.top_customers.map(item => [item.customer, money(item.revenue), String(item.transactions)])); else document.getElementById('customers').replaceChildren(cell('p', result.customers.reason)); const conditional = document.getElementById('conditional'); conditional.replaceChildren(cell('p', result.profit.reason), cell('p', result.inventory.reason)); } catch (error) { status('dashboard-status', error.message, true); } }
+function renderChart(items) { const target = document.getElementById('trend'); target.replaceChildren(); if (!items.length) { target.append(cell('p', 'No data for this period.')); return; } const max = Math.max(...items.map(item => item.revenue)); const chart = document.createElement('div'); chart.className = 'chart'; items.forEach(item => { const row = document.createElement('div'); row.className = 'bar-row'; row.append(cell('span', item.period)); const track = document.createElement('div'); track.className = 'bar-track'; const bar = document.createElement('div'); bar.className = 'bar'; bar.style.width = `${max ? item.revenue / max * 100 : 0}%`; track.append(bar); row.append(track, cell('span', money(item.revenue))); chart.append(row); }); target.append(chart); }
+function renderProductMetrics(products) { const target = document.getElementById('products'); target.replaceChildren(); target.append(cell('h4', 'Best sellers')); renderTableInto(target, ['Product', 'Revenue', 'Units sold'], products.best_sellers.map(item => [item.product, money(item.revenue), item.units_sold === undefined ? 'Unavailable' : String(item.units_sold)])); target.append(cell('h4', 'Worst sellers')); renderTableInto(target, ['Product', 'Revenue', 'Units sold'], products.worst_sellers.map(item => [item.product, money(item.revenue), item.units_sold === undefined ? 'Unavailable' : String(item.units_sold)])); }
+function renderTableInto(target, headers, rows) { const table = document.createElement('table'); const head = document.createElement('tr'); headers.forEach(header => head.append(cell('th', header))); table.append(head); rows.forEach(row => { const line = document.createElement('tr'); row.forEach(value => line.append(cell('td', value))); table.append(line); }); target.append(table); }
+document.getElementById('refresh-dashboard').addEventListener('click', loadDashboard);
+document.getElementById('dataset-select').addEventListener('change', loadDashboard);
+document.getElementById('date-preset').addEventListener('change', event => { const custom = event.target.value === 'custom'; document.getElementById('from-date').disabled = !custom; document.getElementById('to-date').disabled = !custom; loadDashboard(); });
+document.getElementById('from-date').disabled = true; document.getElementById('to-date').disabled = true;
 </script>
 </body>
 </html>

@@ -2,13 +2,13 @@
 
 Ferlance is a business intelligence platform for African SMEs, initially focused on Ghana.
 
-This repository contains the first post-research MVP slice, aligned with Sprint 3:
+This repository contains the first post-research MVP slices, aligned with completed Sprint 3 and Sprint 4:
 
 ```text
 create account -> create business -> upload sales data -> validate and clean -> inspect dataset history
 ```
 
-The current slice focuses on reliable data ingestion. Revenue analytics, dashboards, predefined business questions, automated insights, LLM features, and RAG are follow-on slices.
+The current slice includes reliable ingestion, deterministic revenue analytics, and a filtered dashboard. Predefined business questions, automated insights, LLM features, and RAG are follow-on slices.
 
 For the authoritative implementation status, evidence, risks, and next done condition, see [MVP_PROGRESS.md](MVP_PROGRESS.md).
 
@@ -22,6 +22,8 @@ For the authoritative implementation status, evidence, risks, and next done cond
 - Preserve accepted records as normalized JSONL.
 - Record dataset status, row counts, warnings, and errors.
 - View dataset history for the authenticated business.
+- Read accepted normalized records for an uploaded dataset.
+- View filtered revenue, trend, product, customer, and KPI analytics.
 - Use the browser interface at the root URL.
 
 ## Run locally
@@ -73,6 +75,13 @@ curl http://127.0.0.1:8000/api/businesses/<BUSINESS_ID>/datasets \
 	-H 'Authorization: Bearer <ACCESS_TOKEN>'
 ```
 
+Read normalized records for a dataset:
+
+```bash
+curl http://127.0.0.1:8000/api/businesses/<BUSINESS_ID>/datasets/<DATASET_ID>/records \
+	-H 'Authorization: Bearer <ACCESS_TOKEN>'
+```
+
 The health endpoint is available at `GET /health`.
 
 ## Test
@@ -81,7 +90,7 @@ The health endpoint is available at `GET /health`.
 .venv/bin/pytest -q
 ```
 
-Supported uploads require date and amount/revenue columns. Optional columns include transaction ID, product, customer, and quantity. Invalid rows are rejected with warnings; the normalized JSONL output preserves accepted records without silently hiding the rejection counts.
+Supported uploads require date and amount/revenue columns. Optional columns include transaction ID, product, customer, and quantity. Invalid rows are rejected with warnings; the normalized JSONL output preserves accepted records without silently hiding the rejection counts. Uploads return `processed` when all rows are accepted, `partial` when some rows are rejected, and `failed` when no rows can be accepted.
 
 ## Dataset contract
 
@@ -96,7 +105,7 @@ Optional fields include transaction ID, product, customer, and quantity. Rows wi
 
 ## MVP roadmap
 
-1. **Sprint 3, ingestion:** authentication, business boundary, upload, validation, cleaning, storage, history, and useful errors.
+1. **Sprint 3, ingestion:** complete for the current MVP slice: authentication, business boundary, upload, validation, cleaning, storage, history, records, and useful errors.
 2. **Sprint 4, analytics:** revenue, trends, products, customers, conditional profit/inventory metrics, KPI cards, and date filters.
 3. **Sprint 5, insights:** deterministic summaries, anomaly detection, recommendations, and predefined business questions. Natural-language assistance follows the core product.
 4. **Sprint 6, pilot validation:** representative datasets, pilot businesses, usability testing, feedback, and critical bug fixes.
@@ -109,9 +118,10 @@ This is an MVP development foundation, not a production deployment:
 
 - Storage is local SQLite and filesystem storage.
 - The default signing secret is for development and must be replaced before deployment.
-- Logout/revocation, richer business profiles, upload limits, malformed XLSX handling, and stronger production security controls remain follow-up work.
-- Processed JSONL is currently an internal storage artifact; a stable read API will be added before analytics consumers depend on it.
-- The frontend is an ingestion workspace, not the final analytics dashboard.
+- Logout/revocation, richer business profiles, upload limits, and stronger production security controls remain follow-up work.
+- Processed JSONL remains an internal storage artifact; normalized records are exposed through the tenant-scoped dataset records API.
+- Profit and inventory analytics remain unavailable unless future input schemas provide the required source fields.
+- Predefined questions, automated insights, LLM features, and RAG remain future slices.
 
 ## Product principles
 
