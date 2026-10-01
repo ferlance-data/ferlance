@@ -3,6 +3,7 @@ from io import BytesIO
 
 from fastapi.testclient import TestClient
 from openpyxl import Workbook
+import jwt
 
 from backend import main
 
@@ -220,3 +221,65 @@ def test_analytics_is_tenant_scoped(tmp_path, monkeypatch):
     response = client.get(f"/api/businesses/{second_business}/analytics", headers=second_headers, params={"dataset_id": upload.json()["id"]})
 
     assert response.status_code == 404
+
+
+def test_jwt_session_refresh_logout_and_me_flow(tmp_path, monkeypatch):
+    monkeypatch.setattr(main, "DB_PATH", tmp_path / "test.sqlite3")
+    monkeypatch.setattr(main, "RAW_DIR", tmp_path / "raw")
+    monkeypatch.setattr(main, "PROCESSED_DIR", tmp_path / "processed")
+    main.RAW_DIR.mkdir()
+    main.PROCESSED_DIR.mkdir()
+    main.db.initialize(main.DB_PATH)
+    client = TestClient(main.app)
+
+    signup = client.post("/api/auth/signup", json={"email": " Owner@Example.com ", "password": "password123", "business_name": "Ama Retail"})
+    token = signup.json()["access_token"]
+    assert jwt.decode(token, main.SECRET_KEY, algorithms=["HS256"])["type"] == "access"
+    assert client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"}).status_code == 200
+
+    refreshed = client.post("/api/auth/refresh")
+    assert refreshed.status_code == 200
+    assert refreshed.json()["access_token"] != token
+    assert client.post("/api/auth/logout").json() == {"status": "signed_out"}
+    assert client.post("/api/auth/refresh").status_code == 401
+
+
+def test_auth_rejects_forged_and_expired_tokens(tmp_path, monkeypatch):
+    monkeypatch.setattr(main, "DB_PATH", tmp_path / "test.sqlite3")
+    monkeypatch.setattr(main, "RAW_DIR", tmp_path / "raw")
+    monkeypatch.setattr(main, "PROCESSED_DIR", tmp_path / "processed")
+    main.RAW_DIR.mkdir()
+    main.PROCESSED_DIR.mkdir()
+    main.db.initialize(main.DB_PATH)
+    client = TestClient(main.app)
+    forged = jwt.encode({"sub": "missing", "type": "access"}, "wrong", algorithm="HS256")
+    expired = jwt.encode({"sub": "missing", "type": "access", "exp": 1}, main.SECRET_KEY, algorithm="HS256")
+
+    assert client.get("/api/auth/me", headers={"Authorization": f"Bearer {forged}"}).status_code == 401
+    assert client.get("/api/auth/me", headers={"Authorization": f"Bearer {expired}"}).status_code == 401
+
+
+def test_insights_and_predefined_questions_are_tenant_scoped(tmp_path, monkeypatch):
+    monkeypatch.setattr(main, "DB_PATH", tmp_path / "test.sqlite3")
+    monkeypatch.setattr(main, "RAW_DIR", tmp_path / "raw")
+    monkeypatch.setattr(main, "PROCESSED_DIR", tmp_path / "processed")
+    main.RAW_DIR.mkdir()
+    main.PROCESSED_DIR.mkdir()
+    main.db.initialize(main.DB_PATH)
+    client = TestClient(main.app)
+    signup = client.post("/api/auth/signup", json={"email": "insights@example.com", "password": "password123", "business_name": "Ama Retail"})
+    headers = {"Authorization": f"Bearer {signup.json()['access_token']}"}
+    business_id = signup.json()["business"]["id"]
+    fixture = Path(__file__).parent / "fixtures" / "valid_sales.csv"
+    upload = client.post(f"/api/businesses/{business_id}/datasets", headers=headers, files={"file": ("sales.csv", fixture.read_bytes(), "text/csv")})
+    dataset_id = upload.json()["id"]
+
+    insights = client.get(f"/api/businesses/{business_id}/insights", headers=headers, params={"dataset_id": dataset_id})
+    question = client.get(f"/api/businesses/{business_id}/questions/best-products", headers=headers, params={"dataset_id": dataset_id})
+    unknown = client.get(f"/api/businesses/{business_id}/questions/unknown", headers=headers)
+
+    assert insights.status_code == 200
+    assert insights.json()["dataset"]["id"] == dataset_id
+    assert question.status_code == 200
+    assert question.json()["answer"][0]["product"] == "Rice"
+    assert unknown.status_code == 404

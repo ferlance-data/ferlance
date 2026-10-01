@@ -8,7 +8,7 @@ This repository contains the first post-research MVP slices, aligned with comple
 create account -> create business -> upload sales data -> validate and clean -> inspect dataset history
 ```
 
-The current slice includes reliable ingestion, deterministic revenue analytics, and a filtered dashboard. Predefined business questions, automated insights, LLM features, and RAG are follow-on slices.
+The current slice includes JWT-backed authentication, a public landing page, a protected responsive app shell, reliable ingestion, deterministic revenue analytics, grounded insights, and predefined business questions. LLM features and RAG remain follow-on slices.
 
 For the authoritative implementation status, evidence, risks, and next done condition, see [MVP_PROGRESS.md](MVP_PROGRESS.md).
 
@@ -24,6 +24,7 @@ For the authoritative implementation status, evidence, risks, and next done cond
 - View dataset history for the authenticated business.
 - Read accepted normalized records for an uploaded dataset.
 - View filtered revenue, trend, product, customer, and KPI analytics.
+- View grounded comparison insights and six predefined business questions.
 - Use the browser interface at the root URL.
 
 ## Run locally
@@ -35,6 +36,8 @@ python3 -m venv .venv
 ```
 
 Open http://127.0.0.1:8000.
+
+The public landing page is at `/`; authenticated workspaces run at `/app`. Access tokens are short-lived JWTs held in the app session, while refresh sessions are rotated and revoked server-side through an HttpOnly cookie.
 
 The service uses SQLite metadata and local files under `data/` by default. Set `FERLANCE_DATA_DIR` to change the storage directory.
 
@@ -118,10 +121,10 @@ This is an MVP development foundation, not a production deployment:
 
 - Storage is local SQLite and filesystem storage.
 - The default signing secret is for development and must be replaced before deployment.
-- Logout/revocation, richer business profiles, upload limits, and stronger production security controls remain follow-up work.
+- Richer business profiles, roles, audit logging, and stronger production deployment controls remain follow-up work; logout and refresh-session revocation are implemented.
 - Processed JSONL remains an internal storage artifact; normalized records are exposed through the tenant-scoped dataset records API.
 - Profit and inventory analytics remain unavailable unless future input schemas provide the required source fields.
-- Predefined questions, automated insights, LLM features, and RAG remain future slices.
+- LLM features and RAG remain future slices; deterministic metrics and insights are the current source of truth.
 
 ## Product principles
 
