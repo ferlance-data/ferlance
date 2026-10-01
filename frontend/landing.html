@@ -4,53 +4,21 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Ferlance | Business clarity from your records</title>
-  <style>
-    :root { color-scheme: light; font-family: Georgia, 'Times New Roman', serif; color: #19352d; background: #f1eee5; }
-    * { box-sizing: border-box; }
-    body { margin: 0; min-height: 100vh; background: radial-gradient(circle at 80% 12%, #d9e7d6 0 18%, transparent 40%), #f1eee5; }
-    main { width: min(1120px, calc(100% - 40px)); margin: 0 auto; padding: 28px 0 72px; }
-    nav { display: flex; justify-content: space-between; align-items: center; font: 700 .8rem/1.2 system-ui, sans-serif; letter-spacing: .1em; text-transform: uppercase; }
-    .brand { color: #235b49; }
-    .hero { min-height: 62vh; display: grid; grid-template-columns: 1.2fr .8fr; align-items: center; gap: 64px; padding: 72px 0 54px; }
-    h1 { max-width: 720px; margin: 0; font-size: clamp(3.2rem, 8vw, 7rem); line-height: .9; font-weight: 500; letter-spacing: 0; }
-    .lede { max-width: 430px; font: 1.1rem/1.55 system-ui, sans-serif; color: #405b50; }
-    .auth-panel { background: #fffdf8; border: 1px solid #c8d0c4; padding: 24px; box-shadow: 10px 10px 0 #d9e1d3; }
-    .tabs { display: flex; gap: 18px; border-bottom: 1px solid #c8d0c4; margin-bottom: 20px; }
-    .tabs button { border: 0; border-bottom: 3px solid transparent; background: transparent; color: #235b49; padding: 8px 0; cursor: pointer; font-weight: 700; }
-    .tabs button.active { border-bottom-color: #235b49; }
-    form { display: grid; gap: 13px; }
-    label { display: grid; gap: 7px; font: 700 .75rem/1.2 system-ui, sans-serif; text-transform: uppercase; letter-spacing: .08em; }
-    input, button { font: 1rem system-ui, sans-serif; border: 1px solid #829486; padding: 12px 14px; background: #fffdf8; }
-    form button { background: #235b49; color: #fffdf8; border-color: #235b49; cursor: pointer; font-weight: 700; }
-    .status { min-height: 24px; font: .9rem/1.4 system-ui, sans-serif; }
-    .error { color: #a22e28; }
-    .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; border-top: 1px solid #aab8aa; padding-top: 24px; }
-    .features h2 { margin: 0 0 8px; font-size: 1.2rem; }
-    .features p { margin: 0; font: .92rem/1.5 system-ui, sans-serif; color: #52695e; }
-    @media (max-width: 760px) { main { width: min(100% - 24px, 1120px); } .hero { grid-template-columns: 1fr; gap: 30px; padding-top: 48px; } .features { grid-template-columns: 1fr; } }
-  </style>
+  <link rel="stylesheet" href="/assets/styles.css">
 </head>
 <body>
-<main>
-  <nav><span class="brand">Ferlance</span><span>Business intelligence for growing businesses</span></nav>
-  <section class="hero">
-    <div><h1>See what your records are telling you.</h1><p class="lede">Upload the sales file you already have. Ferlance turns it into clear performance signals, useful comparisons, and grounded next steps.</p></div>
-    <div class="auth-panel">
-      <div class="tabs"><button id="login-tab" class="active" type="button">Sign in</button><button id="signup-tab" type="button">Create workspace</button></div>
-      <form id="login-form"><label>Email<input name="email" type="email" required autocomplete="email"></label><label>Password<input name="password" type="password" required autocomplete="current-password"></label><button>Sign in</button><div id="login-status" class="status"></div></form>
-      <form id="signup-form" hidden><label>Email<input name="email" type="email" required autocomplete="email"></label><label>Password<input name="password" type="password" minlength="8" required autocomplete="new-password"></label><label>Business name<input name="business_name" required maxlength="120" autocomplete="organization"></label><button>Create workspace</button><div id="signup-status" class="status"></div></form>
-    </div>
-  </section>
-  <section class="features"><article><h2>One clear workspace</h2><p>Keep uploads, processing status, and business performance together.</p></article><article><h2>Trust the numbers</h2><p>Deterministic metrics show exactly what the accepted records support.</p></article><article><h2>Start where you are</h2><p>Bring a CSV or Excel sales file and build from the data already in your business.</p></article></section>
-</main>
-<script>
-const api = async (path, options = {}) => { const response = await fetch(path, { ...options, headers: { 'Content-Type': 'application/json', ...(options.headers || {}) } }); const body = await response.json().catch(() => ({})); if (!response.ok) throw new Error(body.detail || 'Request failed'); return body; };
-const show = (id, message, error = false) => { const element = document.getElementById(id); element.textContent = message; element.className = `status${error ? ' error' : ''}`; };
-const redirect = () => { window.location.href = '/app'; };
-document.getElementById('login-tab').onclick = () => { document.getElementById('login-form').hidden = false; document.getElementById('signup-form').hidden = true; document.getElementById('login-tab').className = 'active'; document.getElementById('signup-tab').className = ''; };
-document.getElementById('signup-tab').onclick = () => { document.getElementById('login-form').hidden = true; document.getElementById('signup-form').hidden = false; document.getElementById('login-tab').className = ''; document.getElementById('signup-tab').className = 'active'; };
-document.getElementById('login-form').onsubmit = async event => { event.preventDefault(); show('login-status', 'Signing in...'); const form = new FormData(event.target); try { await api('/api/auth/login', { method: 'POST', body: JSON.stringify({ email: form.get('email'), password: form.get('password') }) }); redirect(); } catch (error) { show('login-status', error.message, true); } };
-document.getElementById('signup-form').onsubmit = async event => { event.preventDefault(); show('signup-status', 'Creating your workspace...'); const form = new FormData(event.target); try { await api('/api/auth/signup', { method: 'POST', body: JSON.stringify({ email: form.get('email'), password: form.get('password'), business_name: form.get('business_name') }) }); redirect(); } catch (error) { show('signup-status', error.message, true); } };
-</script>
+  <main class="public-page">
+    <nav class="public-nav"><span class="brand">Ferlance</span><span>Business intelligence for growing businesses</span></nav>
+    <section class="hero">
+      <div><h1>See what your records are telling you.</h1><p class="lede">Bring the sales file you already have. Ferlance turns it into clear performance signals, useful comparisons, and grounded next steps.</p></div>
+      <div class="auth-card">
+        <div class="tabs" role="tablist"><button class="tab active" id="login-tab" role="tab" aria-selected="true" type="button">Sign in</button><button class="tab" id="signup-tab" role="tab" aria-selected="false" type="button">Create workspace</button></div>
+        <form class="form-stack" id="login-form"><label>Email<input name="email" type="email" required autocomplete="email"></label><label>Password<input name="password" type="password" required autocomplete="current-password"></label><button>Sign in</button><div class="form-status" id="login-status" role="status" aria-live="polite"></div></form>
+        <form class="form-stack" id="signup-form" hidden><label>Email<input name="email" type="email" required autocomplete="email"></label><label>Password<input name="password" type="password" minlength="8" required autocomplete="new-password"></label><label>Business name<input name="business_name" required maxlength="120" autocomplete="organization"></label><button>Create workspace</button><div class="form-status" id="signup-status" role="status" aria-live="polite"></div></form>
+      </div>
+    </section>
+    <section class="feature-strip"><article><h2>One clear workspace</h2><p>Keep uploads, processing status, and business performance together.</p></article><article><h2>Trust the numbers</h2><p>Deterministic metrics show exactly what the accepted records support.</p></article><article><h2>Start where you are</h2><p>Bring a CSV or Excel sales file and build from the data already in your business.</p></article></section>
+  </main>
+  <script type="module" src="/assets/landing.js"></script>
 </body>
 </html>

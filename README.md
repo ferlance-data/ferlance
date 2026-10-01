@@ -45,11 +45,13 @@ The service uses SQLite metadata and local files under `data/` by default. Set `
 
 ```text
 backend/             FastAPI application, SQLite persistence, security, and processing
-frontend/            Minimal onboarding and upload interface
+frontend/            Structured landing page, authenticated app shell, and shared assets
 tests/               API and processor tests
 tests/fixtures/      Valid and invalid representative CSV files
 data/                Local SQLite, raw uploads, and processed output
 ```
+
+The frontend is a dependency-free structured client: `frontend/landing.html` is the public entry page, `frontend/index.html` is the authenticated app shell, and shared behavior/styles live under `frontend/assets/`.
 
 The application creates SQLite metadata, raw uploads, and processed JSONL files on startup. Local runtime data is ignored by Git.
 

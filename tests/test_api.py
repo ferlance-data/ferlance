@@ -42,6 +42,25 @@ def test_signup_upload_and_history_are_tenant_scoped(tmp_path, monkeypatch):
     assert forbidden.status_code == 404
 
 
+def test_public_and_app_pages_serve_structured_frontend(tmp_path, monkeypatch):
+    monkeypatch.setattr(main, "DB_PATH", tmp_path / "test.sqlite3")
+    monkeypatch.setattr(main, "RAW_DIR", tmp_path / "raw")
+    monkeypatch.setattr(main, "PROCESSED_DIR", tmp_path / "processed")
+    main.RAW_DIR.mkdir()
+    main.PROCESSED_DIR.mkdir()
+    main.db.initialize(main.DB_PATH)
+    client = TestClient(main.app)
+
+    landing = client.get("/")
+    app_shell = client.get("/app")
+    styles = client.get("/assets/styles.css")
+
+    assert "Business clarity from your records" in landing.text
+    assert "Ferlance | Workspace" in app_shell.text
+    assert styles.status_code == 200
+    assert ".app-nav" in styles.text
+
+
 def test_upload_rejects_unsupported_type(tmp_path, monkeypatch):
     monkeypatch.setattr(main, "DB_PATH", tmp_path / "test.sqlite3")
     monkeypatch.setattr(main, "RAW_DIR", tmp_path / "raw")

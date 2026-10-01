@@ -6,6 +6,7 @@ from pathlib import Path
 
 from fastapi import Cookie, Depends, FastAPI, File, Header, HTTPException, Query, Response, UploadFile
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import db
@@ -18,6 +19,7 @@ from .security import create_access_token, create_refresh_token, hash_password, 
 ensure_storage()
 db.initialize(DB_PATH)
 app = FastAPI(title="Ferlance MVP", version="0.1.0")
+app.mount("/assets", StaticFiles(directory=Path(__file__).parent.parent / "frontend" / "assets"), name="assets")
 DATASET_FIELDS = (
     "id",
     "filename",
