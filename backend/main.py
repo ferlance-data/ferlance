@@ -15,6 +15,7 @@ from .config import ADMIN_EMAILS, COOKIE_SECURE, DB_PATH, MAX_UPLOAD_BYTES, PROC
 from .insights import QUESTION_NAMES, answer_question, generate_insights
 from .llm import ask_lance
 from .processor import process_file
+from .rag import all_records, context as rag_context
 from .security import create_access_token, create_refresh_token, hash_password, read_access_token, token_hash, verify_password
 
 ensure_storage()
@@ -333,12 +334,15 @@ def ask_lance_question(
 ) -> dict:
     if from_date and to_date and from_date > to_date:
         raise HTTPException(400, "The from date must be on or before the to date.")
-    dataset, records = selected_records(business_id, dataset_id, user)
+    business_for_user(business_id, user)
+    datasets = db.many(DB_PATH, "SELECT * FROM datasets WHERE business_id = ? AND status != 'failed' ORDER BY created_at DESC", (business_id,))
+    if not datasets:
+        raise HTTPException(404, "No accepted business data is available for Lance.")
+    dataset = next((item for item in datasets if item["id"] == dataset_id), datasets[0])
+    records = all_records(datasets)
     conversation = db.one(DB_PATH, "SELECT * FROM chat_conversations WHERE id = ? AND business_id = ? AND user_id = ?", (payload.conversation_id or "", business_id, user["id"])) if payload.conversation_id else None
     if payload.conversation_id and not conversation:
         raise HTTPException(404, "Conversation not found.")
-    if conversation and conversation["dataset_id"] != dataset["id"]:
-        raise HTTPException(409, "This conversation belongs to a different dataset.")
     if not conversation:
         conversation_id = str(uuid.uuid4())
         timestamp = db.now()
@@ -346,7 +350,7 @@ def ask_lance_question(
         conversation = db.one(DB_PATH, "SELECT * FROM chat_conversations WHERE id = ?", (conversation_id,))
     history = db.many(DB_PATH, "SELECT role, content FROM chat_messages WHERE conversation_id = ? ORDER BY created_at LIMIT 12", (conversation["id"],))
     snapshot = analyze(records, from_date, to_date)
-    snapshot.pop("dataset", None)
+    snapshot = rag_context(DB_PATH, business_id, payload.question.strip(), datasets, from_date, to_date, snapshot)
     try:
         answer = ask_lance(payload.question.strip(), snapshot, history)
     except RuntimeError as error:
@@ -355,7 +359,7 @@ def ask_lance_question(
     db.insert(DB_PATH, "INSERT INTO chat_messages VALUES (?, ?, ?, ?, ?)", (str(uuid.uuid4()), conversation["id"], "user", payload.question.strip(), timestamp))
     db.insert(DB_PATH, "INSERT INTO chat_messages VALUES (?, ?, ?, ?, ?)", (str(uuid.uuid4()), conversation["id"], "assistant", answer, db.now()))
     db.insert(DB_PATH, "UPDATE chat_conversations SET updated_at = ? WHERE id = ?", (db.now(), conversation["id"]))
-    return {"conversation_id": conversation["id"], "answer": answer, "question": payload.question.strip(), "period": snapshot["period"], "dataset": dataset_response(dataset)}
+    return {"conversation_id": conversation["id"], "answer": answer, "question": payload.question.strip(), "period": snapshot["analytics"]["period"], "dataset": dataset_response(dataset), "scope": snapshot["scope"], "datasets_considered": len(datasets)}
 
 
 @app.get("/api/businesses/{business_id}/ask-lance/conversations")

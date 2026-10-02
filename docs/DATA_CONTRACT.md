@@ -84,6 +84,7 @@ Actual-versus-budget files can include both `budgeted_cost_usd` and `actual_cost
 - Accepted date formats are `YYYY-MM-DD`, `DD/MM/YYYY`, `MM/DD/YYYY`, and `YYYY/MM/DD`.
 - XLSX files use the first worksheet and the first row as headers.
 - CSV files should be UTF-8; UTF-8 BOM files are supported.
+- A date is strongly recommended for transaction, cost, procurement, and budget rows because trends and cross-dataset comparisons must be time-grounded. The universal engine retains date-less records such as manufacturing BOM lines, but downstream time-based analytics cannot use them. Add an `effective_date` column when a BOM needs temporal analysis; Ferlance does not fabricate dates.
 
 ## What the metrics can use
 
@@ -105,11 +106,15 @@ The workspace dashboard provides product rankings that can be switched between:
 
 Profit and loss rankings are shown only when every product record in the selected period has a recognized cost. This prevents the system from treating missing cost as zero profit. The ranking compares the complete available picture, such as revenue, transactions, units, cost, gross profit, and margin, rather than declaring a winner from revenue alone.
 
-Ask Lance uses the same calculated snapshot as the dashboard. It sends the user's question and structured metrics to Groq, not the raw uploaded file. Add the key to the local `.env` file and restart the server:
+Ask Lance uses the same calculated snapshot as the dashboard. It sends the user's question and structured metrics to OpenRouter, not the raw uploaded file. Add the key to the local `.env` file and restart the server:
 
 ```dotenv
-GROQ_API_KEY=your_groq_api_key_here
-GROQ_MODEL=openai/gpt-oss-20b
+OPENROUTER_KEY=your_openrouter_key_here
+OPENROUTER_MODEL=deepseek/deepseek-v4.1-flash
+OPENROUTER_URL=https://openrouter.ai/api/v1/chat/completions
+OPENROUTER_MODELS=inclusionai/ling-3.1-flash,openai/gpt-oss-20b,upstage/solar-mini4,allam-2-7b,openai/gpt-oss-120b
+OPENROUTER_MAX_TOKENS=800
+OPENROUTER_TIMEOUT_SECONDS=8
 ```
 
 Without a configured key, Ask Lance reports that it is unavailable; deterministic dashboard metrics continue to work. Lance is instructed to stay grounded in the supplied metrics and to identify unavailable data instead of inventing it.
@@ -122,7 +127,9 @@ Conversation API endpoints:
 - `GET /api/businesses/{business_id}/ask-lance/conversations` lists the signed-in user's saved conversations.
 - `GET /api/businesses/{business_id}/ask-lance/conversations/{conversation_id}` returns one conversation and its ordered messages.
 
-Conversation history is tenant-scoped and is never shared between businesses or users. The model receives the current calculated snapshot plus a limited recent message history; raw uploaded files are not sent to Groq.
+Conversation history is tenant-scoped and is never shared between businesses or users. Ask Lance now uses a business-wide retrieval-augmented generation (RAG) context: accepted rows from every processed dataset are indexed in a local SQLite FTS5 index, relevant rows are retrieved from that index, and aggregate analytics are calculated across all accepted business records. The model receives the calculated cross-dataset snapshot, retrieved evidence, and a limited recent message history; raw uploaded files are not sent to OpenRouter.
+
+The selected dataset remains an anchor for the conversation label and date filters, but it no longer limits Lance's knowledge. A question can compare sales, costs, budgets, procurement, and other processed data belonging to the same business. RAG retrieval is rebuilt automatically for datasets that are not yet indexed, so existing uploads become available without re-uploading them.
 
 ## Upload status
 

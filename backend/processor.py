@@ -113,6 +113,9 @@ def process_file(path: Path, extension: str) -> ProcessingResult:
                 "transaction_date": _date(source.get(columns["transaction_date"])),
                 "amount": _number(source.get(columns["amount"])) if "amount" in columns and source.get(columns["amount"]) not in (None, "") else 0.0,
             }
+            financial_headers = [columns[field] for field in FINANCIAL_ALIASES if field in columns]
+            if any("usd" in _key(header) for header in financial_headers):
+                output["currency"] = "USD"
             if "cost" in columns and source.get(columns["cost"]) not in (None, ""):
                 output["cost"] = _number(source.get(columns["cost"]))
             for field in OPTIONAL_ALIASES:

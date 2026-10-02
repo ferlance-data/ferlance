@@ -327,6 +327,40 @@ def test_ask_lance_saves_two_way_conversation_history(tmp_path, monkeypatch):
     assert forbidden.status_code == 404
 
 
+def test_ask_lance_retrieves_across_all_business_datasets(tmp_path, monkeypatch):
+    monkeypatch.setattr(main, "DB_PATH", tmp_path / "test.sqlite3")
+    monkeypatch.setattr(main, "RAW_DIR", tmp_path / "raw")
+    monkeypatch.setattr(main, "PROCESSED_DIR", tmp_path / "processed")
+    main.RAW_DIR.mkdir()
+    main.PROCESSED_DIR.mkdir()
+    main.db.initialize(main.DB_PATH)
+    captured = {}
+
+    def fake_lance(question, snapshot, history):
+        captured["snapshot"] = snapshot
+        return "Cross-dataset answer"
+
+    monkeypatch.setattr(main, "ask_lance", fake_lance)
+    client = TestClient(main.app)
+    signup = client.post("/api/auth/signup", json={"email": "rag@example.com", "password": "password123", "business_name": "Ama Retail"})
+    headers = {"Authorization": f"Bearer {signup.json()['access_token']}"}
+    business_id = signup.json()["business"]["id"]
+    first = client.post(f"/api/businesses/{business_id}/datasets", headers=headers, files={"file": ("sales.csv", b"date,amount,product\n2026-01-01,100,Rice\n", "text/csv")})
+    second = client.post(f"/api/businesses/{business_id}/datasets", headers=headers, files={"file": ("cost.csv", b"date,cost,project_name\n2026-01-02,40,Store renovation\n", "text/csv")})
+    assert first.json()["status"] == "processed"
+    assert second.json()["status"] == "processed"
+
+    response = client.post(f"/api/businesses/{business_id}/ask-lance", headers=headers, params={"dataset_id": first.json()["id"]}, json={"question": "What do we know about renovation and rice?"})
+
+    assert response.status_code == 200
+    assert response.json()["datasets_considered"] == 2
+    assert captured["snapshot"]["scope"] == "all accepted records across this business"
+    assert captured["snapshot"]["analytics"]["revenue"]["total"] == 100.0
+    evidence = " ".join(item["evidence"] for item in captured["snapshot"]["retrieved_evidence"])
+    assert "renovation" in evidence.lower()
+    assert "rice" in evidence.lower()
+
+
 def test_auth_rejects_forged_and_expired_tokens(tmp_path, monkeypatch):
     monkeypatch.setattr(main, "DB_PATH", tmp_path / "test.sqlite3")
     monkeypatch.setattr(main, "RAW_DIR", tmp_path / "raw")

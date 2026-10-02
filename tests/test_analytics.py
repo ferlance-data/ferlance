@@ -60,6 +60,19 @@ def test_product_rankings_compare_transactions_and_profit():
     assert result["products"]["rankings"]["profit"][0]["gross_profit"] == 200.0
 
 
+def test_cost_records_use_cost_as_primary_metric_and_filter_dates():
+    result = analyze([
+        {"transaction_date": "2026-01-01", "amount": 0.0, "cost": 100.0, "product": "Cloud"},
+        {"transaction_date": "2026-02-01", "amount": 0.0, "cost": 250.0, "product": "Cloud"},
+    ], date(2026, 2, 1), date(2026, 2, 1))
+
+    assert result["profile"]["domain"] == "cost"
+    assert result["summary"] == "Costs recorded GHS 250.00 across 1 records."
+    assert result["kpis"]["primary_label"] == "Total cost"
+    assert result["kpis"]["primary_value"] == 250.0
+    assert result["products"]["items"][0]["metric_value"] == 250.0
+
+
 def test_analyze_exposes_costs_and_gross_profit():
     result = analyze([{"transaction_date": "2026-01-01", "amount": 250.0, "cost": 80.0}])
 

@@ -70,4 +70,4 @@ def test_cost_file_aliases_are_accepted_without_becoming_revenue(tmp_path):
     result = process_file(path, ".csv")
 
     assert result.rejected_rows == 0
-    assert result.rows == [{"transaction_date": "2026-01-02", "amount": 0.0, "cost": 125.5, "transaction_id": "PO-1", "customer": "Vendor", "quantity": 2.0}]
+    assert result.rows == [{"transaction_date": "2026-01-02", "amount": 0.0, "currency": "USD", "cost": 125.5, "transaction_id": "PO-1", "customer": "Vendor", "quantity": 2.0}]

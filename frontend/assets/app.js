@@ -9,7 +9,7 @@ const pages = {
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 const cell = (tag, text) => { const element = document.createElement(tag); element.textContent = text; return element; };
-const money = (value) => new Intl.NumberFormat('en-GH', { style: 'currency', currency: 'GHS', currencyDisplay: 'narrowSymbol', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value));
+const money = (value, currency = state.currency || 'GHS') => new Intl.NumberFormat(currency === 'USD' ? 'en-US' : 'en-GH', { style: 'currency', currency, currencyDisplay: 'narrowSymbol', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value));
 const status = (selector, message, error = false) => { const element = $(selector); element.textContent = message; element.className = `${element.className.replace(' error', '')}${error ? ' error' : ''}`; };
 
 async function request(path, options = {}) {
@@ -41,11 +41,11 @@ function createTable(headers, rows) {
   return table;
 }
 
-function renderChart(items) {
+function renderChart(items, valueKey = 'revenue') {
   const target = $('#trend'); target.replaceChildren();
   if (!items.length) { target.append(cell('p', 'No data for this period.')); return; }
-  const max = Math.max(...items.map((item) => item.revenue)); const chart = document.createElement('div'); chart.className = 'chart';
-  items.forEach((item) => { const row = document.createElement('div'); row.className = 'bar-row'; row.append(cell('span', item.period)); const track = document.createElement('div'); track.className = 'bar-track'; const bar = document.createElement('div'); bar.className = 'bar'; bar.style.width = `${max ? item.revenue / max * 100 : 0}%`; track.append(bar); row.append(track, cell('span', money(item.revenue))); chart.append(row); }); target.append(chart);
+  const max = Math.max(...items.map((item) => item[valueKey])); const chart = document.createElement('div'); chart.className = 'chart';
+  items.forEach((item) => { const value = item[valueKey]; const row = document.createElement('div'); row.className = 'bar-row'; row.append(cell('span', item.period)); const track = document.createElement('div'); track.className = 'bar-track'; const bar = document.createElement('div'); bar.className = 'bar'; bar.style.width = `${max ? value / max * 100 : 0}%`; track.append(bar); row.append(track, cell('span', money(value))); chart.append(row); }); target.append(chart);
 }
 
 function renderProducts(products) {
@@ -53,16 +53,26 @@ function renderProducts(products) {
   if (!products.available) { target.append(cell('p', products.reason)); return; }
   const ranking = $('#product-ranking').value; const items = products.rankings[ranking] || [];
   if (!items.length) { target.append(cell('p', ranking === 'profit' || ranking === 'loss' ? 'Profit rankings need cost data on every product record.' : 'No products match this ranking.')); return; }
-  const rows = items.map((item) => [item.product, money(item.revenue), item.transactions, item.units_sold ?? 'Unavailable', products.profit_available ? money(item.gross_profit) : 'Unavailable']);
-  target.append(createTable(['Product', 'Revenue', 'Transactions', 'Units', 'Gross profit'], rows));
+  const rows = items.map((item) => [item.product, money(item.metric_value ?? item.revenue), item.transactions, item.units_sold ?? 'Unavailable', products.profit_available ? money(item.gross_profit) : 'Unavailable']);
+  target.append(createTable(['Product', products.metric_label || 'Revenue', 'Transactions', 'Units', 'Gross profit'], rows));
+}
+
+function configureDomainView(result) {
+  const isCost = result.profile?.domain === 'cost';
+  $('#trend-title').textContent = isCost ? 'Cost trend' : 'Revenue trend';
+  $('#products-title').textContent = isCost ? 'Project / item rankings' : 'Product rankings';
+  $('#customers-title').textContent = isCost ? 'Vendors / providers' : 'Customers';
+  const ranking = $('#product-ranking');
+  ranking.querySelector('option[value="revenue"]').textContent = isCost ? 'Most cost' : 'Most revenue';
+  ranking.querySelector('option[value="transactions"]').textContent = isCost ? 'Most records' : 'Most transactions';
 }
 
 function selectedDataset() { return $('#dataset-select').value; }
 function filterParams() {
-  const params = new URLSearchParams({ dataset_id: selectedDataset() }); const preset = $('#date-preset').value; const today = new Date(); const iso = (value) => value.toISOString().slice(0, 10);
-  if (preset === 'today') { params.set('from', iso(today)); params.set('to', iso(today)); }
-  if (preset === '7' || preset === '30') { const start = new Date(today); start.setDate(start.getDate() - Number(preset) + 1); params.set('from', iso(start)); params.set('to', iso(today)); }
-  if (preset === 'quarter') { params.set('from', iso(new Date(today.getFullYear(), Math.floor(today.getMonth() / 3) * 3, 1))); params.set('to', iso(today)); }
+  const params = new URLSearchParams(); const selected = selectedDataset(); if (selected) params.set('dataset_id', selected); const preset = $('#date-preset').value; const bounds = state.datasetBounds || {}; const end = bounds.to ? new Date(`${bounds.to}T00:00:00`) : new Date(); const iso = (value) => value.toISOString().slice(0, 10);
+  if (preset === 'today') { params.set('from', iso(end)); params.set('to', iso(end)); }
+  if (preset === '7' || preset === '30') { const start = new Date(end); start.setDate(start.getDate() - Number(preset) + 1); params.set('from', iso(start)); params.set('to', iso(end)); }
+  if (preset === 'quarter') { params.set('from', iso(new Date(end.getFullYear(), Math.floor(end.getMonth() / 3) * 3, 1))); params.set('to', iso(end)); }
   if (preset === 'custom') { if ($('#from-date').value) params.set('from', $('#from-date').value); if ($('#to-date').value) params.set('to', $('#to-date').value); }
   return params;
 }
@@ -72,12 +82,16 @@ async function loadDashboard() {
   status('#dashboard-status', 'Calculating metrics...');
   const result = await request(`/api/businesses/${state.businessId}/analytics?${filterParams()}`);
   state.lastAnalytics = result;
+  state.currency = result.currency || 'GHS';
+  state.datasetBounds = result.available_period;
+  configureDomainView(result);
   status('#dashboard-status', `${result.dataset.filename} · ${result.period.from || 'all dates'} to ${result.period.to || 'all dates'}`);
   $('#summary').replaceChildren(cell('p', result.summary)); $('#dashboard-warnings').replaceChildren(...result.warnings.map((warning) => { const item = cell('div', warning); item.className = 'warning'; return item; }));
-  $('#kpis').replaceChildren(...[['Total revenue', money(result.kpis.total_revenue)], ['Transactions', result.kpis.transactions], ['Average sale', money(result.kpis.average_sale)], ['Top product', result.kpis.top_product || 'Unavailable']].map(([label, value]) => { const card = document.createElement('div'); card.className = 'kpi'; card.append(cell('span', label), cell('strong', value)); return card; }));
-  renderChart(result.trend.daily); renderProducts(result.products);
-  if (result.customers.available) renderTable($('#customers'), ['Customer', 'Revenue', 'Transactions'], result.customers.top_customers.map((item) => [item.customer, money(item.revenue), item.transactions])); else $('#customers').replaceChildren(cell('p', result.customers.reason));
-  $('#conditional').replaceChildren(cell('p', result.profit.available ? `Gross profit is ${money(result.profit.gross_profit)} after ${money(result.profit.cost)} in costs.` : result.profit.reason), cell('p', result.inventory.reason));
+  const isCost = result.profile?.domain === 'cost'; const primaryLabel = result.kpis.primary_label || 'Total revenue'; const primaryValue = result.kpis.primary_value ?? result.kpis.total_revenue; const cards = [[primaryLabel, money(primaryValue)], ['Records', result.kpis.transactions], [isCost ? 'Average cost record' : 'Average sale', money(isCost ? (result.kpis.total_cost / (result.kpis.transactions || 1)) : result.kpis.average_sale)], ['Top project / item', result.kpis.top_product || 'Unavailable']];
+  $('#kpis').replaceChildren(...cards.map(([label, value]) => { const card = document.createElement('div'); card.className = 'kpi'; card.append(cell('span', label), cell('strong', value)); return card; }));
+  const trend = result.profile?.domain === 'cost' ? result.trend.cost_daily : result.trend.daily; renderChart(trend, result.profile?.domain === 'cost' ? 'cost' : 'revenue'); renderProducts(result.products);
+  if (result.customers.available) renderTable($('#customers'), ['Customer', result.profile?.domain === 'cost' ? 'Cost' : 'Revenue', 'Records'], result.customers.top_customers.map((item) => [item.customer, money(item.metric_value ?? item.revenue), item.transactions])); else $('#customers').replaceChildren(cell('p', result.customers.reason));
+  $('#conditional').replaceChildren(cell('p', result.profit.available ? `Gross profit is ${money(result.profit.gross_profit)} after ${money(result.profit.cost)} in costs.` : result.profile?.domain === 'cost' ? `Recorded costs total ${money(result.kpis.total_cost)}. Revenue is not present in this dataset, so profit cannot be calculated.` : result.profit.reason), cell('p', result.inventory.reason));
 }
 
 async function loadInsights() {
@@ -104,10 +118,12 @@ function renderQuestionAnswer(result) {
 }
 
 async function askLance() {
-  if (!selectedDataset()) { status('#ask-status', 'Select a processed dataset first.', true); return; }
-  status('#ask-status', 'Lance is analyzing the selected records...');
+  if (!state.datasets.length) { status('#ask-status', 'Upload at least one processed business file first.', true); return; }
+  status('#ask-status', 'Lance is searching all business datasets and preparing an answer...');
   const question = $('#lance-question').value.trim(); if (!question) return;
-  try { const result = await request(`/api/businesses/${state.businessId}/ask-lance?${filterParams()}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question, conversation_id: state.conversationId }) }); state.conversationId = result.conversation_id; $('#lance-question').value = ''; renderMessage({ role: 'user', content: result.question }); renderMessage({ role: 'assistant', content: result.answer }); status('#ask-status', `${result.dataset.filename} · saved to conversation.`); await loadConversations(); } catch (error) { status('#ask-status', error.message, true); }
+  const submit = $('#ask-form button[type="submit"]'); submit.disabled = true;
+  const controller = new AbortController(); const timeout = window.setTimeout(() => controller.abort(), 50000);
+  try { const result = await request(`/api/businesses/${state.businessId}/ask-lance?${filterParams()}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question, conversation_id: state.conversationId }), signal: controller.signal }); state.conversationId = result.conversation_id; $('#lance-question').value = ''; renderMessage({ role: 'user', content: result.question }); renderMessage({ role: 'assistant', content: result.answer }); status('#ask-status', `${result.datasets_considered} business datasets searched · saved to conversation.`); await loadConversations(); } catch (error) { status('#ask-status', error.name === 'AbortError' ? 'Lance took too long to respond. Check the model configuration or try again.' : error.message, true); } finally { window.clearTimeout(timeout); submit.disabled = false; }
 }
 
 function renderMessage(message) {

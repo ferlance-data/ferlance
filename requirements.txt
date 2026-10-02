@@ -6,3 +6,5 @@ pytest==8.3.4
 httpx==0.28.1
 PyJWT==2.10.1
 python-dotenv==1.0.1
+pandas==2.2.3
+charset-normalizer==3.4.1

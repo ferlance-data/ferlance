@@ -8,7 +8,7 @@ This repository contains the first post-research MVP slices, aligned with comple
 create account -> create business -> upload sales data -> validate and clean -> inspect dataset history
 ```
 
-The current slice includes JWT-backed authentication, a public landing page, a protected responsive app shell, reliable ingestion, deterministic revenue analytics, grounded insights, and predefined business questions. LLM features and RAG remain follow-on slices.
+The current slice includes JWT-backed authentication, a public landing page, a protected responsive app shell, reliable ingestion, deterministic revenue analytics, grounded insights, predefined business questions, OpenRouter-backed Ask Lance, and business-wide RAG.
 
 For the authoritative implementation status, evidence, risks, and next done condition, see [MVP_PROGRESS.md](MVP_PROGRESS.md).
 
@@ -29,8 +29,10 @@ For the authoritative implementation status, evidence, risks, and next done cond
 - Use the browser interface at the root URL.
 - Accept flexible sales, operating cost, procurement, cloud cost, and budget headers; see [docs/DATA_CONTRACT.md](docs/DATA_CONTRACT.md).
 - Rank products by revenue, transaction count, profit, or loss when the required cost data is available.
-- Ask Lance can produce grounded natural-language summaries through Groq when `GROQ_API_KEY` is configured in `.env`.
+- Ask Lance can produce grounded natural-language summaries through OpenRouter when `OPENROUTER_KEY` is configured in `.env`.
 - Ask Lance supports saved, dataset-pinned conversations with follow-up questions and tenant-scoped history.
+- Ask Lance uses business-scoped RAG over accepted rows from all processed datasets, with SQLite FTS5 retrieval and cross-dataset analytics.
+- Use `backend.universal_ingestion.UniversalCSVIngestionEngine` for schema-flexible CSV ingestion across sales, costs, budgets, projections, payroll, procurement, and textual logs.
 
 ## Run locally
 
@@ -59,6 +61,8 @@ data/                Local SQLite, raw uploads, and processed output
 The frontend is a dependency-free structured client: `frontend/landing.html` is the public entry page, `frontend/index.html` is the authenticated app shell, and shared behavior/styles live under `frontend/assets/`.
 
 The application creates SQLite metadata, raw uploads, and processed JSONL files on startup. Local runtime data is ignored by Git.
+
+The universal ingestion engine returns typed records, row-level quarantine reasons, domain classification confidence, canonical mappings, checksum, encoding, delimiter, and schema metadata. See [docs/REUSABLE_PROMPTS.md](docs/REUSABLE_PROMPTS.md) for reusable engineering prompts.
 
 ## API walkthrough
 
@@ -100,7 +104,7 @@ The health endpoint is available at `GET /health`.
 .venv/bin/pytest -q
 ```
 
-Supported uploads require a recognized date and at least one recognized revenue or cost column. Optional columns include transaction ID, product or service, customer or supplier, and quantity. Cost-only files are retained as costs with zero revenue and can power gross-profit metrics without inflating sales. Invalid rows are rejected with warnings; the normalized JSONL output preserves accepted records without silently hiding the rejection counts. Uploads return `processed` when all rows are accepted, `partial` when some rows are rejected, and `failed` when no rows can be accepted. See [docs/DATA_CONTRACT.md](docs/DATA_CONTRACT.md) for the complete category-by-category contract and examples.
+The existing MVP upload path requires a recognized date and at least one recognized revenue or cost column. The standalone universal engine also supports date-less records such as BOM lines, while preserving the limitation that time-based analytics need dates. Optional columns include transaction ID, product or service, customer or supplier, and quantity. Cost-only files are retained as costs with zero revenue and can power gross-profit metrics without inflating sales. Invalid rows are rejected with warnings; the normalized JSONL output preserves accepted records without silently hiding the rejection counts. Uploads return `processed` when all rows are accepted, `partial` when some rows are rejected, and `failed` when no rows can be accepted. See [docs/DATA_CONTRACT.md](docs/DATA_CONTRACT.md) for the complete category-by-category contract and examples.
 
 ## Dataset contract
 
