@@ -61,3 +61,13 @@ def test_malformed_xlsx_is_a_controlled_error(tmp_path):
 
     assert result.rows == []
     assert result.errors == ["The XLSX file is malformed or unreadable."]
+
+
+def test_cost_file_aliases_are_accepted_without_becoming_revenue(tmp_path):
+    path = tmp_path / "costs.csv"
+    path.write_text("po_number,order_date,vendor_name,total_cost_usd,quantity\nPO-1,2026-01-02,Vendor,125.50,2\n", encoding="utf-8")
+
+    result = process_file(path, ".csv")
+
+    assert result.rejected_rows == 0
+    assert result.rows == [{"transaction_date": "2026-01-02", "amount": 0.0, "cost": 125.5, "transaction_id": "PO-1", "customer": "Vendor", "quantity": 2.0}]

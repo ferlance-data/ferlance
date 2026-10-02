@@ -23,27 +23,43 @@ def _product_metrics(records: list[dict[str, Any]]) -> dict[str, Any]:
     if not product_records:
         return {"available": False, "reason": "No product field is present in the accepted records."}
     quantity_available = all("quantity" in record for record in product_records)
+    cost_available = all("cost" in record for record in product_records)
     for record in product_records:
         name = record["product"]
-        item = products.setdefault(name, {"product": name, "revenue": 0.0, "units_sold": 0.0, "transactions": 0})
+        item = products.setdefault(name, {"product": name, "revenue": 0.0, "cost": 0.0, "units_sold": 0.0, "transactions": 0})
         item["revenue"] += record["amount"]
+        if cost_available:
+            item["cost"] += record["cost"]
         item["transactions"] += 1
         if quantity_available:
             item["units_sold"] += record["quantity"]
     items = []
     for item in products.values():
         item["revenue"] = round(item["revenue"], 2)
+        if cost_available:
+            item["cost"] = round(item["cost"], 2)
+            item["gross_profit"] = round(item["revenue"] - item["cost"], 2)
+            item["margin_pct"] = round(item["gross_profit"] / item["revenue"] * 100, 2) if item["revenue"] else 0.0
+        else:
+            item.pop("cost")
         if quantity_available:
             item["units_sold"] = int(item["units_sold"]) if item["units_sold"].is_integer() else round(item["units_sold"], 2)
         else:
-            item.pop("units_sold")
+            item.pop("units_sold", None)
         items.append(item)
     return {
         "available": True,
         "quantity_available": quantity_available,
+        "profit_available": cost_available,
         "items": sorted(items, key=lambda item: (-item["revenue"], item["product"])),
         "best_sellers": sorted(items, key=lambda item: (-item["revenue"], item["product"])),
         "worst_sellers": sorted(items, key=lambda item: (item["revenue"], item["product"])),
+        "rankings": {
+            "revenue": sorted(items, key=lambda item: (-item["revenue"], item["product"])),
+            "transactions": sorted(items, key=lambda item: (-item["transactions"], item["product"])),
+            "profit": sorted(items, key=lambda item: (-item["gross_profit"], item["product"])) if cost_available else [],
+            "loss": sorted([item for item in items if item.get("gross_profit", 0) < 0], key=lambda item: (item["gross_profit"], item["product"])) if cost_available else [],
+        },
     }
 
 
@@ -81,6 +97,7 @@ def analyze(records: list[dict[str, Any]], from_date: date | None = None, to_dat
         and (end is None or record["transaction_date"] <= end.isoformat())
     ]
     total = sum(record["amount"] for record in filtered)
+    costs = sum(record.get("cost", 0.0) for record in filtered)
     transactions = len(filtered)
     products = _product_metrics(filtered)
     top_product = products["items"][0]["product"] if products["available"] and products["items"] else None
@@ -102,7 +119,7 @@ def analyze(records: list[dict[str, Any]], from_date: date | None = None, to_dat
         },
         "products": products,
         "customers": _customer_metrics(filtered),
-        "profit": {"available": False, "reason": "Accepted records contain revenue but no cost or expense fields."},
+        "profit": {"available": bool(costs or any("cost" in record for record in filtered)), "revenue": round(total, 2), "cost": round(costs, 2), "gross_profit": round(total - costs, 2)} if any("cost" in record for record in filtered) else {"available": False, "reason": "Accepted records contain revenue but no cost or expense fields."},
         "inventory": {"available": False, "reason": "No inventory snapshot or stock movement data is present."},
         "kpis": {"total_revenue": round(total, 2), "transactions": transactions, "average_sale": round(total / transactions, 2) if transactions else 0.0, "top_product": top_product},
         "warnings": warnings,

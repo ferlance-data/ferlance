@@ -6,6 +6,9 @@ tests/__pycache__/
 backend/migrations/
 frontend/node_modules/
 docs/
+!docs/
+!docs/DATA_CONTRACT.md
 .venv/
 data/**
 .pytest_cache/
+.env

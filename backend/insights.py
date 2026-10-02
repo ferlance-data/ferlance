@@ -34,6 +34,15 @@ def _change(current: float, previous: float) -> dict[str, Any]:
     return {"current": round(current, 2), "previous": round(previous, 2), "percent": percent, "direction": "up" if percent > 0 else "down" if percent < 0 else "flat"}
 
 
+def _change_message(label: str, change: dict[str, Any]) -> str:
+    if change["direction"] == "new":
+        return f"{label} is new in this period at {change['current']:.2f}; there was no comparable prior-period value."
+    if change["direction"] == "flat":
+        return f"{label} was unchanged at {change['current']:.2f} compared with the previous period."
+    direction = "increased" if change["direction"] == "up" else "declined"
+    return f"{label} {direction} by {abs(change['percent']):.2f}% from {change['previous']:.2f} to {change['current']:.2f}."
+
+
 def generate_insights(records: list[dict[str, Any]], from_date: date | None = None, to_date: date | None = None) -> dict[str, Any]:
     current_start, current_end = _period_bounds(records, from_date, to_date)
     previous_start, previous_end = _previous_period(records, from_date, to_date)
@@ -58,7 +67,8 @@ def generate_insights(records: list[dict[str, Any]], from_date: date | None = No
     if current["products"].get("available") and current["products"].get("items"):
         top = current["products"]["best_sellers"][0]
         insights.append({"type": "recommendation", "title": "Product focus", "message": f"{top['product']} is the leading product by revenue in this period.", "severity": "info", "supporting_metric": top, "limitations": ["This recommendation uses revenue only; inventory and margin are unavailable."]})
-    return {"period": {"from": current_start.isoformat() if current_start else None, "to": current_end.isoformat() if current_end else None}, "comparison_period": {"from": previous_start.isoformat() if previous_start else None, "to": previous_end.isoformat() if previous_end else None}, "revenue_change": revenue_change, "insights": insights, "warnings": current["warnings"]}
+    comparison = {"label": "Revenue", "message": _change_message("Revenue", revenue_change), "current": revenue_change["current"], "previous": revenue_change["previous"], "percent": revenue_change["percent"], "direction": revenue_change["direction"]}
+    return {"period": {"from": current_start.isoformat() if current_start else None, "to": current_end.isoformat() if current_end else None}, "comparison_period": {"from": previous_start.isoformat() if previous_start else None, "to": previous_end.isoformat() if previous_end else None}, "comparison": comparison, "revenue_change": revenue_change, "insights": insights, "warnings": current["warnings"]}
 
 
 def answer_question(question: str, records: list[dict[str, Any]], from_date: date | None = None, to_date: date | None = None) -> dict[str, Any]:
@@ -77,5 +87,5 @@ def answer_question(question: str, records: list[dict[str, Any]], from_date: dat
         answer = result["products"].get("worst_sellers", []) if result["products"].get("available") else []
     else:
         generated = generate_insights(records, from_date, to_date)
-        answer = generated["revenue_change"]
+        answer = generated["comparison"]
     return {"question": question, "label": QUESTION_NAMES[question], "answer": answer, "period": result["period"], "warnings": result["warnings"]}

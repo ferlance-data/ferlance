@@ -263,6 +263,70 @@ def test_jwt_session_refresh_logout_and_me_flow(tmp_path, monkeypatch):
     assert client.post("/api/auth/refresh").status_code == 401
 
 
+def test_profile_update_and_admin_capabilities(tmp_path, monkeypatch):
+    monkeypatch.setattr(main, "DB_PATH", tmp_path / "test.sqlite3")
+    monkeypatch.setattr(main, "RAW_DIR", tmp_path / "raw")
+    monkeypatch.setattr(main, "PROCESSED_DIR", tmp_path / "processed")
+    main.RAW_DIR.mkdir()
+    main.PROCESSED_DIR.mkdir()
+    main.db.initialize(main.DB_PATH)
+    client = TestClient(main.app)
+    signup = client.post("/api/auth/signup", json={"email": "admin@example.com", "password": "password123", "business_name": "Old Name"})
+    headers = {"Authorization": f"Bearer {signup.json()['access_token']}"}
+
+    profile = client.patch("/api/auth/profile", headers=headers, json={"full_name": "Admin User", "business_name": "New Name"})
+    assert profile.status_code == 200
+    assert profile.json()["user"]["full_name"] == "Admin User"
+    assert profile.json()["business"]["name"] == "New Name"
+    assert client.get("/api/admin/capabilities", headers=headers).status_code == 403
+
+    main.db.insert(main.DB_PATH, "UPDATE users SET role = 'admin' WHERE email = ?", ("admin@example.com",))
+    capabilities = client.get("/api/admin/capabilities", headers=headers)
+    assert capabilities.status_code == 200
+    assert "manage_roles" in capabilities.json()["capabilities"]
+    users = client.get("/api/admin/users", headers=headers)
+    assert users.status_code == 200
+    user_id = users.json()[0]["id"]
+    changed = client.patch(f"/api/admin/users/{user_id}/role", headers=headers, json={"role": "member"})
+    assert changed.status_code == 200
+    assert changed.json()["role"] == "member"
+
+
+def test_ask_lance_saves_two_way_conversation_history(tmp_path, monkeypatch):
+    monkeypatch.setattr(main, "DB_PATH", tmp_path / "test.sqlite3")
+    monkeypatch.setattr(main, "RAW_DIR", tmp_path / "raw")
+    monkeypatch.setattr(main, "PROCESSED_DIR", tmp_path / "processed")
+    main.RAW_DIR.mkdir()
+    main.PROCESSED_DIR.mkdir()
+    main.db.initialize(main.DB_PATH)
+    monkeypatch.setattr(main, "ask_lance", lambda question, snapshot, history: f"Answer to: {question}")
+    client = TestClient(main.app)
+    signup = client.post("/api/auth/signup", json={"email": "chat@example.com", "password": "password123", "business_name": "Ama Retail"})
+    headers = {"Authorization": f"Bearer {signup.json()['access_token']}"}
+    business_id = signup.json()["business"]["id"]
+    fixture = Path(__file__).parent / "fixtures" / "valid_sales.csv"
+    upload = client.post(f"/api/businesses/{business_id}/datasets", headers=headers, files={"file": ("sales.csv", fixture.read_bytes(), "text/csv")})
+    dataset_id = upload.json()["id"]
+
+    first = client.post(f"/api/businesses/{business_id}/ask-lance", headers=headers, params={"dataset_id": dataset_id}, json={"question": "Which product leads?"})
+    assert first.status_code == 200
+    conversation_id = first.json()["conversation_id"]
+    second = client.post(f"/api/businesses/{business_id}/ask-lance", headers=headers, params={"dataset_id": dataset_id}, json={"conversation_id": conversation_id, "question": "Why does it lead?"})
+    assert second.status_code == 200
+
+    conversations = client.get(f"/api/businesses/{business_id}/ask-lance/conversations", headers=headers)
+    assert conversations.status_code == 200
+    assert conversations.json()[0]["id"] == conversation_id
+    saved = client.get(f"/api/businesses/{business_id}/ask-lance/conversations/{conversation_id}", headers=headers)
+    assert [message["role"] for message in saved.json()["messages"]] == ["user", "assistant", "user", "assistant"]
+    assert saved.json()["messages"][-1]["content"] == "Answer to: Why does it lead?"
+
+    other = client.post("/api/auth/signup", json={"email": "other-chat@example.com", "password": "password123", "business_name": "Other"})
+    other_headers = {"Authorization": f"Bearer {other.json()['access_token']}"}
+    forbidden = client.get(f"/api/businesses/{other.json()['business']['id']}/ask-lance/conversations/{conversation_id}", headers=other_headers)
+    assert forbidden.status_code == 404
+
+
 def test_auth_rejects_forged_and_expired_tokens(tmp_path, monkeypatch):
     monkeypatch.setattr(main, "DB_PATH", tmp_path / "test.sqlite3")
     monkeypatch.setattr(main, "RAW_DIR", tmp_path / "raw")

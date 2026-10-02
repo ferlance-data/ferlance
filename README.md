@@ -27,6 +27,10 @@ For the authoritative implementation status, evidence, risks, and next done cond
 - View grounded comparison insights and six predefined business questions.
 - Display financial values in Ghanaian cedi (`GHS`) using the Ghana locale.
 - Use the browser interface at the root URL.
+- Accept flexible sales, operating cost, procurement, cloud cost, and budget headers; see [docs/DATA_CONTRACT.md](docs/DATA_CONTRACT.md).
+- Rank products by revenue, transaction count, profit, or loss when the required cost data is available.
+- Ask Lance can produce grounded natural-language summaries through Groq when `GROQ_API_KEY` is configured in `.env`.
+- Ask Lance supports saved, dataset-pinned conversations with follow-up questions and tenant-scoped history.
 
 ## Run locally
 
@@ -96,7 +100,7 @@ The health endpoint is available at `GET /health`.
 .venv/bin/pytest -q
 ```
 
-Supported uploads require date and amount/revenue columns. Optional columns include transaction ID, product, customer, and quantity. Invalid rows are rejected with warnings; the normalized JSONL output preserves accepted records without silently hiding the rejection counts. Uploads return `processed` when all rows are accepted, `partial` when some rows are rejected, and `failed` when no rows can be accepted.
+Supported uploads require a recognized date and at least one recognized revenue or cost column. Optional columns include transaction ID, product or service, customer or supplier, and quantity. Cost-only files are retained as costs with zero revenue and can power gross-profit metrics without inflating sales. Invalid rows are rejected with warnings; the normalized JSONL output preserves accepted records without silently hiding the rejection counts. Uploads return `processed` when all rows are accepted, `partial` when some rows are rejected, and `failed` when no rows can be accepted. See [docs/DATA_CONTRACT.md](docs/DATA_CONTRACT.md) for the complete category-by-category contract and examples.
 
 ## Dataset contract
 

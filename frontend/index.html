@@ -10,7 +10,7 @@
   <main class="app-page" id="app-root" hidden>
     <nav class="app-nav">
       <div class="identity"><span class="avatar" id="user-avatar">F</span><span><strong id="business-name">Workspace</strong><br><small id="user-email">Loading identity...</small></span></div>
-      <div class="nav-actions"><button class="secondary nav-link" data-page="dashboard" type="button">Dashboard</button><button class="secondary nav-link" data-page="data" type="button">Data</button><button class="secondary nav-link" data-page="insights" type="button">Insights</button><button class="secondary" id="logout" type="button">Sign out</button></div>
+      <div class="nav-actions"><button class="secondary nav-link" data-page="dashboard" type="button">Dashboard</button><button class="secondary nav-link" data-page="data" type="button">Data</button><button class="secondary nav-link" data-page="insights" type="button">Insights</button><button class="secondary nav-link" data-page="ask-lance" type="button">Ask Lance</button><button class="secondary nav-link" data-page="profile" type="button">Profile</button><button class="secondary" id="logout" type="button">Sign out</button></div>
     </nav>
 
     <section class="page-heading"><div><p class="brand">FERLANCE WORKSPACE</p><h1 id="page-title">Business dashboard</h1></div><p id="page-description">A clear view of the records your business has accepted and the signals they support.</p></section>
@@ -21,7 +21,7 @@
         <div class="toolbar"><label>Dataset<select id="dataset-select"></select></label><label>Range<select id="date-preset"><option value="all">All dates</option><option value="today">Today</option><option value="7">Last 7 days</option><option value="30">Last 30 days</option><option value="quarter">Quarter</option><option value="custom">Custom</option></select></label><label>From<input id="from-date" type="date" disabled></label><label>To<input id="to-date" type="date" disabled></label><button id="refresh-dashboard" type="button">Update view</button></div>
         <div class="page-status" id="dashboard-status" role="status" aria-live="polite"></div><div id="dashboard-warnings"></div><div id="summary"></div><div class="kpi-grid" id="kpis"></div>
       </div>
-      <div class="page-grid"><div class="surface"><h2>Revenue trend</h2><div id="trend"></div></div><div class="surface"><h2>Products</h2><div id="products"></div></div><div class="surface"><h2>Customers</h2><div id="customers"></div></div><div class="surface"><h2>Conditional metrics</h2><div id="conditional"></div></div></div>
+      <div class="page-grid"><div class="surface"><h2>Revenue trend</h2><div id="trend"></div></div><div class="surface"><div class="section-heading"><h2>Product rankings</h2><select id="product-ranking"><option value="revenue">Most revenue</option><option value="transactions">Most transactions</option><option value="profit">Most profit</option><option value="loss">Most loss</option></select></div><div class="entity-list" id="products"></div></div><div class="surface"><h2>Customers</h2><div class="entity-list" id="customers"></div></div><div class="surface"><h2>Conditional metrics</h2><div id="conditional"></div></div></div>
     </section>
 
     <section class="page-view" data-view="data" hidden>
@@ -32,6 +32,14 @@
     <section class="page-view" data-view="insights" hidden>
       <div class="surface"><h2>Grounded insights</h2><div class="page-status" id="insight-status" role="status" aria-live="polite"></div><div id="insights-list"></div></div>
       <div class="surface"><h2>Defined business questions</h2><p>These answers use the selected dataset and active date range. They do not invent unsupported metrics.</p><div class="question-grid" id="question-grid"><button data-question="sales-summary" type="button">Sales summary</button><button data-question="best-products" type="button">Best products</button><button data-question="customer-overview" type="button">Customer overview</button><button data-question="revenue-trend" type="button">Revenue trend</button><button data-question="underperforming-products" type="button">Underperforming products</button><button data-question="monthly-comparison" type="button">Monthly comparison</button></div><pre id="question-result" hidden></pre></div>
+    </section>
+
+    <section class="page-view" data-view="profile" hidden>
+      <div class="page-grid"><div class="surface"><h2>Profile</h2><form class="form-stack" id="profile-form"><label>Full name<input id="profile-name" maxlength="120"></label><label>Business name<input id="profile-business" maxlength="120" required></label><label>Email<input id="profile-email" disabled></label><button type="submit">Save profile</button><div class="form-status" id="profile-status" role="status" aria-live="polite"></div></form></div><div class="surface" id="admin-panel" hidden><h2>Administration</h2><p>Manage workspace access and account capabilities.</p><div class="entity-list" id="admin-users"></div></div></div>
+    </section>
+
+    <section class="page-view" data-view="ask-lance" hidden>
+      <div class="chat-layout"><aside class="surface chat-history"><div class="section-heading"><h2>Saved chats</h2><button class="secondary" id="new-chat" type="button">New chat</button></div><div class="entity-list" id="conversation-list"></div></aside><section class="surface ask-lance"><div class="chat-heading"><div><h2>Ask Lance</h2><p>Ask a business question about the selected dataset and active date range.</p></div><span class="chat-context" id="chat-context">No dataset selected</span></div><div class="chat-messages" id="chat-messages" aria-live="polite"><p class="empty-chat">Your conversation will appear here.</p></div><form class="chat-composer" id="ask-form"><label class="visually-hidden" for="lance-question">Your question</label><textarea id="lance-question" rows="2" maxlength="1000" placeholder="Which products create the strongest overall result?" required></textarea><div class="composer-actions"><div class="form-status" id="ask-status" role="status" aria-live="polite"></div><button type="submit">Send question</button></div></form></section></div>
     </section>
   </main>
   <div id="loading-state" class="empty">Checking your workspace session...</div>

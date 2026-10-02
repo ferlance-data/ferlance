@@ -1,8 +1,10 @@
-const state = { token: null, businessId: null, datasets: [], page: location.hash.slice(1) || 'dashboard' };
+const state = { token: null, businessId: null, user: null, datasets: [], lastAnalytics: null, conversationId: null, page: location.hash.slice(1) || 'dashboard' };
 const pages = {
   dashboard: { title: 'Business dashboard', description: 'A clear view of the records your business has accepted and the signals they support.' },
   data: { title: 'Your data', description: 'Upload, inspect, and understand the processing history behind your numbers.' },
   insights: { title: 'Business insights', description: 'Deterministic observations and fixed questions grounded in the selected dataset.' },
+  profile: { title: 'Profile and access', description: 'Keep your workspace identity current and manage access when you have administrator privileges.' },
+  'ask-lance': { title: 'Ask Lance', description: 'A grounded business conversation based on accepted records and calculated metrics.' },
 };
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
@@ -49,8 +51,10 @@ function renderChart(items) {
 function renderProducts(products) {
   const target = $('#products'); target.replaceChildren();
   if (!products.available) { target.append(cell('p', products.reason)); return; }
-  target.append(cell('h3', 'Best sellers'), createTable(['Product', 'Revenue', 'Units'], products.best_sellers.map((item) => [item.product, money(item.revenue), item.units_sold ?? 'Unavailable'])));
-  target.append(cell('h3', 'Worst sellers'), createTable(['Product', 'Revenue', 'Units'], products.worst_sellers.map((item) => [item.product, money(item.revenue), item.units_sold ?? 'Unavailable'])));
+  const ranking = $('#product-ranking').value; const items = products.rankings[ranking] || [];
+  if (!items.length) { target.append(cell('p', ranking === 'profit' || ranking === 'loss' ? 'Profit rankings need cost data on every product record.' : 'No products match this ranking.')); return; }
+  const rows = items.map((item) => [item.product, money(item.revenue), item.transactions, item.units_sold ?? 'Unavailable', products.profit_available ? money(item.gross_profit) : 'Unavailable']);
+  target.append(createTable(['Product', 'Revenue', 'Transactions', 'Units', 'Gross profit'], rows));
 }
 
 function selectedDataset() { return $('#dataset-select').value; }
@@ -67,12 +71,13 @@ async function loadDashboard() {
   if (!selectedDataset()) { status('#dashboard-status', 'Upload a processed dataset to activate analytics.'); return; }
   status('#dashboard-status', 'Calculating metrics...');
   const result = await request(`/api/businesses/${state.businessId}/analytics?${filterParams()}`);
+  state.lastAnalytics = result;
   status('#dashboard-status', `${result.dataset.filename} · ${result.period.from || 'all dates'} to ${result.period.to || 'all dates'}`);
   $('#summary').replaceChildren(cell('p', result.summary)); $('#dashboard-warnings').replaceChildren(...result.warnings.map((warning) => { const item = cell('div', warning); item.className = 'warning'; return item; }));
   $('#kpis').replaceChildren(...[['Total revenue', money(result.kpis.total_revenue)], ['Transactions', result.kpis.transactions], ['Average sale', money(result.kpis.average_sale)], ['Top product', result.kpis.top_product || 'Unavailable']].map(([label, value]) => { const card = document.createElement('div'); card.className = 'kpi'; card.append(cell('span', label), cell('strong', value)); return card; }));
   renderChart(result.trend.daily); renderProducts(result.products);
   if (result.customers.available) renderTable($('#customers'), ['Customer', 'Revenue', 'Transactions'], result.customers.top_customers.map((item) => [item.customer, money(item.revenue), item.transactions])); else $('#customers').replaceChildren(cell('p', result.customers.reason));
-  $('#conditional').replaceChildren(cell('p', result.profit.reason), cell('p', result.inventory.reason));
+  $('#conditional').replaceChildren(cell('p', result.profit.available ? `Gross profit is ${money(result.profit.gross_profit)} after ${money(result.profit.cost)} in costs.` : result.profit.reason), cell('p', result.inventory.reason));
 }
 
 async function loadInsights() {
@@ -90,6 +95,42 @@ async function loadInsights() {
   });
 }
 
+function renderQuestionAnswer(result) {
+  const output = $('#question-result'); output.hidden = false; output.replaceChildren();
+  if (typeof result.answer === 'string') { output.append(cell('p', result.answer)); return; }
+  if (result.answer?.message) { output.append(cell('p', result.answer.message)); return; }
+  if (Array.isArray(result.answer)) { output.append(createTable(['Product', 'Revenue', 'Transactions', 'Units', 'Gross profit'], result.answer.map((item) => [item.product, money(item.revenue), item.transactions, item.units_sold ?? 'Unavailable', item.gross_profit === undefined ? 'Unavailable' : money(item.gross_profit)]))); return; }
+  output.append(cell('p', 'This answer is not available for the selected data.'));
+}
+
+async function askLance() {
+  if (!selectedDataset()) { status('#ask-status', 'Select a processed dataset first.', true); return; }
+  status('#ask-status', 'Lance is analyzing the selected records...');
+  const question = $('#lance-question').value.trim(); if (!question) return;
+  try { const result = await request(`/api/businesses/${state.businessId}/ask-lance?${filterParams()}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question, conversation_id: state.conversationId }) }); state.conversationId = result.conversation_id; $('#lance-question').value = ''; renderMessage({ role: 'user', content: result.question }); renderMessage({ role: 'assistant', content: result.answer }); status('#ask-status', `${result.dataset.filename} · saved to conversation.`); await loadConversations(); } catch (error) { status('#ask-status', error.message, true); }
+}
+
+function renderMessage(message) {
+  const target = $('#chat-messages'); if (target.querySelector('.empty-chat')) target.replaceChildren();
+  const bubble = document.createElement('article'); bubble.className = `chat-message chat-${message.role}`; bubble.append(cell('span', message.role === 'assistant' ? 'Lance' : 'You'), cell('p', message.content)); if (message.created_at) bubble.append(cell('time', new Date(message.created_at).toLocaleString())); target.append(bubble); target.scrollTop = target.scrollHeight;
+}
+
+function renderConversationList(conversations) {
+  const target = $('#conversation-list'); target.replaceChildren();
+  if (!conversations.length) { target.append(cell('p', 'No saved conversations yet.')); return; }
+  conversations.forEach((conversation) => { const button = document.createElement('button'); button.type = 'button'; button.className = `conversation-item${conversation.id === state.conversationId ? ' active' : ''}`; button.append(cell('strong', conversation.title), cell('small', new Date(conversation.updated_at).toLocaleString())); button.addEventListener('click', () => loadConversation(conversation.id)); target.append(button); });
+}
+
+async function loadConversations() {
+  if (!state.businessId) return; const conversations = await request(`/api/businesses/${state.businessId}/ask-lance/conversations`); renderConversationList(conversations);
+}
+
+async function loadConversation(conversationId) {
+  const conversation = await request(`/api/businesses/${state.businessId}/ask-lance/conversations/${conversationId}`); state.conversationId = conversation.id; $('#chat-messages').replaceChildren(); conversation.messages.forEach(renderMessage); $('#chat-context').textContent = conversation.title; await loadConversations();
+}
+
+function startConversation() { state.conversationId = null; $('#chat-messages').replaceChildren(cell('p', 'Your conversation will appear here.')); $('#chat-messages').firstChild.className = 'empty-chat'; $('#chat-context').textContent = selectedDataset() ? 'New conversation' : 'No dataset selected'; $('#lance-question').focus(); loadConversations().catch((error) => status('#ask-status', error.message, true)); }
+
 async function refreshViews() {
   $('#question-result').hidden = true; $('#question-result').textContent = '';
   try { await loadDashboard(); await loadInsights(); }
@@ -103,12 +144,30 @@ async function loadHistory() {
   if (selectedDataset()) { await loadDashboard(); await loadInsights(); }
 }
 
+async function loadProfile() {
+  const identity = await request('/api/auth/me');
+  $('#profile-name').value = identity.user.full_name || '';
+  $('#profile-email').value = identity.user.email;
+  $('#profile-business').value = identity.business?.name || '';
+  if (identity.user.role !== 'admin') return;
+  $('#admin-panel').hidden = false;
+  const users = await request('/api/admin/users');
+  const target = $('#admin-users'); target.replaceChildren();
+  users.forEach((item) => {
+    const row = document.createElement('div'); row.className = 'admin-user'; row.append(cell('span', `${item.email}${item.full_name ? ` · ${item.full_name}` : ''}`));
+    const select = document.createElement('select');
+    ['owner', 'admin', 'member'].forEach((role) => { const option = cell('option', role); option.value = role; option.selected = role === item.role; select.append(option); });
+    select.addEventListener('change', async () => { await request(`/api/admin/users/${item.id}/role`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role: select.value }) }); });
+    row.append(select); target.append(row);
+  });
+}
+
 function navigate(page) { state.page = pages[page] ? page : 'dashboard'; location.hash = state.page; $$('.page-view').forEach((view) => { view.hidden = view.dataset.view !== state.page; }); $('#page-title').textContent = pages[state.page].title; $('#page-description').textContent = pages[state.page].description; $$('.nav-link').forEach((link) => link.classList.toggle('active', link.dataset.page === state.page)); }
 
 async function bootstrap() {
   try {
     const refresh = await fetch('/api/auth/refresh', { method: 'POST', credentials: 'same-origin' }); if (!refresh.ok) throw new Error('signed out'); state.token = (await refresh.json()).access_token;
-    const identity = await request('/api/auth/me'); state.businessId = identity.business.id; $('#business-name').textContent = identity.business.name; $('#user-email').textContent = identity.user.email; $('#user-avatar').textContent = identity.business.name.slice(0, 1).toUpperCase(); $('#app-root').hidden = false; $('#loading-state').hidden = true; navigate(state.page); await loadHistory();
+    const identity = await request('/api/auth/me'); state.user = identity.user; state.businessId = identity.business.id; $('#business-name').textContent = identity.business.name; $('#user-email').textContent = identity.user.email; $('#user-avatar').textContent = identity.business.name.slice(0, 1).toUpperCase(); $('#app-root').hidden = false; $('#loading-state').hidden = true; navigate(state.page); await loadHistory(); if (state.page === 'ask-lance') await loadConversations();
   } catch { window.location.replace('/'); }
 }
 
@@ -118,6 +177,11 @@ $('#dataset-select').addEventListener('change', refreshViews);
 $('#refresh-dashboard').addEventListener('click', refreshViews);
 $('#date-preset').addEventListener('change', async (event) => { const custom = event.target.value === 'custom'; $('#from-date').disabled = !custom; $('#to-date').disabled = !custom; await refreshViews(); });
 $('#upload-form').addEventListener('submit', async (event) => { event.preventDefault(); const submit = event.target.querySelector('button[type="submit"]'); submit.disabled = true; status('#upload-status', 'Processing your file...'); const body = new FormData(); body.append('file', $('#dataset-file').files[0]); try { const result = await request(`/api/businesses/${state.businessId}/datasets`, { method: 'POST', body }); status('#upload-status', `${result.status}: ${result.accepted_rows} accepted, ${result.rejected_rows} rejected.`); await loadHistory(); navigate('dashboard'); } catch (error) { status('#upload-status', error.message, true); } finally { submit.disabled = false; } });
-$('#question-grid').addEventListener('click', async (event) => { if (!event.target.dataset.question || !selectedDataset()) return; try { const result = await request(`/api/businesses/${state.businessId}/questions/${event.target.dataset.question}?${filterParams()}`); const output = $('#question-result'); output.hidden = false; output.textContent = JSON.stringify(result.answer, null, 2); } catch (error) { status('#insight-status', error.message, true); } });
-window.addEventListener('hashchange', () => navigate(location.hash.slice(1)));
+$('#profile-form').addEventListener('submit', async (event) => { event.preventDefault(); try { const identity = await request('/api/auth/profile', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ full_name: $('#profile-name').value, business_name: $('#profile-business').value }) }); state.businessId = identity.business.id; $('#business-name').textContent = identity.business.name; status('#profile-status', 'Profile saved.'); } catch (error) { status('#profile-status', error.message, true); } });
+$('#question-grid').addEventListener('click', async (event) => { if (!event.target.dataset.question || !selectedDataset()) return; try { const result = await request(`/api/businesses/${state.businessId}/questions/${event.target.dataset.question}?${filterParams()}`); renderQuestionAnswer(result); } catch (error) { status('#insight-status', error.message, true); } });
+$('#product-ranking').addEventListener('change', () => { if (state.lastAnalytics) renderProducts(state.lastAnalytics.products); });
+$('#ask-form').addEventListener('submit', async (event) => { event.preventDefault(); await askLance(); });
+$('#new-chat').addEventListener('click', startConversation);
+window.addEventListener('hashchange', () => { navigate(location.hash.slice(1)); if (state.page === 'profile') loadProfile().catch((error) => status('#profile-status', error.message, true)); if (state.page === 'ask-lance') loadConversations().catch((error) => status('#ask-status', error.message, true)); });
+$$('.nav-link').forEach((link) => link.addEventListener('click', () => { if (link.dataset.page === 'profile') loadProfile().catch((error) => status('#profile-status', error.message, true)); }));
 bootstrap();

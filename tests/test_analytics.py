@@ -46,3 +46,21 @@ def test_analyze_warns_when_optional_fields_are_incomplete():
     result = analyze(records)
 
     assert len(result["warnings"]) == 3
+
+
+def test_product_rankings_compare_transactions_and_profit():
+    result = analyze([
+        {"transaction_date": "2026-01-01", "amount": 300.0, "cost": 100.0, "product": "A", "quantity": 40},
+        {"transaction_date": "2026-01-01", "amount": 100.0, "cost": 75.0, "product": "B", "quantity": 25},
+        {"transaction_date": "2026-01-01", "amount": 100.0, "cost": 75.0, "product": "B", "quantity": 25},
+    ])
+
+    assert result["products"]["rankings"]["profit"][0]["product"] == "A"
+    assert result["products"]["rankings"]["transactions"][0]["product"] == "B"
+    assert result["products"]["rankings"]["profit"][0]["gross_profit"] == 200.0
+
+
+def test_analyze_exposes_costs_and_gross_profit():
+    result = analyze([{"transaction_date": "2026-01-01", "amount": 250.0, "cost": 80.0}])
+
+    assert result["profit"] == {"available": True, "revenue": 250.0, "cost": 80.0, "gross_profit": 170.0}

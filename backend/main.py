@@ -11,8 +11,9 @@ from pydantic import BaseModel, Field
 
 from . import db
 from .analytics import analyze
-from .config import COOKIE_SECURE, DB_PATH, MAX_UPLOAD_BYTES, PROCESSED_DIR, RAW_DIR, SECRET_KEY, ensure_storage
+from .config import ADMIN_EMAILS, COOKIE_SECURE, DB_PATH, MAX_UPLOAD_BYTES, PROCESSED_DIR, RAW_DIR, SECRET_KEY, ensure_storage
 from .insights import QUESTION_NAMES, answer_question, generate_insights
+from .llm import ask_lance
 from .processor import process_file
 from .security import create_access_token, create_refresh_token, hash_password, read_access_token, token_hash, verify_password
 
@@ -45,13 +46,33 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class ProfileUpdate(BaseModel):
+    full_name: str = Field(default="", max_length=120)
+    business_name: str = Field(min_length=1, max_length=120)
+
+
+class RoleUpdate(BaseModel):
+    role: str = Field(pattern="^(admin|owner|member)$")
+
+
+class AskLanceRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=1000)
+    conversation_id: str | None = None
+
+
 def user_from_auth(authorization: str | None = Header(default=None)) -> dict:
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(401, "Authentication required.")
     user_id = read_access_token(authorization.split(" ", 1)[1])
-    user = db.one(DB_PATH, "SELECT id, email FROM users WHERE id = ?", (user_id or "",))
+    user = db.one(DB_PATH, "SELECT id, email, role, full_name FROM users WHERE id = ?", (user_id or "",))
     if not user:
         raise HTTPException(401, "Invalid or expired token.")
+    return user
+
+
+def admin_from_auth(user: dict = Depends(user_from_auth)) -> dict:
+    if user["role"] != "admin" and user["email"].lower() not in ADMIN_EMAILS:
+        raise HTTPException(403, "Administrator privileges are required.")
     return user
 
 
@@ -112,7 +133,7 @@ def signup(payload: SignupRequest, response: Response) -> dict:
     if db.one(DB_PATH, "SELECT id FROM users WHERE email = ?", (email,)):
         raise HTTPException(409, "An account with that email already exists.")
     user_id, business_id = str(uuid.uuid4()), str(uuid.uuid4())
-    db.insert(DB_PATH, "INSERT INTO users VALUES (?, ?, ?, ?)", (user_id, email, hash_password(payload.password), db.now()))
+    db.insert(DB_PATH, "INSERT INTO users (id, email, password_hash, created_at, role, full_name) VALUES (?, ?, ?, ?, ?, ?)", (user_id, email, hash_password(payload.password), db.now(), "owner", ""))
     db.insert(DB_PATH, "INSERT INTO businesses VALUES (?, ?, ?, ?)", (business_id, user_id, payload.business_name.strip(), db.now()))
     return auth_response(user_id, {"id": business_id, "name": payload.business_name.strip()}, response)
 
@@ -130,6 +151,35 @@ def login(payload: LoginRequest, response: Response) -> dict:
 def me(user: dict = Depends(user_from_auth)) -> dict:
     business = db.one(DB_PATH, "SELECT id, name FROM businesses WHERE user_id = ? ORDER BY created_at LIMIT 1", (user["id"],))
     return {"user": user, "business": business}
+
+
+@app.patch("/api/auth/profile")
+def update_profile(payload: ProfileUpdate, user: dict = Depends(user_from_auth)) -> dict:
+    full_name = payload.full_name.strip()
+    business_name = payload.business_name.strip()
+    db.insert(DB_PATH, "UPDATE users SET full_name = ? WHERE id = ?", (full_name, user["id"]))
+    db.insert(DB_PATH, "UPDATE businesses SET name = ? WHERE user_id = ?", (business_name, user["id"]))
+    updated = db.one(DB_PATH, "SELECT id, email, role, full_name FROM users WHERE id = ?", (user["id"],))
+    business = db.one(DB_PATH, "SELECT id, name FROM businesses WHERE user_id = ? ORDER BY created_at LIMIT 1", (user["id"],))
+    return {"user": updated, "business": business}
+
+
+@app.get("/api/admin/capabilities")
+def admin_capabilities(user: dict = Depends(admin_from_auth)) -> dict:
+    return {"role": user["role"], "capabilities": ["view_users", "manage_roles", "manage_profiles", "view_all_businesses"]}
+
+
+@app.get("/api/admin/users")
+def admin_users(user: dict = Depends(admin_from_auth)) -> list[dict]:
+    return db.many(DB_PATH, "SELECT id, email, role, full_name, created_at FROM users ORDER BY created_at")
+
+
+@app.patch("/api/admin/users/{user_id}/role")
+def admin_update_role(user_id: str, payload: RoleUpdate, user: dict = Depends(admin_from_auth)) -> dict:
+    if not db.one(DB_PATH, "SELECT id FROM users WHERE id = ?", (user_id,)):
+        raise HTTPException(404, "User not found.")
+    db.insert(DB_PATH, "UPDATE users SET role = ? WHERE id = ?", (payload.role, user_id))
+    return db.one(DB_PATH, "SELECT id, email, role, full_name, created_at FROM users WHERE id = ?", (user_id,)) or {}
 
 
 @app.post("/api/auth/refresh")
@@ -270,3 +320,55 @@ def business_question(
         raise HTTPException(400, "The from date must be on or before the to date.")
     _, records = selected_records(business_id, dataset_id, user)
     return answer_question(question, records, from_date, to_date)
+
+
+@app.post("/api/businesses/{business_id}/ask-lance")
+def ask_lance_question(
+    business_id: str,
+    payload: AskLanceRequest,
+    dataset_id: str | None = None,
+    from_date: date | None = Query(default=None, alias="from"),
+    to_date: date | None = Query(default=None, alias="to"),
+    user: dict = Depends(user_from_auth),
+) -> dict:
+    if from_date and to_date and from_date > to_date:
+        raise HTTPException(400, "The from date must be on or before the to date.")
+    dataset, records = selected_records(business_id, dataset_id, user)
+    conversation = db.one(DB_PATH, "SELECT * FROM chat_conversations WHERE id = ? AND business_id = ? AND user_id = ?", (payload.conversation_id or "", business_id, user["id"])) if payload.conversation_id else None
+    if payload.conversation_id and not conversation:
+        raise HTTPException(404, "Conversation not found.")
+    if conversation and conversation["dataset_id"] != dataset["id"]:
+        raise HTTPException(409, "This conversation belongs to a different dataset.")
+    if not conversation:
+        conversation_id = str(uuid.uuid4())
+        timestamp = db.now()
+        db.insert(DB_PATH, "INSERT INTO chat_conversations VALUES (?, ?, ?, ?, ?, ?, ?)", (conversation_id, business_id, user["id"], dataset["id"], payload.question.strip()[:80], timestamp, timestamp))
+        conversation = db.one(DB_PATH, "SELECT * FROM chat_conversations WHERE id = ?", (conversation_id,))
+    history = db.many(DB_PATH, "SELECT role, content FROM chat_messages WHERE conversation_id = ? ORDER BY created_at LIMIT 12", (conversation["id"],))
+    snapshot = analyze(records, from_date, to_date)
+    snapshot.pop("dataset", None)
+    try:
+        answer = ask_lance(payload.question.strip(), snapshot, history)
+    except RuntimeError as error:
+        raise HTTPException(503, str(error))
+    timestamp = db.now()
+    db.insert(DB_PATH, "INSERT INTO chat_messages VALUES (?, ?, ?, ?, ?)", (str(uuid.uuid4()), conversation["id"], "user", payload.question.strip(), timestamp))
+    db.insert(DB_PATH, "INSERT INTO chat_messages VALUES (?, ?, ?, ?, ?)", (str(uuid.uuid4()), conversation["id"], "assistant", answer, db.now()))
+    db.insert(DB_PATH, "UPDATE chat_conversations SET updated_at = ? WHERE id = ?", (db.now(), conversation["id"]))
+    return {"conversation_id": conversation["id"], "answer": answer, "question": payload.question.strip(), "period": snapshot["period"], "dataset": dataset_response(dataset)}
+
+
+@app.get("/api/businesses/{business_id}/ask-lance/conversations")
+def chat_conversations(business_id: str, user: dict = Depends(user_from_auth)) -> list[dict]:
+    business_for_user(business_id, user)
+    return db.many(DB_PATH, "SELECT id, dataset_id, title, created_at, updated_at FROM chat_conversations WHERE business_id = ? AND user_id = ? ORDER BY updated_at DESC", (business_id, user["id"]))
+
+
+@app.get("/api/businesses/{business_id}/ask-lance/conversations/{conversation_id}")
+def chat_conversation(business_id: str, conversation_id: str, user: dict = Depends(user_from_auth)) -> dict:
+    business_for_user(business_id, user)
+    conversation = db.one(DB_PATH, "SELECT id, dataset_id, title, created_at, updated_at FROM chat_conversations WHERE id = ? AND business_id = ? AND user_id = ?", (conversation_id, business_id, user["id"]))
+    if not conversation:
+        raise HTTPException(404, "Conversation not found.")
+    conversation["messages"] = db.many(DB_PATH, "SELECT id, role, content, created_at FROM chat_messages WHERE conversation_id = ? ORDER BY created_at, id", (conversation_id,))
+    return conversation
