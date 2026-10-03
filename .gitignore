@@ -3,12 +3,6 @@
 *docx
 backend/__pycache__/
 tests/__pycache__/
-backend/migrations/
 frontend/node_modules/
-docs/
-!docs/
-!docs/DATA_CONTRACT.md
-!docs/REUSABLE_PROMPTS.md
 .venv/
 .pytest_cache/
-.env
