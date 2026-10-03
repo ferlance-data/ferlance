@@ -10,6 +10,5 @@ docs/
 !docs/DATA_CONTRACT.md
 !docs/REUSABLE_PROMPTS.md
 .venv/
-data/**
 .pytest_cache/
 .env

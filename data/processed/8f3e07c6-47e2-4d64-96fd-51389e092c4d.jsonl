@@ -1,0 +1,50 @@
+{"transaction_date": "2026-01-06", "amount": 0.0, "cost": 246.36, "transaction_id": "INV-CLD-4001", "product": "Amazon EC2 Compute", "customer": "AWS", "quantity": 675.34}
+{"transaction_date": "2026-01-11", "amount": 0.0, "cost": 105.36, "transaction_id": "INV-CLD-4002", "product": "Amazon RDS Multi-AZ Postgres", "customer": "AWS", "quantity": 202.62}
+{"transaction_date": "2026-01-16", "amount": 0.0, "cost": 1848.33, "transaction_id": "INV-CLD-4003", "product": "Amazon S3 Standard Storage", "customer": "AWS", "quantity": 84591.71}
+{"transaction_date": "2026-01-21", "amount": 0.0, "cost": 2.32, "transaction_id": "INV-CLD-4004", "product": "AWS Lambda Serverless", "customer": "AWS", "quantity": 12.22}
+{"transaction_date": "2026-01-27", "amount": 0.0, "cost": 257.96, "transaction_id": "INV-CLD-4005", "product": "Amazon CloudFront CDN", "customer": "AWS", "quantity": 3194.54}
+{"transaction_date": "2026-02-01", "amount": 0.0, "cost": 299.41, "transaction_id": "INV-CLD-4006", "product": "Google Cloud BigQuery", "customer": "GCP", "quantity": 70.45}
+{"transaction_date": "2026-02-06", "amount": 0.0, "cost": 582.33, "transaction_id": "INV-CLD-4007", "product": "Google Kubernetes Engine (GKE)", "customer": "GCP", "quantity": 13931.27}
+{"transaction_date": "2026-02-11", "amount": 0.0, "cost": 187.52, "transaction_id": "INV-CLD-4008", "product": "Azure OpenAI Services", "customer": "Azure", "quantity": 6250.61}
+{"transaction_date": "2026-02-16", "amount": 0.0, "cost": 365.51, "transaction_id": "INV-CLD-4009", "product": "Azure Blob Storage Cool Tier", "customer": "Azure", "quantity": 36551.33}
+{"transaction_date": "2026-02-22", "amount": 0.0, "cost": 640.0, "transaction_id": "INV-CLD-4010", "product": "Cloudflare DDoS & WAF", "customer": "Cloudflare", "quantity": 2.56}
+{"transaction_date": "2026-02-27", "amount": 0.0, "cost": 90.33, "transaction_id": "INV-CLD-4011", "product": "Amazon EC2 Compute", "customer": "AWS", "quantity": 247.61}
+{"transaction_date": "2026-03-04", "amount": 0.0, "cost": 179.98, "transaction_id": "INV-CLD-4012", "product": "Amazon RDS Multi-AZ Postgres", "customer": "AWS", "quantity": 384.57}
+{"transaction_date": "2026-03-09", "amount": 0.0, "cost": 2070.29, "transaction_id": "INV-CLD-4013", "product": "Amazon S3 Standard Storage", "customer": "AWS", "quantity": 94749.94}
+{"transaction_date": "2026-03-14", "amount": 0.0, "cost": 2.37, "transaction_id": "INV-CLD-4014", "product": "AWS Lambda Serverless", "customer": "AWS", "quantity": 13.16}
+{"transaction_date": "2026-03-20", "amount": 0.0, "cost": 3461.05, "transaction_id": "INV-CLD-4015", "product": "Amazon CloudFront CDN", "customer": "AWS", "quantity": 40718.28}
+{"transaction_date": "2026-03-25", "amount": 0.0, "cost": 59.66, "transaction_id": "INV-CLD-4016", "product": "Google Cloud BigQuery", "customer": "GCP", "quantity": 12.56}
+{"transaction_date": "2026-03-30", "amount": 0.0, "cost": 279.49, "transaction_id": "INV-CLD-4017", "product": "Google Kubernetes Engine (GKE)", "customer": "GCP", "quantity": 7057.69}
+{"transaction_date": "2026-04-04", "amount": 0.0, "cost": 202.68, "transaction_id": "INV-CLD-4018", "product": "Azure OpenAI Services", "customer": "Azure", "quantity": 7111.79}
+{"transaction_date": "2026-04-09", "amount": 0.0, "cost": 287.83, "transaction_id": "INV-CLD-4019", "product": "Azure Blob Storage Cool Tier", "customer": "Azure", "quantity": 30298.15}
+{"transaction_date": "2026-04-15", "amount": 0.0, "cost": 327.25, "transaction_id": "INV-CLD-4020", "product": "Cloudflare DDoS & WAF", "customer": "Cloudflare", "quantity": 1.54}
+{"transaction_date": "2026-04-20", "amount": 0.0, "cost": 184.46, "transaction_id": "INV-CLD-4021", "product": "Amazon EC2 Compute", "customer": "AWS", "quantity": 600.45}
+{"transaction_date": "2026-04-25", "amount": 0.0, "cost": 264.44, "transaction_id": "INV-CLD-4022", "product": "Amazon RDS Multi-AZ Postgres", "customer": "AWS", "quantity": 508.53}
+{"transaction_date": "2026-04-30", "amount": 0.0, "cost": 670.56, "transaction_id": "INV-CLD-4023", "product": "Amazon S3 Standard Storage", "customer": "AWS", "quantity": 30689.05}
+{"transaction_date": "2026-05-05", "amount": 0.0, "cost": 8.81, "transaction_id": "INV-CLD-4024", "product": "AWS Lambda Serverless", "customer": "AWS", "quantity": 51.85}
+{"transaction_date": "2026-05-11", "amount": 0.0, "cost": 2404.06, "transaction_id": "INV-CLD-4025", "product": "Amazon CloudFront CDN", "customer": "AWS", "quantity": 33274.15}
+{"transaction_date": "2026-05-16", "amount": 0.0, "cost": 170.1, "transaction_id": "INV-CLD-4026", "product": "Google Cloud BigQuery", "customer": "GCP", "quantity": 37.8}
+{"transaction_date": "2026-05-21", "amount": 0.0, "cost": 263.44, "transaction_id": "INV-CLD-4027", "product": "Google Kubernetes Engine (GKE)", "customer": "GCP", "quantity": 7043.79}
+{"transaction_date": "2026-05-26", "amount": 0.0, "cost": 235.29, "transaction_id": "INV-CLD-4028", "product": "Azure OpenAI Services", "customer": "Azure", "quantity": 9227.0}
+{"transaction_date": "2026-05-31", "amount": 0.0, "cost": 743.89, "transaction_id": "INV-CLD-4029", "product": "Azure Blob Storage Cool Tier", "customer": "Azure", "quantity": 78304.16}
+{"transaction_date": "2026-06-06", "amount": 0.0, "cost": 624.62, "transaction_id": "INV-CLD-4030", "product": "Cloudflare DDoS & WAF", "customer": "Cloudflare", "quantity": 2.63}
+{"transaction_date": "2026-06-11", "amount": 0.0, "cost": 120.2, "transaction_id": "INV-CLD-4031", "product": "Amazon EC2 Compute", "customer": "AWS", "quantity": 347.82}
+{"transaction_date": "2026-06-16", "amount": 0.0, "cost": 240.56, "transaction_id": "INV-CLD-4032", "product": "Amazon RDS Multi-AZ Postgres", "customer": "AWS", "quantity": 486.97}
+{"transaction_date": "2026-06-21", "amount": 0.0, "cost": 1929.37, "transaction_id": "INV-CLD-4033", "product": "Amazon S3 Standard Storage", "customer": "AWS", "quantity": 83885.44}
+{"transaction_date": "2026-06-26", "amount": 0.0, "cost": 13.61, "transaction_id": "INV-CLD-4034", "product": "AWS Lambda Serverless", "customer": "AWS", "quantity": 68.04}
+{"transaction_date": "2026-07-02", "amount": 0.0, "cost": 1936.7, "transaction_id": "INV-CLD-4035", "product": "Amazon CloudFront CDN", "customer": "AWS", "quantity": 22784.75}
+{"transaction_date": "2026-07-07", "amount": 0.0, "cost": 206.41, "transaction_id": "INV-CLD-4036", "product": "Google Cloud BigQuery", "customer": "GCP", "quantity": 45.87}
+{"transaction_date": "2026-07-12", "amount": 0.0, "cost": 384.54, "transaction_id": "INV-CLD-4037", "product": "Google Kubernetes Engine (GKE)", "customer": "GCP", "quantity": 8739.53}
+{"transaction_date": "2026-07-17", "amount": 0.0, "cost": 337.34, "transaction_id": "INV-CLD-4038", "product": "Azure OpenAI Services", "customer": "Azure", "quantity": 11836.22}
+{"transaction_date": "2026-07-22", "amount": 0.0, "cost": 472.31, "transaction_id": "INV-CLD-4039", "product": "Azure Blob Storage Cool Tier", "customer": "Azure", "quantity": 47230.73}
+{"transaction_date": "2026-07-28", "amount": 0.0, "cost": 279.0, "transaction_id": "INV-CLD-4040", "product": "Cloudflare DDoS & WAF", "customer": "Cloudflare", "quantity": 1.24}
+{"transaction_date": "2026-08-02", "amount": 0.0, "cost": 132.48, "transaction_id": "INV-CLD-4041", "product": "Amazon EC2 Compute", "customer": "AWS", "quantity": 363.15}
+{"transaction_date": "2026-08-07", "amount": 0.0, "cost": 86.36, "transaction_id": "INV-CLD-4042", "product": "Amazon RDS Multi-AZ Postgres", "customer": "AWS", "quantity": 166.08}
+{"transaction_date": "2026-08-12", "amount": 0.0, "cost": 751.82, "transaction_id": "INV-CLD-4043", "product": "Amazon S3 Standard Storage", "customer": "AWS", "quantity": 36319.87}
+{"transaction_date": "2026-08-17", "amount": 0.0, "cost": 10.78, "transaction_id": "INV-CLD-4044", "product": "AWS Lambda Serverless", "customer": "AWS", "quantity": 56.75}
+{"transaction_date": "2026-08-23", "amount": 0.0, "cost": 3084.69, "transaction_id": "INV-CLD-4045", "product": "Amazon CloudFront CDN", "customer": "AWS", "quantity": 38200.49}
+{"transaction_date": "2026-08-28", "amount": 0.0, "cost": 66.45, "transaction_id": "INV-CLD-4046", "product": "Google Cloud BigQuery", "customer": "GCP", "quantity": 13.29}
+{"transaction_date": "2026-09-02", "amount": 0.0, "cost": 149.82, "transaction_id": "INV-CLD-4047", "product": "Google Kubernetes Engine (GKE)", "customer": "GCP", "quantity": 3783.38}
+{"transaction_date": "2026-09-07", "amount": 0.0, "cost": 167.63, "transaction_id": "INV-CLD-4048", "product": "Azure OpenAI Services", "customer": "Azure", "quantity": 5587.6}
+{"transaction_date": "2026-09-12", "amount": 0.0, "cost": 829.38, "transaction_id": "INV-CLD-4049", "product": "Azure Blob Storage Cool Tier", "customer": "Azure", "quantity": 92153.29}
+{"transaction_date": "2026-09-18", "amount": 0.0, "cost": 495.12, "transaction_id": "INV-CLD-4050", "product": "Cloudflare DDoS & WAF", "customer": "Cloudflare", "quantity": 2.33}
