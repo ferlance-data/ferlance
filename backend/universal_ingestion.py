@@ -184,10 +184,18 @@ class UniversalCSVIngestionEngine:
     def _date(value: Any) -> str | None:
         if value is None or str(value).strip().lower() in MISSING_TOKENS:
             return None
-        parsed = pd.to_datetime(value, errors="coerce", dayfirst=False)
-        if pd.isna(parsed):
-            raise ValueError(f"not a date: {value!r}")
-        return cast(pd.Timestamp, parsed).date().isoformat()
+        text = str(value).strip()
+        try:
+            from dateutil import parser
+            return parser.parse(text, dayfirst=False).date().isoformat()
+        except Exception:
+            try:
+                parsed = pd.to_datetime(value, errors="coerce", dayfirst=False)
+                if pd.isna(parsed):
+                    raise ValueError(f"not a date: {value!r}")
+                return cast(pd.Timestamp, parsed).date().isoformat()
+            except Exception:
+                raise ValueError(f"not a date: {value!r}")
 
     def infer_domain_and_mapping(self) -> dict[str, Any]:
         """Classify the file and map source headers to canonical fields."""
