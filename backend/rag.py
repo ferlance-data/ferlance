@@ -5,6 +5,19 @@ from pathlib import Path
 from typing import Any
 
 from . import db
+from .config import PROCESSED_DIR
+
+
+def resolve_processed_path(stored_path: str | None) -> Path | None:
+    if not stored_path:
+        return None
+    path = Path(stored_path)
+    if path.is_file():
+        return path
+    fallback = PROCESSED_DIR / path.name
+    if fallback.is_file():
+        return fallback
+    return path
 
 
 def _record_text(record: dict[str, Any]) -> str:
@@ -29,8 +42,8 @@ def _query(question: str) -> str:
 
 def retrieve(db_path: Path, business_id: str, question: str, datasets: list[dict[str, Any]], limit: int = 20) -> list[dict[str, Any]]:
     for dataset in datasets:
-        if dataset.get("processed_path"):
-            path = Path(dataset["processed_path"])
+        path = resolve_processed_path(dataset.get("processed_path"))
+        if path:
             try:
                 with path.open("r", encoding="utf-8") as source:
                     index_dataset(db_path, business_id, dataset["id"], [json.loads(line) for line in source if line.strip()])
@@ -48,10 +61,11 @@ def retrieve(db_path: Path, business_id: str, question: str, datasets: list[dict
 def all_records(datasets: list[dict[str, Any]]) -> list[dict[str, Any]]:
     records: list[dict[str, Any]] = []
     for dataset in datasets:
-        if not dataset.get("processed_path"):
+        path = resolve_processed_path(dataset.get("processed_path"))
+        if not path:
             continue
         try:
-            with Path(dataset["processed_path"]).open("r", encoding="utf-8") as source:
+            with path.open("r", encoding="utf-8") as source:
                 records.extend(json.loads(line) for line in source if line.strip())
         except (OSError, json.JSONDecodeError):
             continue

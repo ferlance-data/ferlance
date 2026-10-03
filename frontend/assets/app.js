@@ -157,7 +157,10 @@ async function loadHistory() {
   state.datasets = await request(`/api/businesses/${state.businessId}/datasets`); const select = $('#dataset-select'); select.replaceChildren(); state.datasets.filter((item) => item.status !== 'failed').forEach((item) => { const option = cell('option', `${item.filename} · ${item.status}`); option.value = item.id; select.append(option); });
   const history = $('#history'); history.replaceChildren(); if (!state.datasets.length) { history.append(cell('p', 'No datasets yet. Upload a CSV or Excel file to begin.')); return; }
   state.datasets.forEach((item) => { const row = document.createElement('div'); row.className = 'dataset'; row.append(cell('span', `${item.filename} · ${item.status} · ${item.accepted_rows} accepted · ${item.rejected_rows} rejected`), cell('span', new Date(item.created_at).toLocaleDateString())); history.append(row); });
-  if (selectedDataset()) { await loadDashboard(); await loadInsights(); }
+  if (selectedDataset()) {
+    try { await loadDashboard(); await loadInsights(); }
+    catch (error) { status('#dashboard-status', error.message, true); status('#insight-status', error.message, true); }
+  }
 }
 
 async function loadProfile() {
@@ -183,8 +186,11 @@ function navigate(page) { state.page = pages[page] ? page : 'dashboard'; locatio
 async function bootstrap() {
   try {
     const refresh = await fetch('/api/auth/refresh', { method: 'POST', credentials: 'same-origin' }); if (!refresh.ok) throw new Error('signed out'); state.token = (await refresh.json()).access_token;
-    const identity = await request('/api/auth/me'); state.user = identity.user; state.businessId = identity.business.id; $('#business-name').textContent = identity.business.name; $('#user-email').textContent = identity.user.email; $('#user-avatar').textContent = identity.business.name.slice(0, 1).toUpperCase(); $('#app-root').hidden = false; $('#loading-state').hidden = true; navigate(state.page); await loadHistory(); if (state.page === 'ask-lance') await loadConversations();
-  } catch { window.location.replace('/'); }
+    const identity = await request('/api/auth/me'); state.user = identity.user; state.businessId = identity.business?.id; $('#business-name').textContent = identity.business?.name || 'Workspace'; $('#user-email').textContent = identity.user.email; $('#user-avatar').textContent = (identity.business?.name || identity.user.email).slice(0, 1).toUpperCase(); $('#app-root').hidden = false; $('#loading-state').hidden = true; navigate(state.page);
+  } catch { window.location.replace('/'); return; }
+  try {
+    await loadHistory(); if (state.page === 'ask-lance') await loadConversations();
+  } catch (error) { status('#dashboard-status', error.message, true); }
 }
 
 $('#logout').addEventListener('click', async () => { await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' }); window.location.replace('/'); });
