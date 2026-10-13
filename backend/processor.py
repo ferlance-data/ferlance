@@ -11,6 +11,8 @@ from typing import Any
 from openpyxl import load_workbook
 from openpyxl.utils.exceptions import InvalidFileException
 
+from backend.universal_ingestion import UniversalCSVIngestionEngine
+
 REQUIRED_ALIASES = {
     "transaction_date": {"transaction_date", "date", "sale_date", "transactiondate", "order_date", "usage_date", "expense_date", "invoice_date"},
 }
@@ -88,6 +90,30 @@ def _date(value: Any) -> str:
 
 
 def process_file(path: Path, extension: str) -> ProcessingResult:
+    if extension == ".csv":
+        universal = UniversalCSVIngestionEngine(path).process_file()
+        sections = universal["schema_summary"].get("sections", [])
+        if len(sections) > 1:
+            normalized = []
+            for source in universal["clean_df"].to_dict(orient="records"):
+                output = dict(source)
+                if "date" in output:
+                    output["transaction_date"] = output.pop("date")
+                if "record_id" in output:
+                    output["transaction_id"] = output.pop("record_id")
+                if "amount" not in output or output["amount"] is None:
+                    output["amount"] = 0.0
+                normalized.append(output)
+            warnings = [
+                f"Row {item['row_number']}: {'; '.join(item['errors'])}."
+                for item in universal["quarantined_rows"]
+            ]
+            return ProcessingResult(
+                normalized,
+                universal["schema_summary"]["source_rows"],
+                len(universal["quarantined_rows"]),
+                warnings=warnings,
+            )
     try:
         rows = _read_rows(path, extension)
     except (InvalidFileException, OSError, ValueError, zipfile.BadZipFile):

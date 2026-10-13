@@ -28,19 +28,19 @@ DOMAIN_KEYWORDS: dict[str, set[str]] = {
 }
 
 CANONICAL_ALIASES: dict[str, set[str]] = {
-    "record_id": {"id", "recordid", "transactionid", "txnid", "saleid", "invoiceid", "po", "ponumber", "employeeid", "expenseid"},
-    "date": {"date", "transactiondate", "saledate", "orderdate", "invoicedate", "expensedate", "usagedate", "effectivedate", "period", "month"},
-    "amount": {"amount", "salesamount", "amountpaid", "revenue", "sales", "total", "totalprice", "saleamount", "income", "grosssales", "value", "salary", "wage", "grosspay", "netpay", "compensation"},
-    "cost": {"cost", "costamount", "unitcost", "unitcostusd", "actualcost", "actualcostusd", "totalcost", "totalcostusd", "expense", "expenseamount", "cogs", "subtotal"},
+    "record_id": {"id", "recordid", "transactionid", "txnid", "saleid", "invoiceid", "po", "ponumber", "employeeid", "expenseid", "serviceid", "referenceid", "paymentref", "batchid", "tripid", "blnumber", "orderid", "txid"},
+    "date": {"date", "transactiondate", "saledate", "orderdate", "invoicedate", "expensedate", "usagedate", "effectivedate", "period", "month", "recorddate", "paymentdate", "logdate", "rentaldate", "entrydate"},
+    "amount": {"amount", "salesamount", "amountpaid", "revenue", "revenuebilled", "sales", "total", "totalprice", "saleamount", "income", "grosssales", "value", "salary", "wage", "grosspay", "netpay", "compensation", "verifiedamount", "freightfeebilled", "totalcollectedghs"},
+    "cost": {"cost", "costamount", "unitcost", "unitcostusd", "actualcost", "actualcostusd", "totalcost", "totalcostusd", "expense", "expenseamount", "totalexpenseghs", "cogs", "subtotal", "directlaborcost", "thirdpartytoolingcost", "totaldeliverycost", "fuelcost", "customsdutyghs", "gphahandlingghs", "demurragefeeghs", "agentservicefeeghs", "operatorfee", "dieselcost"},
     "budget": {"budget", "budgeted", "budgetedcost", "budgetedcostusd", "planned", "plannedamount"},
     "variance": {"variance", "varianceusd", "variancepct", "variancepercent", "difference"},
     "quantity": {"quantity", "qty", "units", "unitssold", "usagequantity", "headcount", "count"},
     "unit_price": {"unitprice", "price", "sellingprice", "rate", "blendedrate", "hourlyrate"},
-    "product": {"product", "productname", "item", "itemname", "itemdescription", "service", "servicename", "sku", "finishedproduct"},
-    "customer": {"customer", "customername", "client", "clientname", "account", "accountname"},
+    "product": {"product", "productname", "item", "itemname", "itemdescription", "service", "servicename", "sku", "finishedproduct", "cargo", "cargodesc", "taskdone", "equipmenttype"},
+    "customer": {"customer", "customername", "client", "clientname", "account", "accountname", "clientaccount", "customerproject"},
     "vendor": {"vendor", "vendorname", "supplier", "suppliername", "provider", "cloudprovider"},
     "employee": {"employee", "employeename", "staff", "staffname", "worker", "workername"},
-    "category": {"category", "type", "classification", "department", "costcenter", "phase", "status", "region", "branch"},
+    "category": {"category", "type", "classification", "department", "costcenter", "phase", "status", "region", "branch", "billingmodel", "obligationtype", "socialplatform", "courierremittancestatus"},
 }
 
 NUMERIC_CANONICAL = {"amount", "cost", "budget", "variance", "quantity", "unit_price"}
@@ -131,6 +131,21 @@ class UniversalCSVIngestionEngine:
             raise ValueError("The CSV does not contain a usable header row.")
         return best_index
 
+    def _header_blocks(self) -> list[tuple[int, list[list[str]]]]:
+        """Return non-empty blocks so files containing several exported tables can be read."""
+        blocks: list[tuple[int, list[list[str]]]] = []
+        start: int | None = None
+        for index, row in enumerate(self._raw_rows):
+            if any(str(cell).strip() for cell in row):
+                if start is None:
+                    start = index
+            elif start is not None:
+                blocks.append((start, self._raw_rows[start:index]))
+                start = None
+        if start is not None:
+            blocks.append((start, self._raw_rows[start:]))
+        return blocks
+
     def detect_dialect_and_encoding(self) -> dict[str, Any]:
         """Detect encoding, delimiter, preamble/header row, and source checksum."""
         data = self._read_bytes()
@@ -200,7 +215,10 @@ class UniversalCSVIngestionEngine:
     def infer_domain_and_mapping(self) -> dict[str, Any]:
         """Classify the file and map source headers to canonical fields."""
         self._ensure_parsed()
-        normalized = [self._normal_key(header) for header in self._headers]
+        return self._infer_domain_and_mapping(self._headers)
+
+    def _infer_domain_and_mapping(self, headers: list[str]) -> dict[str, Any]:
+        normalized = [self._normal_key(header) for header in headers]
         scores = {domain: sum(any(keyword in header for keyword in keywords) for header in normalized) for domain, keywords in DOMAIN_KEYWORDS.items()}
         winner = max(scores, key=scores.get) if scores else "unknown"
         if scores.get("budgets_variances", 0) >= 2 and any("budget" in header or "variance" in header for header in normalized):
@@ -212,7 +230,7 @@ class UniversalCSVIngestionEngine:
         confidence = min(confidence, 1.0)
         mapping: dict[str, str] = {}
         used: set[str] = set()
-        for header, key in zip(self._headers, normalized):
+        for header, key in zip(headers, normalized):
             candidates = []
             for canonical, aliases in CANONICAL_ALIASES.items():
                 score = max((1.5 if key == alias else 0.8 + len(alias) / 100 if len(alias) >= 4 and (alias in key or key in alias) else 0.0) for alias in aliases)
@@ -224,22 +242,26 @@ class UniversalCSVIngestionEngine:
         self._mapping = mapping
         return {"domain": winner, "confidence": confidence, "column_mapping": mapping, "domain_scores": scores}
 
-    def sanitize_dataframe(self) -> pd.DataFrame:
-        """Build a typed dataframe and quarantine rows with cast failures."""
-        self._ensure_parsed()
-        data_rows = self._raw_rows[self._source_info.header_row + 1 :] if self._source_info else []
+    def _sanitize_rows(
+        self,
+        headers: list[str],
+        mapping: dict[str, str],
+        data_rows: list[list[str]],
+        first_row_number: int,
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         records: list[dict[str, Any]] = []
-        for offset, row in enumerate(data_rows, start=(self._source_info.header_row + 2 if self._source_info else 2)):
+        quarantined: list[dict[str, Any]] = []
+        for offset, row in enumerate(data_rows, start=first_row_number):
             if not any(str(cell).strip() for cell in row) or str(row[0]).lstrip().startswith(("#", "//")):
                 continue
             errors: list[str] = []
-            padded = list(row[: len(self._headers)]) + [""] * max(0, len(self._headers) - len(row))
-            raw = dict(zip(self._headers, padded))
-            if len(row) > len(self._headers):
-                errors.append(f"extra columns: {len(row) - len(self._headers)}")
+            padded = list(row[: len(headers)]) + [""] * max(0, len(headers) - len(row))
+            raw = dict(zip(headers, padded))
+            if len(row) > len(headers):
+                errors.append(f"extra columns: {len(row) - len(headers)}")
             clean: dict[str, Any] = {}
             for header, value in raw.items():
-                canonical = next((name for name, source in self._mapping.items() if source == header), None)
+                canonical = next((name for name, source in mapping.items() if source == header), None)
                 target = canonical or header
                 if target in NUMERIC_CANONICAL:
                     try:
@@ -258,16 +280,46 @@ class UniversalCSVIngestionEngine:
             if text_payload:
                 clean["_text_payload"] = json.dumps(text_payload, ensure_ascii=False)
             if errors:
-                self._quarantined.append({"row_number": offset, "errors": errors, "raw": raw})
+                quarantined.append({"row_number": offset, "errors": errors, "raw": raw})
             else:
                 records.append(clean)
+        return records, quarantined
+
+    def sanitize_dataframe(self) -> pd.DataFrame:
+        """Build a typed dataframe and quarantine rows with cast failures."""
+        self._ensure_parsed()
+        data_rows = self._raw_rows[self._source_info.header_row + 1 :] if self._source_info else []
+        records, quarantined = self._sanitize_rows(self._headers, self._mapping, data_rows, self._source_info.header_row + 2 if self._source_info else 2)
+        self._quarantined.extend(quarantined)
         return pd.DataFrame(records)
 
     def process_file(self) -> dict[str, Any]:
         """Run detection, classification, sanitization, and return an audit manifest."""
         dialect = self.detect_dialect_and_encoding()
-        classification = self.infer_domain_and_mapping()
-        clean_df = self.sanitize_dataframe()
+        blocks = self._header_blocks()
+        if len(blocks) <= 1:
+            classification = self.infer_domain_and_mapping()
+            clean_df = self.sanitize_dataframe()
+            sections = [{"header_row": self._source_info.header_row + 1, **classification, "source_rows": len(clean_df) + len(self._quarantined)}]
+        else:
+            all_records: list[dict[str, Any]] = []
+            sections: list[dict[str, Any]] = []
+            self._quarantined = []
+            for block_start, block in blocks:
+                header_offset = self._find_header(block)
+                headers = []
+                seen: dict[str, int] = {}
+                for position, header in enumerate(block[header_offset]):
+                    clean = str(header).replace("\ufeff", "").strip() or f"unnamed_{position + 1}"
+                    seen[clean] = seen.get(clean, 0) + 1
+                    headers.append(clean if seen[clean] == 1 else f"{clean}_{seen[clean]}")
+                classification = self._infer_domain_and_mapping(headers)
+                records, quarantined = self._sanitize_rows(headers, classification["column_mapping"], block[header_offset + 1:], block_start + header_offset + 2)
+                all_records.extend({**record, "_source_domain": classification["domain"]} for record in records)
+                self._quarantined.extend(quarantined)
+                sections.append({"header_row": block_start + header_offset + 1, **classification, "source_rows": len(block) - header_offset - 1, "accepted_rows": len(records), "quarantined_count": len(quarantined)})
+            clean_df = pd.DataFrame(all_records)
+            classification = {"domain": "mixed", "confidence": round(sum(section["confidence"] for section in sections) / len(sections), 3), "column_mapping": {}, "domain_scores": {}}
         type_summary = {column: str(dtype) for column, dtype in clean_df.dtypes.items()}
         return {
             "domain": classification["domain"],
@@ -277,8 +329,9 @@ class UniversalCSVIngestionEngine:
             "schema_summary": {
                 **dialect,
                 **classification,
+                "sections": sections,
                 "data_types": type_summary,
-                "source_rows": len(self._raw_rows) - (self._source_info.header_row + 1 if self._source_info else 0),
+                "source_rows": sum(section["source_rows"] for section in sections),
                 "accepted_rows": len(clean_df),
                 "quarantined_count": len(self._quarantined),
             },
