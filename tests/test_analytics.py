@@ -18,6 +18,10 @@ def test_analyze_groups_revenue_by_day_week_and_month():
         {"period": "2025-12", "revenue": 100.0, "transactions": 1},
         {"period": "2026-01", "revenue": 200.0, "transactions": 1},
     ]
+    assert result["trend"]["yearly"] == [
+        {"period": "2025", "revenue": 100.0, "transactions": 1},
+        {"period": "2026", "revenue": 200.0, "transactions": 1},
+    ]
     assert result["products"]["quantity_available"] is True
     assert result["products"]["best_sellers"][0]["product"] == "B"
     assert result["products"]["worst_sellers"][0]["product"] == "A"
@@ -71,6 +75,9 @@ def test_cost_records_use_cost_as_primary_metric_and_filter_dates():
     assert result["kpis"]["primary_label"] == "Total cost"
     assert result["kpis"]["primary_value"] == 250.0
     assert result["products"]["items"][0]["metric_value"] == 250.0
+    assert result["trend"]["cost_weekly"] == [{"period": "2026-W05", "cost": 250.0, "transactions": 1}]
+    assert result["trend"]["cost_monthly"] == [{"period": "2026-02", "cost": 250.0, "transactions": 1}]
+    assert result["trend"]["cost_yearly"] == [{"period": "2026", "cost": 250.0, "transactions": 1}]
 
 
 def test_analyze_exposes_costs_and_gross_profit():
