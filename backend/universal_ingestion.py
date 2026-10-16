@@ -23,28 +23,38 @@ DOMAIN_KEYWORDS: dict[str, set[str]] = {
     "costs_cogs_procurement": {"cost", "cogs", "expense", "procurement", "purchase", "vendor", "supplier", "unitcost", "po", "material"},
     "budgets_variances": {"budget", "variance", "actual", "planned", "forecastvariance", "budgeted", "overbudget"},
     "projections_forecasting": {"projection", "projected", "forecast", "predicted", "scenario", "outlook", "estimate"},
-    "payroll_compensation": {"payroll", "salary", "wage", "employee", "staff", "compensation", "grosspay", "netpay", "deduction"},
+    "payroll_compensation": {"payroll", "salary", "wage", "employee", "staff", "compensation", "grosspay", "netpay", "deduction", "laborer", "labourer"},
+    "statutory_obligations": {"ssnit", "pension", "obligation", "remitted", "withholdingtax", "payetax", "permit", "agencyauthority"},
+    "cash_reconciliation": {"reconciliation", "verified", "discrepancy", "clearedby", "recordedamount", "cashdrawer"},
+    "shipping_logistics": {"shipping", "customs", "demurrage", "freight", "container", "clearingagent", "handling"},
+    "equipment_rental": {"rental", "hire", "equipment", "dayshired", "operatorfee", "totalcollected"},
+    "credit_collections": {"credit", "settled", "overdue", "followup", "receivable"},
+    "savings_deposits": {"susu", "deposit", "emergencyfund", "collector", "monthcumulative"},
+    "ecommerce_orders": {"socialplatform", "rider", "courier", "delivery", "adcost", "remittance"},
+    "manufacturing_production": {"batch", "ingredient", "production", "unitsproduced", "rawmaterials", "baking"},
     "textual_memos_logs": {"memo", "note", "comment", "narrative", "message", "log", "description", "details", "text"},
 }
 
 CANONICAL_ALIASES: dict[str, set[str]] = {
-    "record_id": {"id", "recordid", "transactionid", "txnid", "saleid", "invoiceid", "po", "ponumber", "employeeid", "expenseid", "serviceid", "referenceid", "paymentref", "batchid", "tripid", "blnumber", "orderid", "txid"},
+    "record_id": {"id", "recordid", "transactionid", "txnid", "saleid", "invoiceid", "po", "ponumber", "employeeid", "workerid", "expenseid", "serviceid", "referenceid", "paymentref", "bankchequeno", "batchid", "tripid", "blnumber", "orderid", "txid"},
     "date": {"date", "transactiondate", "saledate", "orderdate", "invoicedate", "expensedate", "usagedate", "effectivedate", "period", "month", "recorddate", "paymentdate", "logdate", "rentaldate", "entrydate"},
-    "amount": {"amount", "salesamount", "amountpaid", "revenue", "revenuebilled", "sales", "total", "totalprice", "saleamount", "income", "grosssales", "value", "salary", "wage", "grosspay", "netpay", "compensation", "verifiedamount", "freightfeebilled", "totalcollectedghs"},
-    "cost": {"cost", "costamount", "unitcost", "unitcostusd", "actualcost", "actualcostusd", "totalcost", "totalcostusd", "expense", "expenseamount", "totalexpenseghs", "cogs", "subtotal", "directlaborcost", "thirdpartytoolingcost", "totaldeliverycost", "fuelcost", "customsdutyghs", "gphahandlingghs", "demurragefeeghs", "agentservicefeeghs", "operatorfee", "dieselcost"},
+    "amount": {"amount", "salesamount", "amountpaid", "revenue", "revenuebilled", "sales", "total", "totalprice", "saleamount", "income", "grosssales", "value", "compensation", "salary", "freightfeebilled", "totalcollectedghs", "ordervalueghs"},
+    "cost": {"cost", "costamount", "unitcost", "unitcostusd", "actualcost", "actualcostusd", "totalcost", "totalcostusd", "expense", "expenseamount", "totalexpenseghs", "cogs", "subtotal", "directlaborcost", "thirdpartytoolingcost", "totaldeliverycost", "fuelcost", "customsdutyghs", "gphahandlingghs", "demurragefeeghs", "agentservicefeeghs", "operatorfee", "dieselcost", "lunchstipend", "amountremitted", "salary", "wage", "dailywageghs", "grosspay", "netpay"},
     "budget": {"budget", "budgeted", "budgetedcost", "budgetedcostusd", "planned", "plannedamount"},
     "variance": {"variance", "varianceusd", "variancepct", "variancepercent", "difference"},
     "quantity": {"quantity", "qty", "units", "unitssold", "usagequantity", "headcount", "count"},
     "unit_price": {"unitprice", "price", "sellingprice", "rate", "blendedrate", "hourlyrate"},
-    "product": {"product", "productname", "item", "itemname", "itemdescription", "service", "servicename", "sku", "finishedproduct", "cargo", "cargodesc", "taskdone", "equipmenttype"},
-    "customer": {"customer", "customername", "client", "clientname", "account", "accountname", "clientaccount", "customerproject"},
-    "vendor": {"vendor", "vendorname", "supplier", "suppliername", "provider", "cloudprovider"},
-    "employee": {"employee", "employeename", "staff", "staffname", "worker", "workername"},
-    "category": {"category", "type", "classification", "department", "costcenter", "phase", "status", "region", "branch", "billingmodel", "obligationtype", "socialplatform", "courierremittancestatus"},
+    "product": {"product", "productname", "item", "itemname", "itemdescription", "service", "servicename", "sku", "finishedproduct", "cargo", "cargodesc", "taskdone", "equipmenttype", "itemcategory"},
+    "customer": {"customer", "customername", "client", "clientname", "account", "accountname", "clientaccount", "customerproject", "membername"},
+    "vendor": {"vendor", "vendorname", "supplier", "suppliername", "provider", "cloudprovider", "agencyauthority", "clearingagent", "networkagent", "susucollector"},
+    "employee": {"employee", "employeename", "staff", "staffname", "worker", "workername", "laborername"},
+    "category": {"category", "expensecategory", "type", "classification", "department", "costcenter", "phase", "status", "region", "branch", "billingmodel", "obligationtype", "socialplatform", "courierremittancestatus"},
 }
 
 NUMERIC_CANONICAL = {"amount", "cost", "budget", "variance", "quantity", "unit_price"}
 DATE_CANONICAL = {"date"}
+NUMERIC_HEADER_HINTS = ("amount", "revenue", "sales", "cost", "fee", "price", "rate", "wage", "stipend", "deposit", "balance", "remit", "base", "gross", "margin", "percent", "pct", "quantity", "qty", "units", "days", "hours", "litres", "kwh", "overdue", "commission", "fund", "charge", "levy", "duty", "verified", "discrepancy", "collected", "paid", "ghs", "usd")
+NON_NUMERIC_HEADER_HINTS = ("phone", "mobile", "contact", "number", "cheque", "reference", "paymentref", "workerid", "employeeid", "accountid", "blnumber", "tripid", "batchid", "costcenter", "status", "flag")
 TEXT_HINTS = {"memo", "note", "comment", "narrative", "message", "log", "description", "details", "text"}
 
 WORD_NUMBERS = {
@@ -123,11 +133,11 @@ class UniversalCSVIngestionEngine:
             cells = [self._normal_key(cell) for cell in row if str(cell).strip()]
             if not cells:
                 continue
-            score = sum(cell in known or any(alias in cell or cell in alias for alias in known) for cell in cells)
+            score = sum(cell in known or any(len(alias) >= 4 and (alias in cell or cell in alias) for alias in known) for cell in cells)
             score += min(len(cells), 8) / 100
             if score > best_score:
                 best_index, best_score = index, score
-        if not rows or not any(str(cell).strip() for cell in rows[best_index]):
+        if not rows or best_score < 1 or not any(str(cell).strip() for cell in rows[best_index]):
             raise ValueError("The CSV does not contain a usable header row.")
         return best_index
 
@@ -195,6 +205,11 @@ class UniversalCSVIngestionEngine:
             result = float(match.group())
         return result / 100 if percent else result
 
+    @classmethod
+    def _looks_numeric(cls, header: str) -> bool:
+        key = cls._normal_key(header)
+        return not any(hint in key for hint in NON_NUMERIC_HEADER_HINTS) and any(hint in key for hint in NUMERIC_HEADER_HINTS)
+
     @staticmethod
     def _date(value: Any) -> str | None:
         if value is None or str(value).strip().lower() in MISSING_TOKENS:
@@ -233,7 +248,7 @@ class UniversalCSVIngestionEngine:
         for header, key in zip(headers, normalized):
             candidates = []
             for canonical, aliases in CANONICAL_ALIASES.items():
-                score = max((1.5 if key == alias else 0.8 + len(alias) / 100 if len(alias) >= 4 and (alias in key or key in alias) else 0.0) for alias in aliases)
+                score = max((1.5 if key == alias else 0.8 + len(alias) / 100 if len(alias) >= 5 and key.startswith(alias) else 0.0) for alias in aliases)
                 candidates.append((canonical, score))
             canonical, score = max(candidates, key=lambda item: item[1])
             if score and canonical not in used:
@@ -266,11 +281,18 @@ class UniversalCSVIngestionEngine:
                 if target in NUMERIC_CANONICAL:
                     try:
                         clean[target] = self._number(value)
+                        if canonical and header != target:
+                            clean[header] = clean[target]
                     except ValueError as error:
                         errors.append(f"{header}: {error}")
                 elif target in DATE_CANONICAL:
                     try:
                         clean[target] = self._date(value)
+                    except ValueError as error:
+                        errors.append(f"{header}: {error}")
+                elif self._looks_numeric(header):
+                    try:
+                        clean[target] = self._number(value)
                     except ValueError as error:
                         errors.append(f"{header}: {error}")
                 else:
@@ -297,16 +319,25 @@ class UniversalCSVIngestionEngine:
         """Run detection, classification, sanitization, and return an audit manifest."""
         dialect = self.detect_dialect_and_encoding()
         blocks = self._header_blocks()
-        if len(blocks) <= 1:
+        valid_blocks: list[tuple[int, list[list[str]], int]] = []
+        for block_start, block in blocks:
+            try:
+                header_offset = self._find_header(block)
+            except ValueError:
+                continue
+            valid_blocks.append((block_start, block, header_offset))
+        if not valid_blocks:
+            raise ValueError("The CSV does not contain a usable header row.")
+        if len(valid_blocks) == 1:
             classification = self.infer_domain_and_mapping()
             clean_df = self.sanitize_dataframe()
+            clean_df["_source_domain"] = classification["domain"]
             sections = [{"header_row": self._source_info.header_row + 1, **classification, "source_rows": len(clean_df) + len(self._quarantined)}]
         else:
             all_records: list[dict[str, Any]] = []
             sections: list[dict[str, Any]] = []
             self._quarantined = []
-            for block_start, block in blocks:
-                header_offset = self._find_header(block)
+            for block_start, block, header_offset in valid_blocks:
                 headers = []
                 seen: dict[str, int] = {}
                 for position, header in enumerate(block[header_offset]):
