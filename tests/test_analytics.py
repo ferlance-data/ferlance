@@ -84,3 +84,13 @@ def test_analyze_exposes_costs_and_gross_profit():
     result = analyze([{"transaction_date": "2026-01-01", "amount": 250.0, "cost": 80.0}])
 
     assert result["profit"] == {"available": True, "revenue": 250.0, "cost": 80.0, "gross_profit": 170.0}
+
+
+def test_undated_records_are_excluded_from_time_based_metrics():
+    result = analyze([
+        {"amount": 0.0, "cost": 250.0, "_source_domain": "shipping_logistics"},
+        {"transaction_date": "2026-01-01", "amount": 100.0, "_source_domain": "transactions_sales"},
+    ])
+
+    assert result["revenue"]["total"] == 100.0
+    assert result["revenue"]["transactions"] == 1

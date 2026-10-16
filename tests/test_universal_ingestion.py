@@ -1,5 +1,7 @@
 from io import BytesIO
 
+import pandas as pd
+
 from backend.universal_ingestion import UniversalCSVIngestionEngine
 
 
@@ -49,3 +51,72 @@ def test_engine_maps_budget_cost_columns_without_misclassifying_categories():
     assert result["schema_summary"]["column_mapping"]["cost"] == "actual_cost_usd"
     assert result["clean_df"].iloc[0]["category"] == "Cloud Hosting"
     assert result["clean_df"].iloc[0]["cost"] == 120.0
+
+
+def test_engine_keeps_cost_center_text_categorical():
+    source = BytesIO(
+        b"expense_date,cost_center,total_expense_ghs\n"
+        b"2026-09-28,ECG Prepaid Meter,3500.00\n"
+    )
+
+    result = UniversalCSVIngestionEngine(source).process_file()
+
+    assert result["schema_summary"]["accepted_rows"] == 1
+    assert result["clean_df"].iloc[0]["category"] == "ECG Prepaid Meter"
+    assert result["clean_df"].iloc[0]["cost"] == 3500.0
+
+
+def test_engine_keeps_status_text_across_mixed_business_sections():
+    source = BytesIO(
+        b"tx_id,sale_date,customer_tag,credit_amount_ghs,settled_amount_ghs,days_overdue,phone_number,flag\n"
+        b"CRX-101,2026-08-20,Teacher Evans,480.00,200.00,54,0243111222,Follow Up\n\n"
+        b"entry_date,member_name,susu_collector,daily_deposit_ghs,month_cumulative_ghs,commission_deducted,emergency_fund_dues\n"
+        b"2026-10-01,Auntie Mansah,Brother Joe Susu,50.00,50.00,0.00,10.00\n\n"
+        b"order_id,date,social_platform,meta_ad_cost_usd,order_value_ghs,rider_service,delivery_fee_charged,courier_remittance_status\n"
+        b"ORD-881,2026-10-02,Instagram DM,4.50,450.00,Swoove Express,35.00,Remitted\n"
+    )
+
+    result = UniversalCSVIngestionEngine(source).process_file()
+    records = result["clean_df"].to_dict(orient="records")
+
+    assert [section["domain"] for section in result["schema_summary"]["sections"]] == [
+        "credit_collections",
+        "savings_deposits",
+        "ecommerce_orders",
+    ]
+    assert result["schema_summary"]["accepted_rows"] == 3
+    assert records[0]["date"] == "2026-08-20"
+    assert records[0]["phone_number"] == "0243111222"
+    assert records[2]["courier_remittance_status"] == "Remitted"
+    assert records[2]["meta_ad_cost_usd"] == 4.5
+
+
+def test_engine_normalizes_mixed_business_sections_and_preserves_undated_shipping():
+    source = BytesIO(
+        b"payment_date,agency_authority,obligation_type,amount_remitted,gross_base_ghs\n"
+        b"2026-08-15,SSNIT,Tier 1 Pension,2484.00,18400.00\n\n"
+        b"log_date,worker_id,laborer_name,task_done,daily_wage_ghs,lunch_stipend\n"
+        b"2026-10-06,CS-01,Enoch Tetteh,Bagging,90.00,20.00\n\n"
+        b"bl_number,clearing_agent,container_size,shipping_line_usd,customs_duty_ghs\n"
+        b"MSK-TMA-9921,Ocansey Maritime,40ft HC,1850.00,42150.00\n\n"
+        b"rental_date,equipment_type,customer_project,operator_fee,diesel_cost,total_collected_ghs\n"
+        b"2026-09-25,Concrete Mixer 500L,Dansoman Residential,150.00,210.00,1200.00\n"
+    )
+
+    result = UniversalCSVIngestionEngine(source).process_file()
+    sections = result["schema_summary"]["sections"]
+    records = result["clean_df"].to_dict(orient="records")
+
+    assert [section["domain"] for section in sections] == [
+        "statutory_obligations",
+        "payroll_compensation",
+        "shipping_logistics",
+        "equipment_rental",
+    ]
+    assert result["schema_summary"]["accepted_rows"] == 4
+    assert records[0]["cost"] == 2484.0
+    assert records[1]["cost"] == 90.0
+    assert records[2]["shipping_line_usd"] == 1850.0
+    assert records[2]["customs_duty_ghs"] == 42150.0
+    assert pd.isna(records[2]["date"])
+    assert records[3]["amount"] == 1200.0

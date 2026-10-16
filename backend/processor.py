@@ -1,6 +1,8 @@
 import csv
 import hashlib
 import json
+import math
+import math
 import re
 import zipfile
 from dataclasses import dataclass, field
@@ -91,29 +93,45 @@ def _date(value: Any) -> str:
 
 def process_file(path: Path, extension: str) -> ProcessingResult:
     if extension == ".csv":
-        universal = UniversalCSVIngestionEngine(path).process_file()
-        sections = universal["schema_summary"].get("sections", [])
-        if len(sections) > 1:
-            normalized = []
-            for source in universal["clean_df"].to_dict(orient="records"):
-                output = dict(source)
-                if "date" in output:
-                    output["transaction_date"] = output.pop("date")
-                if "record_id" in output:
-                    output["transaction_id"] = output.pop("record_id")
-                if "amount" not in output or output["amount"] is None:
-                    output["amount"] = 0.0
-                normalized.append(output)
-            warnings = [
-                f"Row {item['row_number']}: {'; '.join(item['errors'])}."
-                for item in universal["quarantined_rows"]
-            ]
-            return ProcessingResult(
-                normalized,
-                universal["schema_summary"]["source_rows"],
-                len(universal["quarantined_rows"]),
-                warnings=warnings,
-            )
+        try:
+            if path.stat().st_size == 0:
+                return ProcessingResult([], 0, 0, errors=["The file is empty or has no data rows."])
+            universal = UniversalCSVIngestionEngine(path).process_file()
+        except (OSError, UnicodeError, ValueError) as error:
+            return ProcessingResult([], 0, 0, errors=[str(error)])
+        normalized = []
+        seen_records: set[str] = set()
+        warnings = [
+            f"Row {item['row_number']}: {'; '.join(item['errors'])}."
+            for item in universal["quarantined_rows"]
+        ]
+        rejected_rows = len(universal["quarantined_rows"])
+        for source in universal["clean_df"].to_dict(orient="records"):
+            output = {
+                key: None if isinstance(value, float) and math.isnan(value) else value
+                for key, value in source.items()
+            }
+            if "date" in output:
+                output["transaction_date"] = output.pop("date")
+            else:
+                output["transaction_date"] = None
+            if "record_id" in output:
+                output["transaction_id"] = output.pop("record_id")
+            fingerprint = json.dumps(output, sort_keys=True, default=str)
+            if fingerprint in seen_records:
+                rejected_rows += 1
+                warnings.append("Duplicate normalized row rejected.")
+                continue
+            seen_records.add(fingerprint)
+            if output.get("amount") is None:
+                output["amount"] = 0.0
+            normalized.append(output)
+        return ProcessingResult(
+            normalized,
+            universal["schema_summary"]["source_rows"],
+            rejected_rows,
+            warnings=warnings,
+        )
     try:
         rows = _read_rows(path, extension)
     except (InvalidFileException, OSError, ValueError, zipfile.BadZipFile):
