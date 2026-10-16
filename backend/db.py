@@ -41,6 +41,28 @@ def initialize(path: Path) -> None:
             db.execute("ALTER TABLE users ADD COLUMN full_name TEXT NOT NULL DEFAULT ''")
 
 
+def repair_dataset_paths(path: Path, raw_dir: Path, processed_dir: Path) -> None:
+    with connection(path) as db:
+        rows = db.execute("SELECT id, raw_path, processed_path FROM datasets").fetchall()
+        for row in rows:
+            dataset_id, raw_path, processed_path = row["id"], row["raw_path"], row["processed_path"]
+            updated_raw = raw_path
+            updated_processed = processed_path
+            if raw_path and not Path(raw_path).is_file():
+                candidate = raw_dir / Path(raw_path).name
+                if candidate.is_file():
+                    updated_raw = str(candidate)
+            if processed_path and not Path(processed_path).is_file():
+                candidate = processed_dir / Path(processed_path).name
+                if candidate.is_file():
+                    updated_processed = str(candidate)
+            if updated_raw != raw_path or updated_processed != processed_path:
+                db.execute(
+                    "UPDATE datasets SET raw_path = ?, processed_path = ? WHERE id = ?",
+                    (updated_raw, updated_processed, dataset_id),
+                )
+
+
 def one(path: Path, query: str, params: tuple[Any, ...] = ()) -> dict[str, Any] | None:
     with connection(path) as db:
         row = db.execute(query, params).fetchone()

@@ -8,3 +8,4 @@ frontend/node_modules/
 .pytest_cache/
 test.py
 .env
+backend/.venv/**

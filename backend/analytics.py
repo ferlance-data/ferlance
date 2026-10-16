@@ -8,6 +8,8 @@ from .config import DEFAULT_CURRENCY
 def _periods(records: list[dict[str, Any]], key, field: str = "amount", output: str = "revenue") -> list[dict[str, Any]]:
     grouped: dict[str, dict[str, float | int]] = defaultdict(lambda: {"revenue": 0.0, "transactions": 0})
     for record in records:
+        if not record.get("transaction_date"):
+            continue
         period = key(date.fromisoformat(record["transaction_date"]))
         grouped[period]["revenue"] += record.get(field, 0.0)
         grouped[period]["transactions"] += 1
@@ -113,8 +115,8 @@ def analyze(records: list[dict[str, Any]], from_date: date | None = None, to_dat
     end = to_date or (max(available_dates) if available_dates else None)
     filtered = [
         record for record in records
-        if (start is None or record["transaction_date"] >= start.isoformat())
-        and (end is None or record["transaction_date"] <= end.isoformat())
+        if (start is None or (record.get("transaction_date") and record["transaction_date"] >= start.isoformat()))
+        and (end is None or (record.get("transaction_date") and record["transaction_date"] <= end.isoformat()))
     ]
     total = sum(record["amount"] for record in filtered)
     costs = sum(record.get("cost", 0.0) for record in filtered)
@@ -140,6 +142,10 @@ def analyze(records: list[dict[str, Any]], from_date: date | None = None, to_dat
             "weekly": _periods(filtered, lambda value: f"{value.isocalendar().year}-W{value.isocalendar().week:02d}"),
             "monthly": _periods(filtered, lambda value: value.strftime("%Y-%m")),
             "cost_daily": _periods(filtered, lambda value: value.isoformat(), "cost", "cost") if any("cost" in record for record in filtered) else [],
+            "yearly": _periods(filtered, lambda value: value.strftime("%Y")),
+            "cost_weekly": _periods(filtered, lambda value: f"{value.isocalendar().year}-W{value.isocalendar().week:02d}", "cost", "cost") if any("cost" in record for record in filtered) else [],
+            "cost_monthly": _periods(filtered, lambda value: value.strftime("%Y-%m"), "cost", "cost") if any("cost" in record for record in filtered) else [],
+            "cost_yearly": _periods(filtered, lambda value: value.strftime("%Y"), "cost", "cost") if any("cost" in record for record in filtered) else [],
         },
         "products": products,
         "customers": _customer_metrics(filtered, profile),

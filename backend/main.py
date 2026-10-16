@@ -20,6 +20,7 @@ from .security import create_access_token, create_refresh_token, hash_password, 
 
 ensure_storage()
 db.initialize(DB_PATH)
+db.repair_dataset_paths(DB_PATH, RAW_DIR, PROCESSED_DIR)
 app = FastAPI(title="Ferlance MVP", version="0.1.0")
 app.mount("/assets", StaticFiles(directory=Path(__file__).parent.parent / "frontend" / "assets"), name="assets")
 DATASET_FIELDS = (
@@ -90,11 +91,24 @@ def dataset_response(item: dict) -> dict:
     return {field: item[field] for field in DATASET_FIELDS}
 
 
+def resolve_processed_path(stored_path: str | None) -> Path | None:
+    if not stored_path:
+        return None
+    path = Path(stored_path)
+    if path.is_file():
+        return path
+    fallback = PROCESSED_DIR / path.name
+    if fallback.is_file():
+        return fallback
+    return path
+
+
 def read_processed_records(dataset: dict) -> list[dict]:
-    if not dataset["processed_path"]:
+    resolved = resolve_processed_path(dataset.get("processed_path"))
+    if not resolved:
         return []
     try:
-        with Path(dataset["processed_path"]).open("r", encoding="utf-8") as source:
+        with resolved.open("r", encoding="utf-8") as source:
             return [json.loads(line) for line in source if line.strip()]
     except (OSError, json.JSONDecodeError):
         raise HTTPException(503, "Processed records are temporarily unavailable.")
@@ -210,14 +224,17 @@ def upload_dataset(business_id: str, file: UploadFile = File(...), user: dict = 
         raise HTTPException(415, "Unsupported file type. Upload a CSV or XLSX file.")
     dataset_id = str(uuid.uuid4())
     raw_path = RAW_DIR / f"{dataset_id}{suffix}"
-    with raw_path.open("wb") as target:
-        total_bytes = 0
-        while chunk := file.file.read(1024 * 1024):
-            total_bytes += len(chunk)
-            if total_bytes > MAX_UPLOAD_BYTES:
-                raw_path.unlink(missing_ok=True)
-                raise HTTPException(413, "Uploaded file is too large.")
-            target.write(chunk)
+    try:
+        with raw_path.open("wb") as target:
+            total_bytes = 0
+            while chunk := file.file.read(1024 * 1024):
+                total_bytes += len(chunk)
+                if total_bytes > MAX_UPLOAD_BYTES:
+                    raise HTTPException(413, "Uploaded file is too large.")
+                target.write(chunk)
+    except Exception:
+        raw_path.unlink(missing_ok=True)
+        raise
     result = process_file(raw_path, suffix)
     processed_path: Path | None = None
     status = "failed" if not result.rows else "partial" if result.rejected_rows or result.errors else "processed"
