@@ -1,4 +1,8 @@
+import csv
+import io
 import json
+import math
+import re
 import shutil
 import uuid
 from datetime import date, datetime, timezone
@@ -9,13 +13,13 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import db
+from . import db, financial_position, inventory, market_research
 from .analytics import analyze
 from .config import ADMIN_EMAILS, COOKIE_SECURE, DB_PATH, MAX_UPLOAD_BYTES, PROCESSED_DIR, RAW_DIR, SECRET_KEY, ensure_storage
 from .insights import QUESTION_NAMES, answer_question, generate_insights
 from .llm import ask_lance
 from .processor import process_file
-from .rag import all_records, context as rag_context
+from .rag import DataAvailabilityError, all_records, context as rag_context
 from .security import create_access_token, create_refresh_token, hash_password, read_access_token, token_hash, verify_password
 
 ensure_storage()
@@ -60,6 +64,42 @@ class RoleUpdate(BaseModel):
 class AskLanceRequest(BaseModel):
     question: str = Field(min_length=1, max_length=1000)
     conversation_id: str | None = None
+
+
+class InventoryProductCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    sku: str | None = Field(default=None, max_length=100)
+    unit: str = Field(default="unit", min_length=1, max_length=40)
+    unit_cost: float | None = Field(default=None, ge=0)
+    reorder_level: float = Field(default=0, ge=0)
+    opening_stock: float = Field(default=0, ge=0)
+
+
+class InventoryProductUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    sku: str | None = Field(default=None, max_length=100)
+    unit: str | None = Field(default=None, min_length=1, max_length=40)
+    unit_cost: float | None = Field(default=None, ge=0)
+    reorder_level: float | None = Field(default=None, ge=0)
+    active: bool | None = None
+
+
+class InventoryMovementRequest(BaseModel):
+    movement_type: str = Field(pattern="^(purchase|sale|adjustment)$")
+    quantity: float
+    note: str = Field(default="", max_length=500)
+
+
+class BraveSearchIntegrationRequest(BaseModel):
+    api_key: str = Field(min_length=1, max_length=500)
+
+
+class FinancialPositionBalanceRequest(BaseModel):
+    as_of_date: date
+    category: str = Field(min_length=1, max_length=40)
+    account_name: str = Field(min_length=1, max_length=120)
+    amount: float
+    note: str = Field(default="", max_length=500)
 
 
 def user_from_auth(authorization: str | None = Header(default=None)) -> dict:
@@ -201,11 +241,50 @@ def admin_update_role(user_id: str, payload: RoleUpdate, user: dict = Depends(ad
 def refresh(response: Response, refresh_token: str | None = Cookie(default=None, alias="ferlance_refresh")) -> dict:
     if not refresh_token:
         raise HTTPException(401, "Refresh session is required.")
-    session = db.one(DB_PATH, "SELECT * FROM refresh_sessions WHERE token_hash = ? AND revoked_at IS NULL", (token_hash(refresh_token),))
-    if not session or datetime.fromisoformat(session["expires_at"]) <= datetime.now(timezone.utc):
-        raise HTTPException(401, "Refresh session is invalid or expired.")
-    db.insert(DB_PATH, "UPDATE refresh_sessions SET revoked_at = ? WHERE id = ?", (db.now(), session["id"]))
-    return auth_response(session["user_id"], db.one(DB_PATH, "SELECT id, name FROM businesses WHERE user_id = ? ORDER BY created_at LIMIT 1", (session["user_id"],)), response)
+    with db.connection(DB_PATH) as connection:
+        connection.execute("BEGIN IMMEDIATE")
+        session = connection.execute(
+            "SELECT * FROM refresh_sessions WHERE token_hash = ? AND revoked_at IS NULL",
+            (token_hash(refresh_token),),
+        ).fetchone()
+        if not session or datetime.fromisoformat(session["expires_at"]) <= datetime.now(timezone.utc):
+            raise HTTPException(401, "Refresh session is invalid or expired.")
+        revoked = connection.execute(
+            "UPDATE refresh_sessions SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL",
+            (db.now(), session["id"]),
+        )
+        if revoked.rowcount != 1:
+            raise HTTPException(401, "Refresh session is invalid or expired.")
+        replacement, expires_at = create_refresh_token()
+        connection.execute(
+            "INSERT INTO refresh_sessions VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                str(uuid.uuid4()),
+                session["user_id"],
+                token_hash(replacement),
+                expires_at.isoformat(),
+                None,
+                db.now(),
+            ),
+        )
+        business_row = connection.execute(
+            "SELECT id, name FROM businesses WHERE user_id = ? ORDER BY created_at LIMIT 1",
+            (session["user_id"],),
+        ).fetchone()
+    response.set_cookie(
+        "ferlance_refresh",
+        replacement,
+        httponly=True,
+        secure=COOKIE_SECURE,
+        samesite="lax",
+        max_age=int((expires_at - datetime.now(timezone.utc)).total_seconds()),
+        path="/api/auth",
+    )
+    return {
+        "access_token": create_access_token(session["user_id"]),
+        "token_type": "bearer",
+        "business": dict(business_row) if business_row else None,
+    }
 
 
 @app.post("/api/auth/logout")
@@ -252,6 +331,284 @@ def upload_dataset(business_id: str, file: UploadFile = File(...), user: dict = 
 def dataset_history(business_id: str, user: dict = Depends(user_from_auth)) -> list[dict]:
     business_for_user(business_id, user)
     return [dataset_response(item) for item in db.many(DB_PATH, "SELECT * FROM datasets WHERE business_id = ? ORDER BY created_at DESC", (business_id,))]
+
+
+def _inventory_error(error: inventory.InventoryError) -> HTTPException:
+    message = str(error)
+    status_code = 404 if message == "Product not found." else 409 if "already exists" in message else 400
+    return HTTPException(status_code, message)
+
+
+def _parse_inventory_number(value: str | None, row_number: int, field: str, required: bool = False) -> float | None:
+    if value is None or not value.strip():
+        if required:
+            raise HTTPException(400, f"Row {row_number} is missing {field}.")
+        return None
+    cleaned = value.strip()
+    if not re.fullmatch(r"(?:(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d+)?|\.\d+)", cleaned):
+        raise HTTPException(400, f"Row {row_number} has an invalid {field}.")
+    try:
+        number = float(cleaned.replace(",", ""))
+    except ValueError:
+        raise HTTPException(400, f"Row {row_number} has an invalid {field}.")
+    if not math.isfinite(number) or number < 0:
+        raise HTTPException(400, f"Row {row_number} {field} must be finite and non-negative.")
+    return number
+
+
+@app.get("/api/businesses/{business_id}/inventory")
+def inventory_list(
+    business_id: str,
+    include_archived: bool = False,
+    user: dict = Depends(user_from_auth),
+) -> dict:
+    business_for_user(business_id, user)
+    return inventory.list_products(DB_PATH, business_id, include_archived)
+
+
+@app.post("/api/businesses/{business_id}/inventory/products")
+def inventory_create_product(
+    business_id: str,
+    payload: InventoryProductCreate,
+    user: dict = Depends(user_from_auth),
+) -> dict:
+    business_for_user(business_id, user)
+    try:
+        product = inventory.create_product(
+            DB_PATH,
+            business_id,
+            user["id"],
+            name=payload.name,
+            sku=payload.sku,
+            unit=payload.unit,
+            unit_cost=payload.unit_cost,
+            reorder_level=payload.reorder_level,
+            opening_stock=payload.opening_stock,
+        )
+    except inventory.InventoryError as error:
+        raise _inventory_error(error)
+    return product
+
+
+@app.patch("/api/businesses/{business_id}/inventory/products/{product_id}")
+def inventory_update_product(
+    business_id: str,
+    product_id: str,
+    payload: InventoryProductUpdate,
+    user: dict = Depends(user_from_auth),
+) -> dict:
+    business_for_user(business_id, user)
+    try:
+        return inventory.update_product(
+            DB_PATH, business_id, product_id, payload.model_dump(exclude_unset=True)
+        )
+    except inventory.InventoryError as error:
+        raise _inventory_error(error)
+
+
+@app.post("/api/businesses/{business_id}/inventory/products/{product_id}/movements")
+def inventory_record_movement(
+    business_id: str,
+    product_id: str,
+    payload: InventoryMovementRequest,
+    user: dict = Depends(user_from_auth),
+) -> dict:
+    business_for_user(business_id, user)
+    try:
+        return inventory.record_movement(
+            DB_PATH,
+            business_id,
+            product_id,
+            user["id"],
+            payload.movement_type,
+            payload.quantity,
+            payload.note,
+        )
+    except inventory.InventoryError as error:
+        raise _inventory_error(error)
+
+
+@app.get("/api/businesses/{business_id}/inventory/movements")
+def inventory_movement_history(
+    business_id: str,
+    limit: int = Query(default=100, ge=1, le=500),
+    user: dict = Depends(user_from_auth),
+) -> list[dict]:
+    business_for_user(business_id, user)
+    return inventory.list_movements(DB_PATH, business_id, limit)
+
+
+@app.post("/api/businesses/{business_id}/inventory/import")
+def inventory_import_stocktake(
+    business_id: str,
+    file: UploadFile = File(...),
+    user: dict = Depends(user_from_auth),
+) -> dict:
+    business_for_user(business_id, user)
+    if Path(file.filename or "").suffix.lower() != ".csv":
+        raise HTTPException(415, "Inventory stocktake imports must be CSV files.")
+    content = file.file.read(MAX_UPLOAD_BYTES + 1)
+    if len(content) > MAX_UPLOAD_BYTES:
+        raise HTTPException(413, "Uploaded file is too large.")
+    try:
+        text = content.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        raise HTTPException(400, "Inventory CSV must use UTF-8 encoding.")
+    reader = csv.DictReader(io.StringIO(text, newline=""))
+    if not reader.fieldnames:
+        raise HTTPException(400, "Inventory CSV must include a header row.")
+    headers = [header.strip().casefold() for header in reader.fieldnames]
+    if len(headers) != len(set(headers)):
+        raise HTTPException(400, "Inventory CSV contains duplicate column names.")
+    if not {"product", "quantity_on_hand"}.issubset(headers):
+        raise HTTPException(
+            400,
+            "Inventory CSV must include product and quantity_on_hand columns.",
+        )
+    header_map = dict(zip(headers, reader.fieldnames))
+    rows = []
+    for row_number, raw_row in enumerate(reader, start=2):
+        if None in raw_row:
+            raise HTTPException(400, f"Row {row_number} has extra values beyond its headers.")
+        if not any((value or "").strip() for value in raw_row.values()):
+            continue
+        rows.append(
+            {
+                "name": raw_row.get(header_map["product"]) or "",
+                "sku": raw_row.get(header_map["sku"]) if "sku" in header_map else None,
+                "unit": raw_row.get(header_map["unit"]) if "unit" in header_map else "unit",
+                "quantity_on_hand": _parse_inventory_number(
+                    raw_row.get(header_map["quantity_on_hand"]),
+                    row_number,
+                    "quantity_on_hand",
+                    required=True,
+                ),
+                "unit_cost": _parse_inventory_number(
+                    raw_row.get(header_map["unit_cost"]) if "unit_cost" in header_map else None,
+                    row_number,
+                    "unit_cost",
+                ),
+                "reorder_level": _parse_inventory_number(
+                    raw_row.get(header_map["reorder_level"]) if "reorder_level" in header_map else None,
+                    row_number,
+                    "reorder_level",
+                ),
+            }
+        )
+    try:
+        return inventory.import_stocktake(DB_PATH, business_id, user["id"], rows)
+    except inventory.InventoryError as error:
+        raise _inventory_error(error)
+
+
+@app.get("/api/businesses/{business_id}/inventory/import-template")
+def inventory_import_template(
+    business_id: str,
+    user: dict = Depends(user_from_auth),
+) -> Response:
+    business_for_user(business_id, user)
+    content = "product,sku,unit,quantity_on_hand,unit_cost,reorder_level\n"
+    return Response(
+        content,
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="inventory-stocktake-template.csv"'},
+    )
+
+
+@app.post("/api/businesses/{business_id}/performance-research")
+def business_performance_research(
+    business_id: str,
+    dataset_id: str | None = None,
+    from_date: date | None = Query(default=None, alias="from"),
+    to_date: date | None = Query(default=None, alias="to"),
+    user: dict = Depends(user_from_auth),
+) -> dict:
+    if from_date and to_date and from_date > to_date:
+        raise HTTPException(400, "The from date must be on or before the to date.")
+    _, records = selected_records(business_id, dataset_id, user)
+    try:
+        return market_research.research_performance(
+            DB_PATH, business_id, records, from_date, to_date
+        )
+    except market_research.MarketResearchError as error:
+        raise HTTPException(503, str(error))
+
+
+@app.get("/api/businesses/{business_id}/integrations/brave-search")
+def business_brave_search_status(
+    business_id: str,
+    user: dict = Depends(user_from_auth),
+) -> dict:
+    business_for_user(business_id, user)
+    return market_research.brave_key_status(DB_PATH, business_id)
+
+
+@app.put("/api/businesses/{business_id}/integrations/brave-search")
+def configure_business_brave_search(
+    business_id: str,
+    payload: BraveSearchIntegrationRequest,
+    user: dict = Depends(user_from_auth),
+) -> dict:
+    business_for_user(business_id, user)
+    try:
+        market_research.save_brave_key(DB_PATH, business_id, payload.api_key)
+    except market_research.MarketResearchError as error:
+        raise HTTPException(503, str(error))
+    return market_research.brave_key_status(DB_PATH, business_id)
+
+
+@app.delete("/api/businesses/{business_id}/integrations/brave-search")
+def remove_business_brave_search(
+    business_id: str,
+    user: dict = Depends(user_from_auth),
+) -> dict:
+    business_for_user(business_id, user)
+    market_research.delete_brave_key(DB_PATH, business_id)
+    return {"configured": False}
+
+
+@app.post("/api/businesses/{business_id}/financial-position/balances")
+def add_financial_position_balance(
+    business_id: str,
+    payload: FinancialPositionBalanceRequest,
+    user: dict = Depends(user_from_auth),
+) -> dict:
+    business_for_user(business_id, user)
+    try:
+        if not math.isfinite(payload.amount):
+            raise financial_position.FinancialPositionError("Balance must be a finite number.")
+        return financial_position.record_balance(
+            DB_PATH,
+            business_id,
+            user["id"],
+            payload.category,
+            payload.account_name,
+            payload.as_of_date,
+            payload.amount,
+            payload.note,
+        )
+    except financial_position.FinancialPositionError as error:
+        raise HTTPException(400, str(error))
+
+
+@app.get("/api/businesses/{business_id}/financial-position")
+def get_financial_position(
+    business_id: str,
+    as_of_date: date = Query(default_factory=date.today, alias="as_of"),
+    user: dict = Depends(user_from_auth),
+) -> dict:
+    business_for_user(business_id, user)
+    return financial_position.position_as_of(DB_PATH, business_id, as_of_date)
+
+
+@app.get("/api/businesses/{business_id}/financial-position/history")
+def financial_position_history(
+    business_id: str,
+    limit: int = Query(default=200, ge=1, le=1000),
+    user: dict = Depends(user_from_auth),
+) -> list[dict]:
+    business_for_user(business_id, user)
+    return financial_position.balance_history(DB_PATH, business_id, limit)
 
 
 @app.get("/api/businesses/{business_id}/datasets/{dataset_id}/records")
@@ -307,6 +664,33 @@ def selected_records(business_id: str, dataset_id: str | None, user: dict) -> tu
     return dataset, read_processed_records(dataset)
 
 
+def _lance_analytics(
+    records: list[dict],
+    from_date: date | None,
+    to_date: date | None,
+) -> dict:
+    currencies = {record.get("currency") or "GHS" for record in records}
+    if len(currencies) <= 1:
+        return analyze(records, from_date, to_date)
+    by_currency = {
+        currency: analyze(
+            [record for record in records if (record.get("currency") or "GHS") == currency],
+            from_date,
+            to_date,
+        )
+        for currency in sorted(currencies)
+    }
+    return {
+        "period": analyze(records, from_date, to_date)["period"],
+        "currency": "MIXED",
+        "monetary_aggregation_available": False,
+        "warnings": [
+            "Business-wide records contain multiple currencies. Amounts are grouped by currency and must not be added or compared without conversion."
+        ],
+        "by_currency": by_currency,
+    }
+
+
 @app.get("/api/businesses/{business_id}/insights")
 def dataset_insights(
     business_id: str,
@@ -356,27 +740,33 @@ def ask_lance_question(
     if not datasets:
         raise HTTPException(404, "No accepted business data is available for Lance.")
     dataset = next((item for item in datasets if item["id"] == dataset_id), datasets[0])
-    records = all_records(datasets)
+    try:
+        records = all_records(datasets)
+    except DataAvailabilityError as error:
+        raise HTTPException(503, str(error))
     conversation = db.one(DB_PATH, "SELECT * FROM chat_conversations WHERE id = ? AND business_id = ? AND user_id = ?", (payload.conversation_id or "", business_id, user["id"])) if payload.conversation_id else None
     if payload.conversation_id and not conversation:
         raise HTTPException(404, "Conversation not found.")
-    if not conversation:
-        conversation_id = str(uuid.uuid4())
-        timestamp = db.now()
-        db.insert(DB_PATH, "INSERT INTO chat_conversations VALUES (?, ?, ?, ?, ?, ?, ?)", (conversation_id, business_id, user["id"], dataset["id"], payload.question.strip()[:80], timestamp, timestamp))
-        conversation = db.one(DB_PATH, "SELECT * FROM chat_conversations WHERE id = ?", (conversation_id,))
-    history = db.many(DB_PATH, "SELECT role, content FROM chat_messages WHERE conversation_id = ? ORDER BY created_at LIMIT 12", (conversation["id"],))
-    snapshot = analyze(records, from_date, to_date)
-    snapshot = rag_context(DB_PATH, business_id, payload.question.strip(), datasets, from_date, to_date, snapshot)
+    is_new_conversation = conversation is None
+    conversation_id = conversation["id"] if conversation else str(uuid.uuid4())
+    history = db.many(DB_PATH, "SELECT role, content FROM chat_messages WHERE conversation_id = ? ORDER BY created_at, id LIMIT 12", (conversation_id,)) if conversation else []
+    snapshot = _lance_analytics(records, from_date, to_date)
+    try:
+        snapshot = rag_context(DB_PATH, business_id, payload.question.strip(), datasets, from_date, to_date, snapshot)
+    except DataAvailabilityError as error:
+        raise HTTPException(503, str(error))
     try:
         answer = ask_lance(payload.question.strip(), snapshot, history)
     except RuntimeError as error:
         raise HTTPException(503, str(error))
+    if is_new_conversation:
+        timestamp = db.now()
+        db.insert(DB_PATH, "INSERT INTO chat_conversations VALUES (?, ?, ?, ?, ?, ?, ?)", (conversation_id, business_id, user["id"], dataset["id"], payload.question.strip()[:80], timestamp, timestamp))
     timestamp = db.now()
-    db.insert(DB_PATH, "INSERT INTO chat_messages VALUES (?, ?, ?, ?, ?)", (str(uuid.uuid4()), conversation["id"], "user", payload.question.strip(), timestamp))
-    db.insert(DB_PATH, "INSERT INTO chat_messages VALUES (?, ?, ?, ?, ?)", (str(uuid.uuid4()), conversation["id"], "assistant", answer, db.now()))
-    db.insert(DB_PATH, "UPDATE chat_conversations SET updated_at = ? WHERE id = ?", (db.now(), conversation["id"]))
-    return {"conversation_id": conversation["id"], "answer": answer, "question": payload.question.strip(), "period": snapshot["analytics"]["period"], "dataset": dataset_response(dataset), "scope": snapshot["scope"], "datasets_considered": len(datasets)}
+    db.insert(DB_PATH, "INSERT INTO chat_messages VALUES (?, ?, ?, ?, ?)", (str(uuid.uuid4()), conversation_id, "user", payload.question.strip(), timestamp))
+    db.insert(DB_PATH, "INSERT INTO chat_messages VALUES (?, ?, ?, ?, ?)", (str(uuid.uuid4()), conversation_id, "assistant", answer, db.now()))
+    db.insert(DB_PATH, "UPDATE chat_conversations SET updated_at = ? WHERE id = ?", (db.now(), conversation_id))
+    return {"conversation_id": conversation_id, "answer": answer, "question": payload.question.strip(), "period": snapshot["analytics"]["period"], "dataset": dataset_response(dataset), "scope": snapshot["scope"], "datasets_considered": len(datasets)}
 
 
 @app.get("/api/businesses/{business_id}/ask-lance/conversations")

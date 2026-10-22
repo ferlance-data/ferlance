@@ -1,5 +1,7 @@
 from io import BytesIO
 
+import pytest
+
 from backend.universal_ingestion import UniversalCSVIngestionEngine
 
 
@@ -49,3 +51,9 @@ def test_engine_maps_budget_cost_columns_without_misclassifying_categories():
     assert result["schema_summary"]["column_mapping"]["cost"] == "actual_cost_usd"
     assert result["clean_df"].iloc[0]["category"] == "Cloud Hosting"
     assert result["clean_df"].iloc[0]["cost"] == 120.0
+
+
+@pytest.mark.parametrize("value", ["10abc20", "12,34", "invoice123", "1e6"])
+def test_engine_rejects_numbers_with_unparsed_characters(value):
+    with pytest.raises(ValueError, match="not numeric"):
+        UniversalCSVIngestionEngine._number(value)

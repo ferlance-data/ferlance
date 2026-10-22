@@ -6,6 +6,7 @@ import csv
 import hashlib
 import io
 import json
+import math
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -168,16 +169,26 @@ class UniversalCSVIngestionEngine:
     def _number(value: Any) -> float | None:
         if value is None or str(value).strip().lower() in MISSING_TOKENS:
             return None
-        text = str(value).strip().lower().replace("(", "-").replace(")", "")
+        text = str(value).strip().lower()
         percent = "%" in text
-        text = text.replace("gh₵", "").replace("gማ", "").replace("$", "").replace("€", "").replace("£", "").replace(",", "").replace("%", "").strip()
+        parenthesized = text.startswith("(") and text.endswith(")")
+        if text.startswith("(") != text.endswith(")"):
+            raise ValueError(f"not numeric: {value!r}")
+        if parenthesized:
+            text = text[1:-1].strip()
+        text = re.sub(r"\b(?:ghs|usd)\b", "", text)
+        text = text.replace("gh₵", "").replace("gማ", "")
+        text = text.translate(str.maketrans("", "", "$€£₵")).replace("%", "").strip()
         if text in WORD_NUMBERS:
             result = float(WORD_NUMBERS[text])
         else:
-            match = re.search(r"[-+]?\d+(?:\.\d+)?", text)
-            if not match:
+            if not re.fullmatch(r"[+-]?(?:(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d+)?|\.\d+)", text):
                 raise ValueError(f"not numeric: {value!r}")
-            result = float(match.group())
+            result = float(text.replace(",", ""))
+        if not math.isfinite(result):
+            raise ValueError(f"not numeric: {value!r}")
+        if parenthesized:
+            result = -abs(result)
         return result / 100 if percent else result
 
     @staticmethod

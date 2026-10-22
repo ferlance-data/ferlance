@@ -8,6 +8,10 @@ from . import db
 from .config import PROCESSED_DIR
 
 
+class DataAvailabilityError(RuntimeError):
+    pass
+
+
 def resolve_processed_path(stored_path: str | None) -> Path | None:
     if not stored_path:
         return None
@@ -22,6 +26,21 @@ def resolve_processed_path(stored_path: str | None) -> Path | None:
 
 def _record_text(record: dict[str, Any]) -> str:
     return " ".join(f"{key} {value}" for key, value in record.items() if value not in (None, ""))
+
+
+def _read_dataset_records(dataset: dict[str, Any]) -> list[dict[str, Any]]:
+    path = resolve_processed_path(dataset.get("processed_path"))
+    if path is None:
+        raise DataAvailabilityError(
+            f"Processed records for {dataset['filename']} are unavailable. Re-upload the dataset before asking Lance."
+        )
+    try:
+        with path.open("r", encoding="utf-8") as source:
+            return [json.loads(line) for line in source if line.strip()]
+    except (OSError, json.JSONDecodeError) as error:
+        raise DataAvailabilityError(
+            f"Processed records for {dataset['filename']} are unavailable. Re-upload the dataset before asking Lance."
+        ) from error
 
 
 def index_dataset(db_path: Path, business_id: str, dataset_id: str, records: list[dict[str, Any]]) -> None:
@@ -42,13 +61,18 @@ def _query(question: str) -> str:
 
 def retrieve(db_path: Path, business_id: str, question: str, datasets: list[dict[str, Any]], limit: int = 20) -> list[dict[str, Any]]:
     for dataset in datasets:
-        path = resolve_processed_path(dataset.get("processed_path"))
-        if path:
-            try:
-                with path.open("r", encoding="utf-8") as source:
-                    index_dataset(db_path, business_id, dataset["id"], [json.loads(line) for line in source if line.strip()])
-            except (OSError, json.JSONDecodeError):
-                continue
+        existing = db.one(
+            db_path,
+            "SELECT rowid FROM rag_documents_fts WHERE business_id = ? AND dataset_id = ? LIMIT 1",
+            (business_id, dataset["id"]),
+        )
+        if not existing:
+            index_dataset(
+                db_path,
+                business_id,
+                dataset["id"],
+                _read_dataset_records(dataset),
+            )
     match = _query(question)
     if match:
         rows = db.many(db_path, "SELECT dataset_id, content FROM rag_documents_fts WHERE business_id = ? AND rag_documents_fts MATCH ? ORDER BY rank LIMIT ?", (business_id, match, limit))
@@ -61,14 +85,7 @@ def retrieve(db_path: Path, business_id: str, question: str, datasets: list[dict
 def all_records(datasets: list[dict[str, Any]]) -> list[dict[str, Any]]:
     records: list[dict[str, Any]] = []
     for dataset in datasets:
-        path = resolve_processed_path(dataset.get("processed_path"))
-        if not path:
-            continue
-        try:
-            with path.open("r", encoding="utf-8") as source:
-                records.extend(json.loads(line) for line in source if line.strip())
-        except (OSError, json.JSONDecodeError):
-            continue
+        records.extend(_read_dataset_records(dataset))
     return records
 
 
