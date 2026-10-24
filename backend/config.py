@@ -29,6 +29,10 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
 GROQ_API_URL = os.getenv("GROQ_API_URL", "https://api.groq.com/openai/v1/chat/completions")
 GROQ_TIMEOUT_SECONDS = float(os.getenv("GROQ_TIMEOUT_SECONDS", "8"))
+AGENTROUTER_API_KEY= os.getenv("AGENTROUTER_API_KEY", "")
+AGENTROUTER_URL=os.getenv("AGENTROUTER_URL", "https://agentrouter.org/v1/")
+AGENTROUTER_MODELS=tuple(model.strip() for  model in os.getenv("AGENTROUTER_MODELS", ""))
+SERPAPI_KEY=os.getenv("SERPAPI_KEY", "")
 
 def ensure_storage() -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)

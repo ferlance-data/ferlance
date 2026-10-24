@@ -6,3 +6,6 @@ tests/__pycache__/
 frontend/node_modules/
 .venv/
 .pytest_cache/
+test.py
+.env
+backend/.venv/**

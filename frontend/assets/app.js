@@ -67,6 +67,14 @@ function configureDomainView(result) {
   ranking.querySelector('option[value="transactions"]').textContent = isCost ? 'Most records' : 'Most transactions';
 }
 
+function renderDashboardTrend() {
+  if (!state.lastAnalytics) return;
+  const period = $('#trend-period').value;
+  const isCost = state.lastAnalytics.profile?.domain === 'cost';
+  const trend = state.lastAnalytics.trend[isCost ? `cost_${period}` : period] || [];
+  renderChart(trend, isCost ? 'cost' : 'revenue');
+}
+
 function selectedDataset() { return $('#dataset-select').value; }
 function filterParams() {
   const params = new URLSearchParams(); const selected = selectedDataset(); if (selected) params.set('dataset_id', selected); const preset = $('#date-preset').value; const bounds = state.datasetBounds || {}; const end = bounds.to ? new Date(`${bounds.to}T00:00:00`) : new Date(); const iso = (value) => value.toISOString().slice(0, 10);
@@ -89,7 +97,7 @@ async function loadDashboard() {
   $('#summary').replaceChildren(cell('p', result.summary)); $('#dashboard-warnings').replaceChildren(...result.warnings.map((warning) => { const item = cell('div', warning); item.className = 'warning'; return item; }));
   const isCost = result.profile?.domain === 'cost'; const primaryLabel = result.kpis.primary_label || 'Total revenue'; const primaryValue = result.kpis.primary_value ?? result.kpis.total_revenue; const cards = [[primaryLabel, money(primaryValue)], ['Records', result.kpis.transactions], [isCost ? 'Average cost record' : 'Average sale', money(isCost ? (result.kpis.total_cost / (result.kpis.transactions || 1)) : result.kpis.average_sale)], ['Top project / item', result.kpis.top_product || 'Unavailable']];
   $('#kpis').replaceChildren(...cards.map(([label, value]) => { const card = document.createElement('div'); card.className = 'kpi'; card.append(cell('span', label), cell('strong', value)); return card; }));
-  const trend = result.profile?.domain === 'cost' ? result.trend.cost_daily : result.trend.daily; renderChart(trend, result.profile?.domain === 'cost' ? 'cost' : 'revenue'); renderProducts(result.products);
+  renderDashboardTrend(); renderProducts(result.products);
   if (result.customers.available) renderTable($('#customers'), ['Customer', result.profile?.domain === 'cost' ? 'Cost' : 'Revenue', 'Records'], result.customers.top_customers.map((item) => [item.customer, money(item.metric_value ?? item.revenue), item.transactions])); else $('#customers').replaceChildren(cell('p', result.customers.reason));
   $('#conditional').replaceChildren(cell('p', result.profit.available ? `Gross profit is ${money(result.profit.gross_profit)} after ${money(result.profit.cost)} in costs.` : result.profile?.domain === 'cost' ? `Recorded costs total ${money(result.kpis.total_cost)}. Revenue is not present in this dataset, so profit cannot be calculated.` : result.profit.reason), cell('p', result.inventory.reason));
 }
@@ -198,6 +206,7 @@ $$('.nav-link').forEach((link) => link.addEventListener('click', () => navigate(
 $('#dataset-select').addEventListener('change', refreshViews);
 $('#refresh-dashboard').addEventListener('click', refreshViews);
 $('#date-preset').addEventListener('change', async (event) => { const custom = event.target.value === 'custom'; $('#from-date').disabled = !custom; $('#to-date').disabled = !custom; await refreshViews(); });
+$('#trend-period').addEventListener('change', renderDashboardTrend);
 $('#upload-form').addEventListener('submit', async (event) => { event.preventDefault(); const submit = event.target.querySelector('button[type="submit"]'); submit.disabled = true; status('#upload-status', 'Processing your file...'); const body = new FormData(); body.append('file', $('#dataset-file').files[0]); try { const result = await request(`/api/businesses/${state.businessId}/datasets`, { method: 'POST', body }); status('#upload-status', `${result.status}: ${result.accepted_rows} accepted, ${result.rejected_rows} rejected.`); await loadHistory(); navigate('dashboard'); } catch (error) { status('#upload-status', error.message, true); } finally { submit.disabled = false; } });
 $('#profile-form').addEventListener('submit', async (event) => { event.preventDefault(); try { const identity = await request('/api/auth/profile', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ full_name: $('#profile-name').value, business_name: $('#profile-business').value }) }); state.businessId = identity.business.id; $('#business-name').textContent = identity.business.name; status('#profile-status', 'Profile saved.'); } catch (error) { status('#profile-status', error.message, true); } });
 $('#question-grid').addEventListener('click', async (event) => { if (!event.target.dataset.question || !selectedDataset()) return; try { const result = await request(`/api/businesses/${state.businessId}/questions/${event.target.dataset.question}?${filterParams()}`); renderQuestionAnswer(result); } catch (error) { status('#insight-status', error.message, true); } });
