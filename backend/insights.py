@@ -67,6 +67,15 @@ def generate_insights(records: list[dict[str, Any]], from_date: date | None = No
     if current["products"].get("available") and current["products"].get("items"):
         top = current["products"]["best_sellers"][0]
         insights.append({"type": "recommendation", "title": "Product focus", "message": f"{top['product']} is the leading product by revenue in this period.", "severity": "info", "supporting_metric": top, "limitations": ["This recommendation uses revenue only; inventory and margin are unavailable."]})
+    if current["products"].get("profit_available"):
+        losses = current["products"]["rankings"]["loss"]
+        if losses:
+            worst = losses[0]
+            insights.append({"type": "anomaly", "title": "Item operating at a loss", "message": f"{worst['product']} recorded a loss after item costs of {abs(worst['gross_profit']):.2f} in this period.", "severity": "attention", "supporting_metric": worst, "limitations": ["This calculation uses the supplied item costs and excludes costs not attached to the item, taxes, and financing."]})
+        roi_items = [item for item in current["products"]["items"] if item["roi_pct"] is not None]
+        if roi_items:
+            best_roi = max(roi_items, key=lambda item: (item["roi_pct"], item["product"]))
+            insights.append({"type": "recommendation", "title": "Highest item return", "message": f"{best_roi['product']} has the highest recorded return on item cost at {best_roi['roi_pct']:.2f}%.", "severity": "positive" if best_roi["roi_pct"] > 0 else "attention", "supporting_metric": best_roi, "limitations": ["ROI is profit after recorded item cost divided by that cost; it excludes costs not attached to the item, taxes, and financing."]})
     comparison = {"label": "Revenue", "message": _change_message("Revenue", revenue_change), "current": revenue_change["current"], "previous": revenue_change["previous"], "percent": revenue_change["percent"], "direction": revenue_change["direction"]}
     return {"period": {"from": current_start.isoformat() if current_start else None, "to": current_end.isoformat() if current_end else None}, "comparison_period": {"from": previous_start.isoformat() if previous_start else None, "to": previous_end.isoformat() if previous_end else None}, "comparison": comparison, "revenue_change": revenue_change, "insights": insights, "warnings": current["warnings"]}
 

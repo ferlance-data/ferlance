@@ -10,26 +10,122 @@
   <main class="app-page" id="app-root" hidden>
     <nav class="app-nav">
       <div class="identity"><span class="avatar" id="user-avatar">F</span><span><strong id="business-name">Workspace</strong><br><small id="user-email">Loading identity...</small></span></div>
-      <div class="nav-actions"><button class="secondary nav-link" data-page="dashboard" type="button">Dashboard</button><button class="secondary nav-link" data-page="data" type="button">Data</button><button class="secondary nav-link" data-page="insights" type="button">Insights</button><button class="secondary nav-link" data-page="ask-lance" type="button">Ask Lance</button><button class="secondary nav-link" data-page="profile" type="button">Profile</button><button class="secondary" id="logout" type="button">Sign out</button></div>
+      <div class="nav-actions"><button class="secondary nav-link" data-page="dashboard" type="button">Dashboard</button><button class="secondary nav-link" data-page="catalogue" type="button">Catalogue</button><button class="secondary nav-link" data-page="inventory" type="button">Inventory</button><button class="secondary nav-link" data-page="financial-position" type="button">Financial position</button><button class="secondary nav-link" data-page="data" type="button">Data</button><button class="secondary nav-link" data-page="insights" type="button">Insights</button><button class="secondary nav-link" data-page="ask-lance" type="button">Ask Lance</button><button class="secondary nav-link" data-page="profile" type="button">Profile</button><button class="secondary" id="logout" type="button">Sign out</button></div>
     </nav>
 
-    <section class="page-heading"><div><p class="brand">FERLANCE WORKSPACE</p><h1 id="page-title">Business dashboard</h1></div><p id="page-description">A clear view of the records your business has accepted and the signals they support.</p></section>
+    <section class="page-heading"><div><p class="brand">FERLANCE WORKSPACE</p><h1 id="page-title">Business dashboard</h1></div><div class="page-heading-actions"><p id="page-description">A clear view of the records your business has accepted and the signals they support.</p><button id="print-report-button" type="button" disabled>Print financial report</button></div></section>
     <div class="page-status" id="global-status"></div>
 
     <section class="page-view" data-view="dashboard">
       <div class="surface dashboard-overview">
-        <div class="toolbar"><label>Dataset<select id="dataset-select"></select></label><label>Date range<select id="date-preset"><option value="all">All dates</option><option value="today">Today</option><option value="7">Last 7 days</option><option value="30">Last 30 days</option><option value="quarter">Quarter</option><option value="custom">Custom</option></select></label><label>From<input id="from-date" type="date" disabled></label><label>To<input id="to-date" type="date" disabled></label><button id="refresh-dashboard" type="button">Update view</button></div>
+        <div class="toolbar"><label>Dataset<select id="dataset-select"></select></label><label>Date range<select id="date-preset"><option value="all">All dates</option><option value="today">Latest day</option><option value="week">Week to date</option><option value="7">Last 7 days</option><option value="month">Month to date</option><option value="30">Last 30 days</option><option value="quarter">Quarter to date</option><option value="year">Year to date</option><option value="custom">Custom</option></select></label><label>From<input id="from-date" type="date" disabled></label><label>To<input id="to-date" type="date" disabled></label><button id="refresh-dashboard" type="button">Update view</button></div>
         <div class="page-status" id="dashboard-status" role="status" aria-live="polite"></div><div id="dashboard-warnings"></div><div id="summary"></div><div class="kpi-grid" id="kpis"></div>
       </div>
-      <div class="page-grid dashboard-grid"><div class="surface"><div class="section-heading"><div><h2 id="trend-title">Revenue trend</h2><p class="section-caption">Track performance over time</p></div><label class="compact-filter">Trend period<select id="trend-period"><option value="daily">Daily</option><option value="weekly" selected>Weekly</option><option value="monthly">Monthly</option><option value="yearly">Yearly</option></select></label></div><div id="trend"></div></div><div class="surface"><div class="section-heading"><div><h2 id="products-title">Product rankings</h2><p class="section-caption">Compare your top performers</p></div><label class="compact-filter">Rank by<select id="product-ranking"><option value="revenue">Most revenue</option><option value="transactions">Most transactions</option><option value="profit">Most profit</option><option value="loss">Most loss</option></select></label></div><div class="entity-list" id="products"></div></div><div class="surface"><h2 id="customers-title">Customers</h2><p class="section-caption">Highest value relationships</p><div class="entity-list" id="customers"></div></div><div class="surface"><h2>Conditional metrics</h2><p class="section-caption">Additional signals from your data</p><div id="conditional"></div></div></div>
+      <div class="surface dashboard-insight-surface"><div class="section-heading"><div><h2>Business insights</h2><p class="section-caption">Automatically surfaced from this report</p></div><button class="secondary" id="view-all-insights" type="button">View all insights</button></div><div id="dashboard-insights"></div></div>
+      <div class="surface dashboard-inventory-surface"><div class="section-heading"><div><h2>Inventory snapshot</h2><p class="section-caption">Current stock from your inventory ledger</p></div><button class="secondary" id="manage-inventory" type="button">Manage inventory</button></div><div class="page-status" id="inventory-dashboard-status" role="status"></div><div class="kpi-grid" id="inventory-dashboard-summary"></div></div>
+      <div class="page-grid dashboard-grid"><div class="surface"><div class="section-heading"><div><h2 id="trend-title">Revenue trend</h2><p class="section-caption">Explore the report by time period</p></div></div><div class="period-tabs" role="group" aria-label="Financial reporting period"><button class="period-tab" type="button" data-period="daily" aria-pressed="false">Day</button><button class="period-tab active" type="button" data-period="weekly" aria-pressed="true">Week</button><button class="period-tab" type="button" data-period="monthly" aria-pressed="false">Month</button><button class="period-tab" type="button" data-period="quarterly" aria-pressed="false">Quarter</button><button class="period-tab" type="button" data-period="yearly" aria-pressed="false">Year</button></div><div id="trend"></div></div><div class="surface"><div class="section-heading"><div><h2 id="products-title">Product performance</h2><p class="section-caption">Current period summary</p></div><button class="secondary" id="view-catalogue" type="button">View full catalogue</button></div><div class="table-scroll" id="products"></div></div><div class="surface"><h2 id="customers-title">Customers</h2><p class="section-caption">Highest value relationships</p><div class="table-scroll" id="customers"></div></div><div class="surface"><h2>Conditional metrics</h2><p class="section-caption">Additional signals from your data</p><div id="conditional"></div></div></div>
+    </section>
+
+    <section class="page-view" data-view="catalogue" hidden>
+      <div class="surface">
+        <div class="catalogue-heading"><div><p class="section-caption">PRODUCT CATALOGUE</p><h2>All products in this dataset</h2><p class="section-caption" id="catalogue-source">Choose a processed dataset on the dashboard.</p></div><div class="catalogue-controls"><label>Search products<input id="catalogue-search" type="search" placeholder="Search product name"></label><label>Sort by<select id="catalogue-sort"><option value="name">Name A–Z</option><option value="revenue">Highest revenue</option><option value="profit">Highest profit</option></select></label></div></div>
+        <div class="catalogue-summary" id="catalogue-summary" role="status"></div>
+        <div class="catalogue-list" id="catalogue-list"><p>Select a dataset with product names to view its catalogue.</p></div>
+        <p class="catalogue-note">This list is built from distinct product names in the selected upload. It is not a separately managed stock catalogue; SKU, current price, stock on hand, and product editing are not available from these records.</p>
+      </div>
+    </section>
+
+    <section class="page-view" data-view="inventory" hidden>
+      <div class="surface inventory-overview">
+        <div class="section-heading"><div><p class="section-caption">LIVE STOCK LEDGER</p><h2>Stock overview</h2><p class="section-caption">Stock changes are recorded here; sales-report uploads never change inventory automatically.</p></div><div class="inventory-overview-actions"><label class="inventory-archived-toggle"><input id="inventory-include-archived" type="checkbox"> Show archived products</label><button class="secondary" id="print-inventory-report" type="button">Print inventory report</button></div></div>
+        <div class="kpi-grid inventory-summary" id="inventory-summary"></div>
+        <div id="inventory-status" class="page-status" role="status" aria-live="polite"></div>
+      </div>
+      <div class="inventory-workspace">
+        <form class="surface inventory-product-form" id="inventory-product-form">
+          <div class="section-heading"><div><h2 id="inventory-product-form-title">Add a product</h2><p class="section-caption">Set a SKU, unit cost, and reorder threshold.</p></div><button class="secondary" id="inventory-product-reset" type="button" hidden>Cancel edit</button></div>
+          <label>Product name<input id="inventory-product-name" maxlength="200" required></label>
+          <label>SKU (optional)<input id="inventory-product-sku" maxlength="100"></label>
+          <div class="inventory-form-grid"><label>Unit<input id="inventory-product-unit" value="unit" maxlength="40" required></label><label>Unit cost<input id="inventory-product-cost" type="number" min="0" step="0.01" placeholder="Optional"></label></div>
+          <div class="inventory-form-grid"><label>Reorder level<input id="inventory-product-reorder" type="number" min="0" step="any" value="0" required></label><label id="inventory-opening-field">Opening stock<input id="inventory-product-opening" type="number" min="0" step="any" value="0"></label></div>
+          <button id="inventory-product-submit" type="submit">Add product</button>
+        </form>
+        <form class="surface inventory-movement-form" id="inventory-movement-form">
+          <div class="section-heading"><div><h2>Record stock movement</h2><p class="section-caption">Purchases add stock; sales deduct it; adjustments can add or remove units.</p></div></div>
+          <label>Product<select id="inventory-movement-product" required></select></label>
+          <label>Movement type<select id="inventory-movement-type"><option value="purchase">Stock received / purchase</option><option value="sale">Sale / stock issued</option><option value="adjustment">Stock adjustment</option></select></label>
+          <label id="inventory-movement-quantity-label">Quantity<input id="inventory-movement-quantity" type="number" min="0.000001" step="any" required></label>
+          <label>Note (optional)<input id="inventory-movement-note" maxlength="500" placeholder="Supplier, reference, or reason"></label>
+          <button id="inventory-movement-submit" type="submit" disabled>Record movement</button>
+        </form>
+      </div>
+      <div class="inventory-workspace inventory-data-workspace">
+        <section class="surface inventory-products-panel"><div class="section-heading"><div><h2>Products and stock</h2><p class="section-caption">Low stock is flagged when on-hand quantity is at or below the reorder level.</p></div><label class="inventory-search">Search<input id="inventory-search" type="search" placeholder="Name or SKU"></label></div><div class="table-scroll" id="inventory-products"></div></section>
+        <form class="surface inventory-import-form" id="inventory-import-form">
+          <div class="section-heading"><div><h2>Import a stocktake</h2><p class="section-caption">Explicitly replace on-hand quantities with a counted CSV snapshot.</p></div></div>
+          <p>A stocktake import creates or matches products and records the difference as an auditable movement. It does not import sales.</p>
+          <a id="inventory-template-download" href="#">Download CSV template</a>
+          <label>Stocktake CSV<input id="inventory-import-file" type="file" accept=".csv" required></label>
+          <button id="inventory-import-submit" type="submit" disabled>Import counted stock</button>
+          <div id="inventory-import-status" class="form-status" role="status" aria-live="polite"></div>
+        </form>
+      </div>
+      <section class="surface inventory-movements-panel"><div class="section-heading"><div><h2>Recent stock movements</h2><p class="section-caption">Opening stock, purchases, sales, adjustments, and imports are retained for audit.</p></div></div><div class="table-scroll" id="inventory-movements"></div></section>
+    </section>
+
+    <section class="page-view" data-view="financial-position" hidden>
+      <div class="surface position-overview">
+        <div class="section-heading"><div><p class="section-caption">POINT-IN-TIME STATEMENT</p><h2>Financial position</h2><p class="section-caption">Choose a date to reconstruct assets, liabilities, and equity from balances entered on or before it.</p></div><div class="position-report-actions"><label>Report as of<input id="position-report-date" type="date" required></label><button id="refresh-position" type="button">Generate position</button><button class="secondary" id="print-position-report" type="button" disabled>Print position report</button></div></div>
+        <div id="position-status" class="page-status" role="status" aria-live="polite"></div>
+        <div id="position-warnings"></div>
+        <div class="kpi-grid inventory-summary" id="position-summary"></div>
+        <div class="position-groups" id="position-groups"></div>
+      </div>
+      <div class="position-workspace">
+        <form class="surface position-balance-form" id="position-balance-form">
+          <div class="section-heading"><div><h2>Record an account balance</h2><p class="section-caption">Enter the account balance as at the date selected above. Enter zero explicitly when the balance is zero.</p></div></div>
+          <label>Balance date<input id="position-entry-date" type="date" required></label>
+          <label>Category<select id="position-category" required></select></label>
+          <label>Account / description<input id="position-account-name" maxlength="120" required placeholder="e.g. Main bank account"></label>
+          <label>Balance<input id="position-amount" type="number" step="0.01" required></label>
+          <label>Note (optional)<input id="position-note" maxlength="500"></label>
+          <button type="submit">Save dated balance</button>
+        </form>
+        <aside class="surface position-guide"><h2>What this statement needs</h2><p>Record cash, bank, receivables, inventory value, fixed assets, payables, loans, and equity balances. Each account carries forward its latest recorded balance on or before the chosen date; stale balances are flagged.</p><p>Amounts must use the workspace currency. Inventory value is entered separately from unit counts. Missing categories stay visibly incomplete; zero is never assumed.</p><p>This is an operational balance-sheet view, not a tax filing or full general ledger. Verify opening balances and consult an accountant.</p></aside>
+      </div>
+      <section class="surface position-history-panel"><div class="section-heading"><div><h2>Balance history</h2><p class="section-caption">Dated entries provide the evidence for historical reports.</p></div></div><div class="table-scroll" id="position-history"></div></section>
     </section>
 
     <section class="page-view" data-view="data" hidden>
-      <div class="page-grid"><div class="surface"><h2>Upload records</h2><p>Accepted CSV or Excel records become searchable business data for analytics and Ask Lance.</p><form class="form-stack" id="upload-form"><label>Sales or business file<input id="dataset-file" type="file" accept=".csv,.xlsx" required></label><button type="submit">Process dataset</button><div class="form-status" id="upload-status" role="status" aria-live="polite"></div></form></div><div class="surface"><h2>Processing contract</h2><p>Every upload records its status, accepted rows, rejected rows, warnings, and errors. Partial data stays visible and traceable.</p></div></div>
-      <div class="surface"><h2>Dataset history</h2><div id="history"></div></div>
+      <div class="upload-layout">
+        <form class="surface upload-card" id="upload-form">
+          <div class="section-heading"><div><h2>Import business data</h2><p class="section-caption">Upload a sales or cost file to refresh your reports and catalogue.</p></div></div>
+          <div class="upload-drop-zone" id="upload-drop-zone">
+            <input id="dataset-file" type="file" accept=".csv,.xlsx" required>
+            <strong>Drop a file here</strong>
+            <span>CSV or Excel workbook · up to 10 MB</span>
+            <label class="button secondary" for="dataset-file">Choose a file</label>
+            <span id="selected-file-name">No file selected</span>
+          </div>
+          <div class="upload-actions"><button id="upload-button" type="submit" disabled>Import and process</button><span id="upload-status" class="form-status" role="status" aria-live="polite"></span></div>
+          <div id="upload-result" class="upload-result" hidden></div>
+        </form>
+        <aside class="surface import-guide"><h2>What happens to your file?</h2><ol><li>We match common date, sales, cost, product, and quantity columns.</li><li>Rows are checked; accepted and rejected counts are reported.</li><li>Accepted records become available to analytics, catalogue, and Ask Lance.</li></ol><p>Profit calculations need recorded revenue and cost. Stock on hand is not inferred from sales.</p></aside>
+      </div>
+      <div class="surface dataset-history"><div class="section-heading"><div><h2>Import history</h2><p class="section-caption">A traceable record of each uploaded file.</p></div></div><div class="table-scroll" id="history"></div></div>
     </section>
 
     <section class="page-view" data-view="insights" hidden>
+      <div class="surface research-panel">
+        <div class="section-heading"><div><h2>External market research</h2><p class="section-caption">When connected, Ferlance automatically compares sales declines and item losses with seasonal, weather, environmental, festive, and market context in Ghana.</p></div><button id="run-performance-research" type="button" disabled>Search this report again</button></div>
+        <p>Search sends product labels, the report period, and market only—not transaction rows, amounts, or customer information. Web results are leads, not proof of cause. Findings and citations can be included in the printed financial report.</p>
+        <form class="research-settings" id="research-settings-form">
+          <label>Brave Search API key<input id="brave-search-key" type="password" autocomplete="new-password" placeholder="Enter key to connect or replace"></label>
+          <div class="research-settings-actions"><button type="submit">Save search connection</button><button class="secondary" id="remove-brave-key" type="button" disabled>Remove connection</button><span id="research-settings-status" class="form-status" role="status" aria-live="polite"></span></div>
+        </form>
+        <div id="research-status" class="page-status" role="status" aria-live="polite"></div>
+        <div id="research-results"></div>
+      </div>
       <div class="surface"><h2>Grounded insights</h2><div class="page-status" id="insight-status" role="status" aria-live="polite"></div><div id="insights-list"></div></div>
       <div class="surface"><h2>Defined business questions</h2><p>These answers use the selected dataset and active date range. They do not invent unsupported metrics.</p><div class="question-grid" id="question-grid"><button data-question="sales-summary" type="button">Sales summary</button><button data-question="best-products" type="button">Best products</button><button data-question="customer-overview" type="button">Customer overview</button><button data-question="revenue-trend" type="button">Revenue trend</button><button data-question="underperforming-products" type="button">Underperforming products</button><button data-question="monthly-comparison" type="button">Monthly comparison</button></div><pre id="question-result" hidden></pre></div>
     </section>
@@ -42,6 +138,7 @@
       <div class="chat-layout"><aside class="surface chat-history"><div class="section-heading"><h2>Saved chats</h2><button class="secondary" id="new-chat" type="button">New chat</button></div><div class="entity-list" id="conversation-list"></div></aside><section class="surface ask-lance"><div class="chat-heading"><div><h2>Ask Lance</h2><p>Ask about the whole business workspace. Lance searches accepted records across all processed datasets.</p></div><span class="chat-context" id="chat-context">No business data selected</span></div><div class="chat-messages" id="chat-messages" aria-live="polite"><p class="empty-chat">Your conversation will appear here.</p></div><form class="chat-composer" id="ask-form"><label class="visually-hidden" for="lance-question">Your question</label><textarea id="lance-question" rows="2" maxlength="1000" placeholder="Which products create the strongest overall result?" required></textarea><div class="composer-actions"><div class="form-status" id="ask-status" role="status" aria-live="polite"></div><button type="submit">Send question</button></div></form></section></div>
     </section>
   </main>
+  <article id="print-report" class="print-report" hidden aria-label="Financial report"></article>
   <div id="loading-state" class="empty">Checking your workspace session...</div>
   <script type="module" src="/assets/app.js"></script>
 </body>

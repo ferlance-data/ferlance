@@ -2,6 +2,7 @@ from pathlib import Path
 
 from openpyxl import Workbook
 
+from backend.analytics import analyze
 from backend.processor import process_file
 
 FIXTURES = Path(__file__).parent / "fixtures"

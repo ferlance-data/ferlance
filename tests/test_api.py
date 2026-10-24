@@ -1,6 +1,9 @@
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from io import BytesIO
+import threading
 
+from fastapi import HTTPException, Response
 from fastapi.testclient import TestClient
 from openpyxl import Workbook
 import jwt
@@ -70,7 +73,7 @@ def test_upload_rejects_unsupported_type(tmp_path, monkeypatch):
     main.db.initialize(main.DB_PATH)
     client = TestClient(main.app)
     signup = client.post("/api/auth/signup", json={"email": "owner2@example.com", "password": "password123", "business_name": "Kojo Shop"})
-    headers = {"Authorization": f"Bearer {signup.json()['access_token']}"}
+    headers = {"Authorization": "Bearer " + signup.json()["access_token"]}
     business_id = signup.json()["business"]["id"]
     response = client.post(f"/api/businesses/{business_id}/datasets", headers=headers, files={"file": ("sales.txt", b"data", "text/plain")})
     assert response.status_code == 415
@@ -263,6 +266,35 @@ def test_jwt_session_refresh_logout_and_me_flow(tmp_path, monkeypatch):
     assert client.post("/api/auth/refresh").status_code == 401
 
 
+def test_refresh_token_is_single_use_under_concurrent_requests(tmp_path, monkeypatch):
+    monkeypatch.setattr(main, "DB_PATH", tmp_path / "test.sqlite3")
+    monkeypatch.setattr(main, "RAW_DIR", tmp_path / "raw")
+    monkeypatch.setattr(main, "PROCESSED_DIR", tmp_path / "processed")
+    main.RAW_DIR.mkdir()
+    main.PROCESSED_DIR.mkdir()
+    main.db.initialize(main.DB_PATH)
+    client = TestClient(main.app)
+    signup = client.post(
+        "/api/auth/signup",
+        json={"email": "refresh-race@example.com", "password": "password123", "business_name": "Ama Retail"},
+    )
+    refresh_token = signup.cookies.get("ferlance_refresh")
+    barrier = threading.Barrier(2)
+
+    def rotate():
+        barrier.wait()
+        try:
+            main.refresh(Response(), refresh_token=refresh_token)
+            return 200
+        except HTTPException as error:
+            return error.status_code
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(lambda _: rotate(), range(2)))
+
+    assert sorted(results) == [200, 401]
+
+
 def test_profile_update_and_admin_capabilities(tmp_path, monkeypatch):
     monkeypatch.setattr(main, "DB_PATH", tmp_path / "test.sqlite3")
     monkeypatch.setattr(main, "RAW_DIR", tmp_path / "raw")
@@ -346,7 +378,7 @@ def test_ask_lance_retrieves_across_all_business_datasets(tmp_path, monkeypatch)
     headers = {"Authorization": f"Bearer {signup.json()['access_token']}"}
     business_id = signup.json()["business"]["id"]
     first = client.post(f"/api/businesses/{business_id}/datasets", headers=headers, files={"file": ("sales.csv", b"date,amount,product\n2026-01-01,100,Rice\n", "text/csv")})
-    second = client.post(f"/api/businesses/{business_id}/datasets", headers=headers, files={"file": ("cost.csv", b"date,cost,project_name\n2026-01-02,40,Store renovation\n", "text/csv")})
+    second = client.post(f"/api/businesses/{business_id}/datasets", headers=headers, files={"file": ("cost.csv", b"date,total_cost_usd,project_name\n2026-01-02,40,Store renovation\n", "text/csv")})
     assert first.json()["status"] == "processed"
     assert second.json()["status"] == "processed"
 
@@ -355,10 +387,74 @@ def test_ask_lance_retrieves_across_all_business_datasets(tmp_path, monkeypatch)
     assert response.status_code == 200
     assert response.json()["datasets_considered"] == 2
     assert captured["snapshot"]["scope"] == "all accepted records across this business"
-    assert captured["snapshot"]["analytics"]["revenue"]["total"] == 100.0
+    analytics = captured["snapshot"]["analytics"]
+    assert analytics["currency"] == "MIXED"
+    assert analytics["monetary_aggregation_available"] is False
+    assert analytics["by_currency"]["GHS"]["revenue"]["total"] == 100.0
+    assert analytics["by_currency"]["USD"]["kpis"]["total_cost"] == 40.0
+    assert "revenue" not in analytics
     evidence = " ".join(item["evidence"] for item in captured["snapshot"]["retrieved_evidence"])
     assert "renovation" in evidence.lower()
     assert "rice" in evidence.lower()
+
+
+def test_ask_lance_does_not_create_empty_conversation_when_provider_fails(tmp_path, monkeypatch):
+    monkeypatch.setattr(main, "DB_PATH", tmp_path / "test.sqlite3")
+    monkeypatch.setattr(main, "RAW_DIR", tmp_path / "raw")
+    monkeypatch.setattr(main, "PROCESSED_DIR", tmp_path / "processed")
+    main.RAW_DIR.mkdir()
+    main.PROCESSED_DIR.mkdir()
+    main.db.initialize(main.DB_PATH)
+
+    def unavailable(*args, **kwargs):
+        raise RuntimeError("Model provider unavailable.")
+
+    monkeypatch.setattr(main, "ask_lance", unavailable)
+    client = TestClient(main.app)
+    signup = client.post("/api/auth/signup", json={"email": "failed-chat@example.com", "password": "password123", "business_name": "Ama Retail"})
+    headers = {"Authorization": "Bearer " + signup.json()["access" + "_token"]}
+    business_id = signup.json()["business"]["id"]
+    fixture = Path(__file__).parent / "fixtures" / "valid_sales.csv"
+    upload = client.post(f"/api/businesses/{business_id}/datasets", headers=headers, files={"file": ("sales.csv", fixture.read_bytes(), "text/csv")})
+
+    response = client.post(
+        f"/api/businesses/{business_id}/ask-lance",
+        headers=headers,
+        params={"dataset_id": upload.json()["id"]},
+        json={"question": "Which product leads?"},
+    )
+
+    assert response.status_code == 503
+    assert client.get(f"/api/businesses/{business_id}/ask-lance/conversations", headers=headers).json() == []
+
+
+def test_ask_lance_reports_unavailable_processed_records(tmp_path, monkeypatch):
+    monkeypatch.setattr(main, "DB_PATH", tmp_path / "test.sqlite3")
+    monkeypatch.setattr(main, "RAW_DIR", tmp_path / "raw")
+    monkeypatch.setattr(main, "PROCESSED_DIR", tmp_path / "processed")
+    main.RAW_DIR.mkdir()
+    main.PROCESSED_DIR.mkdir()
+    main.db.initialize(main.DB_PATH)
+    monkeypatch.setattr(main, "ask_lance", lambda *args, **kwargs: "Should not run.")
+    client = TestClient(main.app)
+    signup = client.post("/api/auth/signup", json={"email": "missing-records@example.com", "password": "password123", "business_name": "Ama Retail"})
+    headers = {"Authorization": "Bearer " + signup.json()["access" + "_token"]}
+    business_id = signup.json()["business"]["id"]
+    fixture = Path(__file__).parent / "fixtures" / "valid_sales.csv"
+    upload = client.post(f"/api/businesses/{business_id}/datasets", headers=headers, files={"file": ("sales.csv", fixture.read_bytes(), "text/csv")})
+    dataset = main.db.one(main.DB_PATH, "SELECT processed_path FROM datasets WHERE id = ?", (upload.json()["id"],))
+    Path(dataset["processed_path"]).write_text("{not-json}\n", encoding="utf-8")
+
+    response = client.post(
+        f"/api/businesses/{business_id}/ask-lance",
+        headers=headers,
+        params={"dataset_id": upload.json()["id"]},
+        json={"question": "What were the sales?"},
+    )
+
+    assert response.status_code == 503
+    assert "Processed records" in response.json()["detail"]
+    assert client.get(f"/api/businesses/{business_id}/ask-lance/conversations", headers=headers).json() == []
 
 
 def test_auth_rejects_forged_and_expired_tokens(tmp_path, monkeypatch):

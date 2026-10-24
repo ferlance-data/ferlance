@@ -53,6 +53,12 @@ def test_engine_maps_budget_cost_columns_without_misclassifying_categories():
     assert result["clean_df"].iloc[0]["cost"] == 120.0
 
 
+<<<<<<< HEAD
+@pytest.mark.parametrize("value", ["10abc20", "12,34", "invoice123", "1e6"])
+def test_engine_rejects_numbers_with_unparsed_characters(value):
+    with pytest.raises(ValueError, match="not numeric"):
+        UniversalCSVIngestionEngine._number(value)
+=======
 def test_engine_keeps_cost_center_text_categorical():
     source = BytesIO(
         b"expense_date,cost_center,total_expense_ghs\n"
@@ -120,3 +126,4 @@ def test_engine_normalizes_mixed_business_sections_and_preserves_undated_shippin
     assert records[2]["customs_duty_ghs"] == 42150.0
     assert pd.isna(records[2]["date"])
     assert records[3]["amount"] == 1200.0
+>>>>>>> main

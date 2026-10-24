@@ -1,6 +1,7 @@
 from datetime import date
 
 from backend.analytics import analyze
+from backend.insights import generate_insights
 
 
 def test_analyze_groups_revenue_by_day_week_and_month():
@@ -17,6 +18,10 @@ def test_analyze_groups_revenue_by_day_week_and_month():
     assert result["trend"]["monthly"] == [
         {"period": "2025-12", "revenue": 100.0, "transactions": 1},
         {"period": "2026-01", "revenue": 200.0, "transactions": 1},
+    ]
+    assert result["trend"]["quarterly"] == [
+        {"period": "2025-Q4", "revenue": 100.0, "transactions": 1},
+        {"period": "2026-Q1", "revenue": 200.0, "transactions": 1},
     ]
     assert result["trend"]["yearly"] == [
         {"period": "2025", "revenue": 100.0, "transactions": 1},
@@ -49,7 +54,8 @@ def test_analyze_warns_when_optional_fields_are_incomplete():
 
     result = analyze(records)
 
-    assert len(result["warnings"]) == 3
+    assert len(result["warnings"]) == 4
+    assert result["profit"]["available"] is False
 
 
 def test_product_rankings_compare_transactions_and_profit():
@@ -62,6 +68,8 @@ def test_product_rankings_compare_transactions_and_profit():
     assert result["products"]["rankings"]["profit"][0]["product"] == "A"
     assert result["products"]["rankings"]["transactions"][0]["product"] == "B"
     assert result["products"]["rankings"]["profit"][0]["gross_profit"] == 200.0
+    assert result["products"]["rankings"]["profit"][0]["roi_pct"] == 200.0
+    assert result["products"]["rankings"]["profit"][1]["roi_pct"] == 33.33
 
 
 def test_cost_records_use_cost_as_primary_metric_and_filter_dates():
@@ -78,6 +86,8 @@ def test_cost_records_use_cost_as_primary_metric_and_filter_dates():
     assert result["trend"]["cost_weekly"] == [{"period": "2026-W05", "cost": 250.0, "transactions": 1}]
     assert result["trend"]["cost_monthly"] == [{"period": "2026-02", "cost": 250.0, "transactions": 1}]
     assert result["trend"]["cost_yearly"] == [{"period": "2026", "cost": 250.0, "transactions": 1}]
+    assert result["trend"]["cost_quarterly"] == [{"period": "2026-Q1", "cost": 250.0, "transactions": 1}]
+    assert result["profit"]["available"] is False
 
 
 def test_analyze_exposes_costs_and_gross_profit():
