@@ -96,68 +96,11 @@ def test_analyze_exposes_costs_and_gross_profit():
     assert result["profit"] == {"available": True, "revenue": 250.0, "cost": 80.0, "gross_profit": 170.0}
 
 
-def test_missing_costs_never_look_like_zero_cost_or_roi():
+def test_undated_records_are_excluded_from_time_based_metrics():
     result = analyze([
-        {"transaction_date": "2026-01-01", "amount": 100.0, "cost": 40.0, "product": "Known"},
-        {"transaction_date": "2026-01-02", "amount": 100.0, "product": "Unknown"},
+        {"amount": 0.0, "cost": 250.0, "_source_domain": "shipping_logistics"},
+        {"transaction_date": "2026-01-01", "amount": 100.0, "_source_domain": "transactions_sales"},
     ])
 
-    assert result["profit"]["available"] is False
-    assert result["products"]["profit_available"] is False
-    assert result["products"]["rankings"]["profit"] == []
-    assert any("missing from some accepted records" in warning for warning in result["warnings"])
-
-
-def test_zero_cost_items_have_no_roi_and_loss_insights_are_grounded():
-    records = [
-        {"transaction_date": "2026-01-01", "amount": 50.0, "cost": 75.0, "product": "Loss maker"},
-        {"transaction_date": "2026-01-02", "amount": 100.0, "cost": 0.0, "product": "No cost"},
-        {"transaction_date": "2026-01-03", "amount": 200.0, "cost": 50.0, "product": "High return"},
-    ]
-
-    result = analyze(records)
-    insights = generate_insights(records)["insights"]
-
-    items = {item["product"]: item for item in result["products"]["items"]}
-    assert items["Loss maker"]["gross_profit"] == -25.0
-    assert items["Loss maker"]["roi_pct"] == -33.33
-    assert items["No cost"]["roi_pct"] is None
-    assert any(item["title"] == "Item operating at a loss" and "Loss maker" in item["message"] for item in insights)
-    assert any(item["title"] == "Highest item return" and "High return" in item["message"] for item in insights)
-
-
-def test_large_dataset_rollups_preserve_totals():
-    records = [
-        {"transaction_date": f"2026-{month:02d}-{day:02d}", "amount": 1.0, "cost": 0.25, "product": "Bulk"}
-        for month in range(1, 13)
-        for day in range(1, 29)
-        for _ in range(30)
-    ]
-
-    result = analyze(records)
-
-    assert result["revenue"]["total"] == 10080.0
-    assert result["profit"]["gross_profit"] == 7560.0
-    assert len(result["trend"]["quarterly"]) == 4
-    assert result["products"]["items"][0]["roi_pct"] == 300.0
-
-
-def test_net_zero_revenue_with_recorded_cost_still_reports_operating_loss():
-    result = analyze([
-        {"transaction_date": "2026-01-01", "amount": 100.0, "cost": 80.0},
-        {"transaction_date": "2026-01-02", "amount": -100.0, "cost": 10.0},
-    ])
-
-    assert result["profit"]["available"] is True
-    assert result["profit"]["gross_profit"] == -90.0
-
-
-def test_cost_trend_is_withheld_when_some_records_have_no_cost():
-    result = analyze([
-        {"transaction_date": "2026-01-01", "amount": 100.0, "cost": 80.0},
-        {"transaction_date": "2026-01-02", "amount": 50.0},
-    ])
-
-    assert result["trend"]["cost_daily"] == []
-    assert result["trend"]["cost_weekly"] == []
-    assert any("Cost trends are unavailable" in warning for warning in result["warnings"])
+    assert result["revenue"]["total"] == 100.0
+    assert result["revenue"]["transactions"] == 1

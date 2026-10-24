@@ -14,7 +14,7 @@ QUESTION_NAMES = {
 
 
 def _period_bounds(records: list[dict[str, Any]], from_date: date | None, to_date: date | None) -> tuple[date | None, date | None]:
-    dates = [date.fromisoformat(record["transaction_date"]) for record in records]
+    dates = [date.fromisoformat(record["transaction_date"]) for record in records if record.get("transaction_date")]
     return from_date or (min(dates) if dates else None), to_date or (max(dates) if dates else None)
 
 
