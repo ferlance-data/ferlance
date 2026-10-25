@@ -193,6 +193,7 @@ button.secondary.nav-link.active { color: var(--green-dark); background: var(--s
 .dashboard-grid > .surface { overflow: hidden; }
 .upload-layout { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(250px, .6fr); gap: 18px; align-items: start; }
 .upload-card, .import-guide, .dataset-history { min-width: 0; }
+.folder-import-path code { display: inline-block; max-width: 100%; overflow-wrap: anywhere; }
 .upload-card { display: grid; gap: 18px; }
 .upload-drop-zone { position: relative; display: grid; justify-items: center; gap: 8px; padding: 32px 18px; border: 1px dashed #98a2b3; border-radius: 12px; background: #f9fafb; text-align: center; }
 .upload-drop-zone.drag-over { border-color: var(--green); background: var(--soft); }

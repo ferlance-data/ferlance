@@ -947,6 +947,7 @@ async function refreshViews() {
 async function loadHistory() {
   const previousDataset = selectedDataset();
   state.datasets = await request(`/api/businesses/${state.businessId}/datasets`);
+  await loadFolderImports();
   const acceptedDatasets = state.datasets.filter((item) => item.status !== 'failed');
   const select = $('#dataset-select');
   select.replaceChildren();
@@ -972,6 +973,39 @@ async function loadHistory() {
   if (selectedDataset()) {
     try { await loadDashboard(); await loadInsights(); }
     catch (error) { status('#dashboard-status', error.message, true); status('#insight-status', error.message, true); }
+  }
+}
+
+function renderFolderImports(result) {
+  status('#folder-import-status', '');
+  $('#folder-import-path').textContent = result.folder;
+  const target = $('#folder-import-history');
+  target.replaceChildren();
+  if (!result.imports.length) {
+    target.append(cell('p', 'No Excel files have been imported from this folder yet.'));
+    return;
+  }
+  const rows = result.imports.map((item) => [
+    item.filename,
+    item.status,
+    item.error || '—',
+    new Date(item.updated_at).toLocaleString(),
+  ]);
+  target.append(createTable(['File', 'Status', 'Details', 'Last checked'], rows));
+}
+
+async function loadFolderImports() {
+  renderFolderImports(await request(`/api/businesses/${state.businessId}/folder-imports`));
+}
+
+async function checkFolderImports() {
+  try {
+    const result = await request(`/api/businesses/${state.businessId}/folder-imports`);
+    const hasNewDataset = result.imports.some((item) => item.dataset_id && !state.datasets.some((dataset) => dataset.id === item.dataset_id));
+    if (hasNewDataset) await loadHistory();
+    else renderFolderImports(result);
+  } catch (error) {
+    status('#folder-import-status', error.message, true);
   }
 }
 
@@ -1014,6 +1048,9 @@ async function bootstrap() {
 }
 
 initializePositionControls();
+window.setInterval(() => {
+  if (state.token && state.businessId) checkFolderImports();
+}, 10000);
 $('#logout').addEventListener('click', async () => { await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' }); window.location.replace('/'); });
 $$('.nav-link').forEach((link) => link.addEventListener('click', () => navigate(link.dataset.page)));
 $('#dataset-select').addEventListener('change', async () => {

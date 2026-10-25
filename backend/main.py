@@ -1,10 +1,13 @@
 import csv
 import io
 import json
+import logging
 import math
 import re
 import shutil
+import threading
 import uuid
+from contextlib import asynccontextmanager
 from datetime import date, datetime, timezone
 from pathlib import Path
 
@@ -15,7 +18,8 @@ from pydantic import BaseModel, Field
 
 from . import db, financial_position, inventory, market_research
 from .analytics import analyze
-from .config import ADMIN_EMAILS, COOKIE_SECURE, DB_PATH, MAX_UPLOAD_BYTES, PROCESSED_DIR, RAW_DIR, SECRET_KEY, ensure_storage
+from .config import ADMIN_EMAILS, COOKIE_SECURE, DB_PATH, IMPORT_DIR, MAX_UPLOAD_BYTES, PROCESSED_DIR, RAW_DIR, SECRET_KEY, ensure_storage
+from .folder_imports import FolderImporter
 from .insights import QUESTION_NAMES, answer_question, generate_insights
 from .llm import ask_lance
 from .processor import process_file
@@ -25,7 +29,36 @@ from .security import create_access_token, create_refresh_token, hash_password, 
 ensure_storage()
 db.initialize(DB_PATH)
 db.repair_dataset_paths(DB_PATH, RAW_DIR, PROCESSED_DIR)
-app = FastAPI(title="Ferlance MVP", version="0.1.0")
+logger = logging.getLogger(__name__)
+
+
+def import_watched_file(business_id: str, source_path: Path) -> dict:
+    suffix = source_path.suffix.lower()
+    if source_path.stat().st_size > MAX_UPLOAD_BYTES:
+        raise ValueError("File is larger than the 10 MB upload limit.")
+    raw_path = RAW_DIR / f"{uuid.uuid4()}{suffix}"
+    shutil.copyfile(source_path, raw_path)
+    try:
+        return _register_dataset(business_id, source_path.name, suffix, raw_path)
+    except Exception:
+        raw_path.unlink(missing_ok=True)
+        raise
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    stop_event = threading.Event()
+    importer = FolderImporter(IMPORT_DIR, DB_PATH, import_watched_file)
+    worker = threading.Thread(target=importer.run, args=(stop_event,), name="excel-folder-importer", daemon=True)
+    worker.start()
+    try:
+        yield
+    finally:
+        stop_event.set()
+        worker.join(timeout=10)
+
+
+app = FastAPI(title="Ferlance MVP", version="0.1.0", lifespan=lifespan)
 app.mount("/assets", StaticFiles(directory=Path(__file__).parent.parent / "frontend" / "assets"), name="assets")
 DATASET_FIELDS = (
     "id",
@@ -314,6 +347,11 @@ def upload_dataset(business_id: str, file: UploadFile = File(...), user: dict = 
     except Exception:
         raw_path.unlink(missing_ok=True)
         raise
+    return _register_dataset(business_id, file.filename or "dataset", suffix, raw_path)
+
+
+def _register_dataset(business_id: str, filename: str, suffix: str, raw_path: Path) -> dict:
+    dataset_id = str(uuid.uuid4())
     result = process_file(raw_path, suffix)
     processed_path: Path | None = None
     status = "failed" if not result.rows else "partial" if result.rejected_rows or result.errors else "processed"
@@ -322,7 +360,16 @@ def upload_dataset(business_id: str, file: UploadFile = File(...), user: dict = 
         with processed_path.open("w", encoding="utf-8") as target:
             for row in result.rows:
                 target.write(json.dumps(row) + "\n")
-    db.insert(DB_PATH, "INSERT INTO datasets VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (dataset_id, business_id, file.filename or "dataset", suffix, str(raw_path), str(processed_path) if processed_path else None, status, result.source_rows, len(result.rows), result.rejected_rows, json.dumps(result.warnings), json.dumps(result.errors), db.now()))
+    db.insert(
+        DB_PATH,
+        """
+        INSERT INTO datasets
+            (id, business_id, filename, extension, raw_path, processed_path, status,
+             source_rows, accepted_rows, rejected_rows, warnings, errors, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (dataset_id, business_id, filename, suffix, str(raw_path), str(processed_path) if processed_path else None, status, result.source_rows, len(result.rows), result.rejected_rows, json.dumps(result.warnings), json.dumps(result.errors), db.now()),
+    )
     response = db.one(DB_PATH, "SELECT * FROM datasets WHERE id = ?", (dataset_id,))
     return dataset_response(response or {})
 
@@ -331,6 +378,19 @@ def upload_dataset(business_id: str, file: UploadFile = File(...), user: dict = 
 def dataset_history(business_id: str, user: dict = Depends(user_from_auth)) -> list[dict]:
     business_for_user(business_id, user)
     return [dataset_response(item) for item in db.many(DB_PATH, "SELECT * FROM datasets WHERE business_id = ? ORDER BY created_at DESC", (business_id,))]
+
+
+@app.get("/api/businesses/{business_id}/folder-imports")
+def folder_import_status(business_id: str, user: dict = Depends(user_from_auth)) -> dict:
+    business_for_user(business_id, user)
+    folder = IMPORT_DIR / business_id
+    folder.mkdir(parents=True, exist_ok=True)
+    imports = db.many(
+        DB_PATH,
+        "SELECT filename, status, error, dataset_id, updated_at FROM folder_imports WHERE business_id = ? ORDER BY updated_at DESC LIMIT 10",
+        (business_id,),
+    )
+    return {"folder": str(folder.resolve()), "imports": imports}
 
 
 def _inventory_error(error: inventory.InventoryError) -> HTTPException:
