@@ -4,423 +4,388 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Ferlance | Workspace</title>
-  <link rel="stylesheet" href="/assets/styles.css">
+  <meta name="theme-color" content="#fbfaf6">
+  <link rel="icon" href="/assets/img/mark.svg" type="image/svg+xml">
+  <script>
+    // Apply the saved theme before first paint to avoid a flash.
+    try {
+      const theme = localStorage.getItem('ferlance-theme') || 'system';
+      const dark = theme === 'dark' || (theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+      document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+    } catch { document.documentElement.dataset.theme = 'light'; }
+  </script>
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <link rel="stylesheet" href="/assets/css/app.css">
 </head>
-<body>
-  <main class="app-page" id="app-root" hidden>
-    <nav class="app-nav">
-      <div class="identity"><span class="avatar" id="user-avatar">F</span><span><strong id="business-name">Workspace</strong><br><small id="user-email">Loading identity...</small></span></div>
-      <div class="nav-actions"><button class="secondary nav-link" data-page="dashboard" type="button">Dashboard</button><button class="secondary nav-link" data-page="catalogue" type="button">Catalogue</button><button class="secondary nav-link" data-page="inventory" type="button">Inventory</button><button class="secondary nav-link" data-page="financial-position" type="button">Financial position</button><button class="secondary nav-link" data-page="data" type="button">Data</button><button class="secondary nav-link" data-page="insights" type="button">Insights</button><button class="secondary nav-link" data-page="ask-lance" type="button">Ask Lance</button><button class="secondary nav-link" data-page="profile" type="button">Profile</button><button class="secondary" id="logout" type="button">Sign out</button></div>
-      <button class="hamburger-btn" id="mobile-menu-btn" type="button" aria-label="Open mobile navigation menu">
-        <span class="hamburger-bar"></span>
-        <span class="hamburger-bar"></span>
-        <span class="hamburger-bar"></span>
-      </button>
-    </nav>
+<body class="app-body">
+  <div class="boot" id="boot" role="status"><svg class="brand-mark" viewBox="0 0 20 20" aria-hidden="true"><rect x="1" y="12" width="5" height="5" rx="1"/><rect x="7.5" y="7.5" width="5" height="5" rx="1"/><rect x="14" y="3" width="5" height="5" rx="1"/></svg><span>Opening your workspace…</span></div>
 
-    <!-- Mobile Navigation Drawer -->
-    <div class="drawer-backdrop" id="drawer-backdrop" hidden></div>
-    <aside class="mobile-nav-drawer" id="mobile-drawer" hidden aria-label="Mobile navigation">
-      <div class="drawer-header">
-        <div class="identity"><span class="avatar" id="drawer-avatar">F</span><span><strong id="drawer-business-name">Workspace</strong><br><small id="drawer-user-email">Profile</small></span></div>
-        <button class="drawer-close-btn" id="drawer-close-btn" type="button" aria-label="Close navigation">&times;</button>
+  <div class="shell" id="shell" hidden>
+    <aside class="sidebar" id="sidebar" aria-label="Workspace navigation">
+      <div class="sidebar-top">
+        <a class="brand" href="#overview"><svg class="brand-mark" viewBox="0 0 20 20" aria-hidden="true"><rect x="1" y="12" width="5" height="5" rx="1"/><rect x="7.5" y="7.5" width="5" height="5" rx="1"/><rect x="14" y="3" width="5" height="5" rx="1"/></svg>Ferlance</a>
+        <button class="btn btn-ghost btn-icon sidebar-close" id="sidebar-close" type="button" aria-label="Close navigation" data-icon="x"></button>
       </div>
-      <div class="drawer-links">
-        <button class="drawer-link active" data-page="dashboard" type="button">📊 Dashboard</button>
-        <button class="drawer-link" data-page="catalogue" type="button">🏷️ Catalogue</button>
-        <button class="drawer-link" data-page="inventory" type="button">📦 Inventory</button>
-        <button class="drawer-link" data-page="financial-position" type="button">📑 Financial position</button>
-        <button class="drawer-link" data-page="data" type="button">💾 Data Sources</button>
-        <button class="drawer-link" data-page="insights" type="button">💡 Insights</button>
-        <button class="drawer-link" data-page="ask-lance" type="button">💬 Ask Lance</button>
-        <button class="drawer-link" data-page="profile" type="button">👤 Profile</button>
+      <div class="workspace-chip" id="workspace-chip">
+        <span class="avatar" id="workspace-avatar">F</span>
+        <span class="workspace-chip-text"><strong id="workspace-name">Workspace</strong><small id="workspace-email"></small></span>
       </div>
-      <div class="drawer-footer">
-        <button class="secondary drawer-logout-btn" id="drawer-logout" type="button">Sign out</button>
+      <nav class="nav" id="nav">
+        <p class="nav-label">Analyse</p>
+        <a class="nav-item" href="#overview" data-page="overview"><span data-icon="overview"></span>Overview</a>
+        <a class="nav-item" href="#products" data-page="products"><span data-icon="products"></span>Products</a>
+        <a class="nav-item" href="#insights" data-page="insights"><span data-icon="insights"></span>Insights</a>
+        <a class="nav-item" href="#lance" data-page="lance"><span data-icon="sparkles"></span>Ask Lance</a>
+        <p class="nav-label">Operate</p>
+        <a class="nav-item" href="#inventory" data-page="inventory"><span data-icon="inventory"></span>Inventory</a>
+        <a class="nav-item" href="#position" data-page="position"><span data-icon="scale"></span>Financial position</a>
+        <a class="nav-item" href="#data" data-page="data"><span data-icon="database"></span>Data imports<span class="nav-count" id="nav-data-count" hidden></span></a>
+      </nav>
+      <div class="sidebar-bottom">
+        <a class="nav-item" href="#settings" data-page="settings"><span data-icon="settings"></span>Settings</a>
+        <button class="nav-item" id="logout" type="button"><span data-icon="logout"></span>Sign out</button>
       </div>
     </aside>
+    <div class="sidebar-backdrop" id="sidebar-backdrop" hidden></div>
 
-    <section class="page-heading"><div><p class="brand">FERLANCE WORKSPACE</p><h1 id="page-title">Business dashboard</h1></div><div class="page-heading-actions"><p id="page-description">A clear view of the records your business has accepted and the signals they support.</p><button id="print-report-button" type="button" disabled>Print financial report</button></div></section>
-    <div class="page-status" id="global-status"></div>
-
-    <section class="page-view" data-view="dashboard">
-      <div class="surface dashboard-overview">
-        <div class="toolbar">
-          <label>Dataset<select id="dataset-select"></select></label>
-          <label>Date range<select id="date-preset"><option value="all">All dates</option><option value="today">Latest day</option><option value="week">Week to date</option><option value="7">Last 7 days</option><option value="month">Month to date</option><option value="30">Last 30 days</option><option value="quarter">Quarter to date</option><option value="year">Year to date</option><option value="custom">Custom</option></select></label>
-          <label>From<input id="from-date" type="date" disabled></label>
-          <label>To<input id="to-date" type="date" disabled></label>
-          <button id="refresh-dashboard" type="button">Update view</button>
-          <button id="sync-dashboard-btn" type="button" class="btn-sync" title="Sync & update bulk business snapshot">⚡ Sync all sources</button>
+    <div class="main">
+      <header class="topbar">
+        <button class="btn btn-ghost btn-icon menu-btn" id="menu-btn" type="button" aria-label="Open navigation" aria-controls="sidebar" data-icon="menu"></button>
+        <div class="topbar-title">
+          <h1 id="page-title">Overview</h1>
         </div>
-        <div class="dashboard-meta-row">
-          <div class="page-status" id="dashboard-status" role="status" aria-live="polite"></div>
-          <span id="snapshot-badge" class="snapshot-badge">Snapshot: Unified Live</span>
-        </div>
-        <div id="dashboard-warnings"></div>
-        <div id="summary"></div>
-        <div class="kpi-grid" id="kpis"></div>
-      </div>
-
-      <!-- Grounded Projections & Macroeconomic Intelligence -->
-      <div class="surface projections-surface" id="projections-surface">
-        <div class="section-heading">
-          <div>
-            <h2>Macroeconomic Projections & Health</h2>
-            <p class="section-caption">Forecasts calibrated for Ghana CPI inflation (21.5%), FX exchange rates, and seasonal cycles</p>
-          </div>
-          <span id="business-health-badge" class="badge-health badge-steady-growth">Steady Growth</span>
-        </div>
-        <div class="projections-grid" id="projections-grid"></div>
-      </div>
-
-      <!-- Top 5 & Worst 5 Performance Cards -->
-      <div class="performance-cards-grid">
-        <div class="surface performance-card top-performers-card" id="top-performers-card" role="button" tabindex="0" title="Click to view full ranked list">
-          <div class="performance-card-header">
-            <div>
-              <span class="performance-pill top-pill">Top 5 Performers</span>
-              <h3 id="top-performers-title">Leading Offerings</h3>
-            </div>
-            <span class="modal-expand-hint">Expand modal ↗</span>
-          </div>
-          <p class="section-caption">Best gross margin & revenue generators in your catalog</p>
-          <div class="performance-card-list" id="top-performers-list">
-            <p class="empty-list-note">No product records in this period.</p>
-          </div>
-        </div>
-
-        <div class="surface performance-card worst-performers-card" id="worst-performers-card" role="button" tabindex="0" title="Click to view full ranked list">
-          <div class="performance-card-header">
-            <div>
-              <span class="performance-pill worst-pill">Underperforming</span>
-              <h3 id="worst-performers-title">Worst 5 Performers</h3>
-            </div>
-            <span class="modal-expand-hint">Expand modal ↗</span>
-          </div>
-          <p class="section-caption">Lagging items that may need pricing adjustments or review</p>
-          <div class="performance-card-list" id="worst-performers-list">
-            <p class="empty-list-note">No product records in this period.</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="surface dashboard-insight-surface"><div class="section-heading"><div><h2>Business insights</h2><p class="section-caption">Automatically surfaced from this report</p></div><button class="secondary" id="view-all-insights" type="button">View all insights</button></div><div id="dashboard-insights"></div></div>
-      <div class="surface dashboard-inventory-surface"><div class="section-heading"><div><h2>Inventory snapshot</h2><p class="section-caption">Current stock from your inventory ledger</p></div><button class="secondary" id="manage-inventory" type="button">Manage inventory</button></div><div class="page-status" id="inventory-dashboard-status" role="status"></div><div class="kpi-grid" id="inventory-dashboard-summary"></div></div>
-      <div class="page-grid dashboard-grid"><div class="surface"><div class="section-heading"><div><h2 id="trend-title">Revenue trend</h2><p class="section-caption">Explore the report by time period</p></div></div><div class="period-tabs" role="group" aria-label="Financial reporting period"><button class="period-tab" type="button" data-period="daily" aria-pressed="false">Day</button><button class="period-tab active" type="button" data-period="weekly" aria-pressed="true">Week</button><button class="period-tab" type="button" data-period="monthly" aria-pressed="false">Month</button><button class="period-tab" type="button" data-period="quarterly" aria-pressed="false">Quarter</button><button class="period-tab" type="button" data-period="yearly" aria-pressed="false">Year</button></div><div id="trend"></div></div><div class="surface"><div class="section-heading"><div><h2 id="products-title">Product performance</h2><p class="section-caption">Current period summary</p></div><button class="secondary" id="view-catalogue" type="button">View full catalogue</button></div><div class="table-scroll" id="products"></div></div><div class="surface"><h2 id="customers-title">Customers</h2><p class="section-caption">Highest value relationships</p><div class="table-scroll" id="customers"></div></div><div class="surface"><h2>Conditional metrics</h2><p class="section-caption">Additional signals from your data</p><div id="conditional"></div></div></div>
-    </section>
-
-    <section class="page-view" data-view="catalogue" hidden>
-      <div class="surface">
-        <div class="catalogue-heading"><div><p class="section-caption">PRODUCT CATALOGUE</p><h2>All products in this dataset</h2><p class="section-caption" id="catalogue-source">Choose a processed dataset on the dashboard.</p></div><div class="catalogue-controls"><label>Search products<input id="catalogue-search" type="search" placeholder="Search product name"></label><label>Sort by<select id="catalogue-sort"><option value="name">Name A–Z</option><option value="revenue">Highest revenue</option><option value="profit">Highest profit</option></select></label></div></div>
-        <div class="catalogue-summary" id="catalogue-summary" role="status"></div>
-        <div class="catalogue-list" id="catalogue-list"><p>Select a dataset with product names to view its catalogue.</p></div>
-        <p class="catalogue-note">This list is built from distinct product names in the selected upload. It is not a separately managed stock catalogue; SKU, current price, stock on hand, and product editing are not available from these records.</p>
-      </div>
-    </section>
-
-    <section class="page-view" data-view="inventory" hidden>
-      <div class="surface inventory-overview">
-        <div class="section-heading"><div><p class="section-caption">LIVE STOCK LEDGER</p><h2>Stock overview</h2><p class="section-caption">Stock changes are recorded here; sales-report uploads never change inventory automatically.</p></div><div class="inventory-overview-actions"><label class="inventory-archived-toggle"><input id="inventory-include-archived" type="checkbox"> Show archived products</label><button class="secondary" id="print-inventory-report" type="button">Print inventory report</button></div></div>
-        <div class="kpi-grid inventory-summary" id="inventory-summary"></div>
-        <div id="inventory-status" class="page-status" role="status" aria-live="polite"></div>
-      </div>
-      <div class="inventory-workspace">
-        <form class="surface inventory-product-form" id="inventory-product-form">
-          <div class="section-heading"><div><h2 id="inventory-product-form-title">Add a product</h2><p class="section-caption">Set a SKU, unit cost, and reorder threshold.</p></div><button class="secondary" id="inventory-product-reset" type="button" hidden>Cancel edit</button></div>
-          <label>Product name<input id="inventory-product-name" maxlength="200" required></label>
-          <label>SKU (optional)<input id="inventory-product-sku" maxlength="100"></label>
-          <div class="inventory-form-grid"><label>Unit<input id="inventory-product-unit" value="unit" maxlength="40" required></label><label>Unit cost<input id="inventory-product-cost" type="number" min="0" step="0.01" placeholder="Optional"></label></div>
-          <div class="inventory-form-grid"><label>Reorder level<input id="inventory-product-reorder" type="number" min="0" step="any" value="0" required></label><label id="inventory-opening-field">Opening stock<input id="inventory-product-opening" type="number" min="0" step="any" value="0"></label></div>
-          <button id="inventory-product-submit" type="submit">Add product</button>
-        </form>
-        <form class="surface inventory-movement-form" id="inventory-movement-form">
-          <div class="section-heading"><div><h2>Record stock movement</h2><p class="section-caption">Purchases add stock; sales deduct it; adjustments can add or remove units.</p></div></div>
-          <label>Product<select id="inventory-movement-product" required></select></label>
-          <label>Movement type<select id="inventory-movement-type"><option value="purchase">Stock received / purchase</option><option value="sale">Sale / stock issued</option><option value="adjustment">Stock adjustment</option></select></label>
-          <label id="inventory-movement-quantity-label">Quantity<input id="inventory-movement-quantity" type="number" min="0.000001" step="any" required></label>
-          <label>Note (optional)<input id="inventory-movement-note" maxlength="500" placeholder="Supplier, reference, or reason"></label>
-          <button id="inventory-movement-submit" type="submit" disabled>Record movement</button>
-        </form>
-      </div>
-      <div class="inventory-workspace inventory-data-workspace">
-        <section class="surface inventory-products-panel"><div class="section-heading"><div><h2>Products and stock</h2><p class="section-caption">Low stock is flagged when on-hand quantity is at or below the reorder level.</p></div><label class="inventory-search">Search<input id="inventory-search" type="search" placeholder="Name or SKU"></label></div><div class="table-scroll" id="inventory-products"></div></section>
-        <form class="surface inventory-import-form" id="inventory-import-form">
-          <div class="section-heading"><div><h2>Import a stocktake</h2><p class="section-caption">Explicitly replace on-hand quantities with a counted CSV snapshot.</p></div></div>
-          <p>A stocktake import creates or matches products and records the difference as an auditable movement. It does not import sales.</p>
-          <a id="inventory-template-download" href="#">Download CSV template</a>
-          <label>Stocktake CSV<input id="inventory-import-file" type="file" accept=".csv" required></label>
-          <button id="inventory-import-submit" type="submit" disabled>Import counted stock</button>
-          <div id="inventory-import-status" class="form-status" role="status" aria-live="polite"></div>
-        </form>
-      </div>
-      <section class="surface inventory-movements-panel"><div class="section-heading"><div><h2>Recent stock movements</h2><p class="section-caption">Opening stock, purchases, sales, adjustments, and imports are retained for audit.</p></div></div><div class="table-scroll" id="inventory-movements"></div></section>
-    </section>
-
-    <section class="page-view" data-view="financial-position" hidden>
-      <div class="surface position-overview">
-        <div class="section-heading"><div><p class="section-caption">POINT-IN-TIME STATEMENT</p><h2>Financial position</h2><p class="section-caption">Choose a date to reconstruct assets, liabilities, and equity from balances entered on or before it.</p></div><div class="position-report-actions"><label>Report as of<input id="position-report-date" type="date" required></label><button id="refresh-position" type="button">Generate position</button><button class="secondary" id="print-position-report" type="button" disabled>Print position report</button></div></div>
-        <div id="position-status" class="page-status" role="status" aria-live="polite"></div>
-        <div id="position-warnings"></div>
-        <div class="kpi-grid inventory-summary" id="position-summary"></div>
-        <div class="position-groups" id="position-groups"></div>
-      </div>
-      <div class="position-workspace">
-        <form class="surface position-balance-form" id="position-balance-form">
-          <div class="section-heading"><div><h2>Record an account balance</h2><p class="section-caption">Enter the account balance as at the date selected above. Enter zero explicitly when the balance is zero.</p></div></div>
-          <label>Balance date<input id="position-entry-date" type="date" required></label>
-          <label>Category<select id="position-category" required></select></label>
-          <label>Account / description<input id="position-account-name" maxlength="120" required placeholder="e.g. Main bank account"></label>
-          <label>Balance<input id="position-amount" type="number" step="0.01" required></label>
-          <label>Note (optional)<input id="position-note" maxlength="500"></label>
-          <button type="submit">Save dated balance</button>
-        </form>
-        <aside class="surface position-guide"><h2>What this statement needs</h2><p>Record cash, bank, receivables, inventory value, fixed assets, payables, loans, and equity balances. Each account carries forward its latest recorded balance on or before the chosen date; stale balances are flagged.</p><p>Amounts must use the workspace currency. Inventory value is entered separately from unit counts. Missing categories stay visibly incomplete; zero is never assumed.</p><p>This is an operational balance-sheet view, not a tax filing or full general ledger. Verify opening balances and consult an accountant.</p></aside>
-      </div>
-      <section class="surface position-history-panel"><div class="section-heading"><div><h2>Balance history</h2><p class="section-caption">Dated entries provide the evidence for historical reports.</p></div></div><div class="table-scroll" id="position-history"></div></section>
-    </section>
-
-    <section class="page-view" data-view="data" hidden>
-      <div class="upload-layout">
-        <form class="surface upload-card" id="upload-form">
-          <div class="section-heading"><div><h2>Import business data</h2><p class="section-caption">Upload spreadsheets, transaction logs, or markdown summaries.</p></div></div>
-          <div class="upload-drop-zone" id="upload-drop-zone">
-            <input id="dataset-file" type="file" accept=".csv,.xlsx,.tsv,.txt,.md" required>
-            <strong>Drop files here</strong>
-            <span>CSV, Excel, TSV, Text, or Markdown · up to 10 MB</span>
-            <label class="button secondary" for="dataset-file">Choose a file</label>
-            <span id="selected-file-name">No file selected</span>
-          </div>
-          <div class="upload-actions"><button id="upload-button" type="submit" disabled>Import and process</button><span id="upload-status" class="form-status" role="status" aria-live="polite"></span></div>
-          <div id="upload-result" class="upload-result" hidden></div>
-        </form>
-        <aside class="surface import-guide"><h2>Supported data sources</h2><ol><li><strong>Spreadsheets:</strong> CSV, Excel (.xlsx), TSV files.</li><li><strong>MoMo SMS:</strong> Ghanaian Mobile Money text feeds.</li><li><strong>Documents:</strong> Text (.txt) logs and Markdown (.md) tables.</li><li><strong>Remote:</strong> Postgres, Mongo, POS APIs, SQLite.</li></ol><p>Accepted records are automatically unified across your workspace dashboard snapshot.</p></aside>
-      </div>
-
-      <!-- MoMo SMS Parser Card -->
-      <div class="surface momo-ingestion-card">
-        <div class="section-heading">
-          <div>
-            <h2>Mobile Money SMS Transaction Detector</h2>
-            <p class="section-caption">Paste SMS notification strings from MTN MoMo, Telecel Cash, or AirtelTigo to automatically parse transactions into business records.</p>
-          </div>
-        </div>
-        <form id="momo-form" class="momo-form">
-          <div class="form-row">
-            <label>Provider Channel
-              <select id="momo-channel">
-                <option value="">Auto-Detect Provider</option>
-                <option value="MTN MoMo">MTN Mobile Money</option>
-                <option value="Telecel Cash">Telecel Cash (Vodafone)</option>
-                <option value="AT Money">AirtelTigo Money</option>
-              </select>
-            </label>
-          </div>
-          <label>Paste Raw SMS Messages (one or multiple)
-            <textarea id="momo-sms-text" rows="4" placeholder="Payment received for GHS 150.00 from Kweku Mensah. Current Balance: GHS 1,450.00. Financial Transaction Id: 18274910291." required></textarea>
+        <div class="scope-bar" id="scope-bar" hidden>
+          <label class="scope-control">
+            <span class="visually-hidden">Data scope</span>
+            <span data-icon="database"></span>
+            <select id="scope-dataset" aria-label="Data scope"></select>
           </label>
-          <div class="upload-actions">
-            <button type="submit" id="momo-submit-btn">Parse & Ingest MoMo Transactions</button>
-            <span id="momo-status" class="form-status" role="status" aria-live="polite"></span>
-          </div>
-        </form>
-        <div id="momo-preview" class="upload-result" hidden></div>
-      </div>
-
-      <!-- External Database & POS Connectors Card -->
-      <div class="surface external-connectors-card">
-        <div class="section-heading">
-          <div>
-            <h2>External Connectors & Integrations</h2>
-            <p class="section-caption">Connect remote PostgreSQL, MongoDB, Point of Sale (POS) systems, or secondary SQLite databases.</p>
-          </div>
-          <button type="button" class="secondary" id="toggle-new-connection-btn">+ Connect Data Source</button>
-        </div>
-        <form id="new-connection-form" class="connection-form" hidden>
-          <div class="form-grid">
-            <label>Connector Type
-              <select id="conn-type" required>
-                <option value="pos">Point of Sale (POS Webhook / API)</option>
-                <option value="postgres">PostgreSQL Database</option>
-                <option value="mongodb">MongoDB Connection</option>
-                <option value="sqlite_external">External SQLite Database</option>
-              </select>
-            </label>
-            <label>Connection Label / Name
-              <input id="conn-name" placeholder="e.g. Osu Branch POS, Warehouse DB" required>
-            </label>
-          </div>
-          <label>Connection String / URL / File Path
-            <input id="conn-string" placeholder="postgresql://user:pass@host:5432/db or https://pos.store.gh/api/v1" required>
+          <label class="scope-control">
+            <span class="visually-hidden">Date range</span>
+            <span data-icon="calendar"></span>
+            <select id="scope-range" aria-label="Date range">
+              <option value="all">All time</option>
+              <option value="7">Last 7 days</option>
+              <option value="30">Last 30 days</option>
+              <option value="90">Last 90 days</option>
+              <option value="mtd">Month to date</option>
+              <option value="qtd">Quarter to date</option>
+              <option value="ytd">Year to date</option>
+              <option value="365">Last 12 months</option>
+              <option value="custom">Custom range…</option>
+            </select>
           </label>
-          <div class="connection-actions">
-            <button type="button" class="secondary" id="test-connection-btn">Test Connection</button>
-            <button type="submit" id="save-connection-btn">Save Connector</button>
-            <span id="connection-form-status" class="form-status"></span>
+          <div class="scope-custom" id="scope-custom" hidden>
+            <input class="input" id="scope-from" type="date" aria-label="From date">
+            <span class="muted">–</span>
+            <input class="input" id="scope-to" type="date" aria-label="To date">
+            <button class="btn btn-secondary btn-sm" id="scope-apply" type="button">Apply</button>
           </div>
-        </form>
-        <div class="connections-list" id="connections-list">
-          <p class="empty-text">No external connections configured yet.</p>
         </div>
-      </div>
+        <div class="topbar-actions" id="topbar-actions"></div>
+      </header>
 
-      <div class="surface dataset-history"><div class="section-heading"><div><h2>Import history</h2><p class="section-caption">A traceable record of each ingested data source.</p></div></div><div class="table-scroll" id="history"></div></div>
-    </section>
+      <main class="content" id="content">
+        <p class="page-description" id="page-description"></p>
+        <div class="banner" id="banner" hidden></div>
 
-    <section class="page-view" data-view="insights" hidden>
-      <div class="surface research-panel">
-        <div class="section-heading"><div><h2>External market research</h2><p class="section-caption">When connected, Ferlance automatically compares sales declines and item losses with seasonal, weather, environmental, festive, and market context in Ghana.</p></div><button id="run-performance-research" type="button" disabled>Search this report again</button></div>
-        <p>Search sends product labels, the report period, and market only—not transaction rows, amounts, or customer information. Web results are leads, not proof of cause. Findings and citations can be included in the printed financial report.</p>
-        <form class="research-settings" id="research-settings-form">
-          <label>Brave Search API key<input id="brave-search-key" type="password" autocomplete="new-password" placeholder="Enter key to connect or replace"></label>
-          <div class="research-settings-actions"><button type="submit">Save search connection</button><button class="secondary" id="remove-brave-key" type="button" disabled>Remove connection</button><span id="research-settings-status" class="form-status" role="status" aria-live="polite"></span></div>
-        </form>
-        <div id="research-status" class="page-status" role="status" aria-live="polite"></div>
-        <div id="research-results"></div>
-      </div>
-      <div class="surface"><h2>Grounded insights</h2><div class="page-status" id="insight-status" role="status" aria-live="polite"></div><div id="insights-list"></div></div>
-      <div class="surface"><h2>Defined business questions</h2><p>These answers use the selected dataset and active date range. They do not invent unsupported metrics.</p><div class="question-grid" id="question-grid"><button data-question="sales-summary" type="button">Sales summary</button><button data-question="best-products" type="button">Best products</button><button data-question="customer-overview" type="button">Customer overview</button><button data-question="revenue-trend" type="button">Revenue trend</button><button data-question="underperforming-products" type="button">Underperforming products</button><button data-question="monthly-comparison" type="button">Monthly comparison</button></div><pre id="question-result" hidden></pre></div>
-    </section>
+        <!-- Overview -->
+        <section class="view" data-view="overview" hidden>
+          <div id="overview-setup"></div>
+          <div class="kpi-grid" id="overview-kpis"></div>
+          <div class="grid-main">
+            <div class="card">
+              <div class="card-header">
+                <div><h2 class="card-title" id="trend-title">Revenue trend</h2><p class="card-subtitle" id="trend-subtitle">Grouped by week</p></div>
+                <div class="segmented" id="trend-periods" role="group" aria-label="Trend grouping">
+                  <button type="button" data-period="daily" aria-pressed="false">Day</button>
+                  <button type="button" data-period="weekly" aria-pressed="true">Week</button>
+                  <button type="button" data-period="monthly" aria-pressed="false">Month</button>
+                  <button type="button" data-period="quarterly" aria-pressed="false">Quarter</button>
+                  <button type="button" data-period="yearly" aria-pressed="false">Year</button>
+                </div>
+              </div>
+              <div class="card-body"><div class="chart" id="trend-chart"></div><div class="chart-legend" id="trend-legend"></div></div>
+            </div>
+            <div class="card attention-card">
+              <div class="card-header"><div><h2 class="card-title">Needs attention</h2><p class="card-subtitle">Signals worth a look today</p></div></div>
+              <div class="card-body"><ul class="attention-list" id="attention-list"></ul></div>
+            </div>
+          </div>
+          <div class="grid-2">
+            <div class="card">
+              <div class="card-header"><div><h2 class="card-title" id="top-title">Top products</h2><p class="card-subtitle">Ranked by revenue in this period</p></div><a class="btn btn-ghost btn-sm" href="#products">View all<span data-icon="arrow-right"></span></a></div>
+              <div class="card-body flush"><ol class="rank-list" id="top-products"></ol></div>
+            </div>
+            <div class="card">
+              <div class="card-header"><div><h2 class="card-title" id="customers-title">Top customers</h2><p class="card-subtitle" id="customers-subtitle">Highest value relationships</p></div></div>
+              <div class="card-body flush"><ol class="rank-list" id="top-customers"></ol></div>
+            </div>
+          </div>
+          <div class="grid-2">
+            <div class="card">
+              <div class="card-header"><div><h2 class="card-title">Latest insights</h2><p class="card-subtitle">Calculated from your records — no guesswork</p></div><a class="btn btn-ghost btn-sm" href="#insights">All insights<span data-icon="arrow-right"></span></a></div>
+              <div class="card-body"><div class="insight-stack" id="overview-insights"></div></div>
+            </div>
+            <div class="card">
+              <div class="card-header"><div><h2 class="card-title">Stock at a glance</h2><p class="card-subtitle">From your inventory ledger</p></div><a class="btn btn-ghost btn-sm" href="#inventory">Inventory<span data-icon="arrow-right"></span></a></div>
+              <div class="card-body"><div class="mini-stats" id="overview-stock"></div></div>
+            </div>
+          </div>
+          <details class="data-notes" id="overview-notes" hidden><summary>Data notes</summary><ul id="overview-notes-list"></ul></details>
+        </section>
 
-    <section class="page-view" data-view="profile" hidden>
-      <div class="page-grid"><div class="surface"><h2>Profile</h2><form class="form-stack" id="profile-form"><label>Full name<input id="profile-name" maxlength="120"></label><label>Business name<input id="profile-business" maxlength="120" required></label><label>Email<input id="profile-email" disabled></label><button type="submit">Save profile</button><div class="form-status" id="profile-status" role="status" aria-live="polite"></div></form></div><div class="surface" id="admin-panel" hidden><h2>Administration</h2><p>Manage workspace access and account capabilities.</p><div class="entity-list" id="admin-users"></div></div></div>
-    </section>
+        <!-- Products -->
+        <section class="view" data-view="products" hidden>
+          <div class="card">
+            <div class="toolbar">
+              <label class="search"><span data-icon="search"></span><input class="input" id="products-search" type="search" placeholder="Search products" aria-label="Search products"></label>
+              <div class="segmented" id="products-filter" role="group" aria-label="Filter products">
+                <button type="button" data-filter="all" aria-pressed="true">All</button>
+                <button type="button" data-filter="profit" aria-pressed="false">Profitable</button>
+                <button type="button" data-filter="loss" aria-pressed="false">Losing money</button>
+              </div>
+              <span class="toolbar-meta muted" id="products-count"></span>
+            </div>
+            <div class="table-wrap" id="products-table"></div>
+          </div>
+          <p class="footnote">Products are recognised from the product, item or service column of your imports. Stock levels live in Inventory and are never inferred from sales files.</p>
+        </section>
 
-    <section class="page-view" data-view="ask-lance" hidden>
-      <div class="chat-layout"><aside class="surface chat-history"><div class="section-heading"><h2>Saved chats</h2><button class="secondary" id="new-chat" type="button">New chat</button></div><div class="entity-list" id="conversation-list"></div></aside><section class="surface ask-lance"><div class="chat-heading"><div><h2>Ask Lance</h2><p>Ask about the whole business workspace. Lance searches accepted records across all processed datasets.</p></div><span class="chat-context" id="chat-context">No business data selected</span></div><div class="chat-messages" id="chat-messages" aria-live="polite"><p class="empty-chat">Your conversation will appear here.</p></div><form class="chat-composer" id="ask-form"><label class="visually-hidden" for="lance-question">Your question</label><textarea id="lance-question" rows="2" maxlength="1000" placeholder="Which products create the strongest overall result?" required></textarea><div class="composer-actions"><div class="form-status" id="ask-status" role="status" aria-live="polite"></div><button type="submit">Send question</button></div></form></section></div>
-    </section>
-  </main>
+        <!-- Insights -->
+        <section class="view" data-view="insights" hidden>
+          <div class="grid-main reverse">
+            <div class="insight-stack" id="insights-list"></div>
+            <div class="stack">
+              <div class="card">
+                <div class="card-header"><div><h2 class="card-title">Comparison</h2><p class="card-subtitle" id="insights-comparison-period"></p></div></div>
+                <div class="card-body" id="insights-comparison"></div>
+              </div>
+              <div class="card">
+                <div class="card-header"><div><h2 class="card-title">Market context</h2><p class="card-subtitle">Web research on declines and losses</p></div><span class="pill" id="research-pill">Not connected</span></div>
+                <div class="card-body">
+                  <p class="body-sm muted">When a sales decline or loss is detected, Ferlance can search the web for Ghanaian seasonal, weather, festive and market context. Only product names and dates are sent.</p>
+                  <div class="button-row"><button class="btn btn-primary btn-sm" id="research-run" type="button" disabled><span data-icon="search"></span>Research this period</button><a class="btn btn-ghost btn-sm" href="#settings">Connect search</a></div>
+                  <p class="status-text" id="research-status" role="status" aria-live="polite"></p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div id="research-results"></div>
+        </section>
 
-  <!-- Performance Detail Modal (Scrollable modal for Top 5 & Worst 5 click expansion) -->
-  <div id="performance-modal" class="modal-overlay" hidden>
-    <div class="modal-dialog">
-      <div class="modal-header">
-        <div>
-          <h2 id="performance-modal-title">Product & Service Performance</h2>
-          <p class="section-caption" id="performance-modal-subtitle">Full rank ordering across all records</p>
-        </div>
-        <button class="modal-close-btn" id="performance-modal-close" type="button" aria-label="Close modal">&times;</button>
-      </div>
-      <div class="modal-toolbar">
-        <input id="perf-search" type="search" placeholder="Filter by product or service name...">
-        <select id="perf-sort">
-          <option value="revenue_desc">Highest Revenue</option>
-          <option value="revenue_asc">Lowest Revenue</option>
-          <option value="profit_desc">Highest Gross Profit</option>
-          <option value="profit_asc">Lowest Gross Profit</option>
-          <option value="roi_desc">Highest ROI %</option>
-          <option value="roi_asc">Lowest ROI %</option>
-          <option value="units_desc">Highest Units Sold</option>
-        </select>
-      </div>
-      <div class="modal-body">
-        <div class="table-scroll" id="performance-modal-table"></div>
-      </div>
+        <!-- Ask Lance -->
+        <section class="view view-lance" data-view="lance" hidden>
+          <div class="lance">
+            <aside class="lance-history">
+              <button class="btn btn-secondary lance-new" id="lance-new" type="button"><span data-icon="plus"></span>New conversation</button>
+              <p class="nav-label">Saved conversations</p>
+              <div class="lance-conversations" id="lance-conversations"></div>
+            </aside>
+            <div class="lance-main">
+              <div class="lance-thread" id="lance-thread" aria-live="polite"></div>
+              <div class="lance-dock">
+                <div class="lance-suggestions" id="lance-suggestions"></div>
+                <form class="composer" id="lance-form">
+                  <label class="visually-hidden" for="lance-input">Ask Lance</label>
+                  <textarea id="lance-input" rows="1" maxlength="1000" placeholder="Ask about sales, products, customers or costs…" required></textarea>
+                  <div class="composer-row">
+                    <span class="composer-scope"><span data-icon="at"></span><span id="lance-scope-label">All business data</span></span>
+                    <span class="pill pill-ai"><span data-icon="sparkles"></span>Lance</span>
+                    <button class="composer-send" id="lance-send" type="submit" aria-label="Send question" data-icon="send"></button>
+                  </div>
+                </form>
+                <p class="status-text" id="lance-status" role="status" aria-live="polite"></p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Inventory -->
+        <section class="view" data-view="inventory" hidden>
+          <div class="kpi-grid" id="inventory-kpis"></div>
+          <div class="grid-main">
+            <div class="card">
+              <div class="toolbar">
+                <label class="search"><span data-icon="search"></span><input class="input" id="inventory-search" type="search" placeholder="Search name or SKU" aria-label="Search inventory"></label>
+                <label class="checkbox"><input id="inventory-archived" type="checkbox">Show archived</label>
+              </div>
+              <div class="table-wrap" id="inventory-table"></div>
+            </div>
+            <div class="card">
+              <div class="card-header">
+                <div class="segmented" id="inventory-tabs" role="tablist" aria-label="Inventory actions">
+                  <button type="button" role="tab" aria-selected="true" data-tab="movement">Record movement</button>
+                  <button type="button" role="tab" aria-selected="false" data-tab="product">Add product</button>
+                  <button type="button" role="tab" aria-selected="false" data-tab="stocktake">Stocktake</button>
+                </div>
+              </div>
+              <div class="card-body">
+                <form class="form-grid" id="movement-form" data-panel="movement">
+                  <label class="field">Product<select class="select" id="movement-product" required></select></label>
+                  <label class="field">Type<select class="select" id="movement-type"><option value="purchase">Stock received / purchase</option><option value="sale">Sale / stock issued</option><option value="adjustment">Adjustment (+/−)</option></select></label>
+                  <label class="field">Quantity<input class="input" id="movement-quantity" type="number" min="0.000001" step="any" required placeholder="Enter a positive quantity"></label>
+                  <label class="field">Note <span class="field-hint">Supplier, reference or reason</span><input class="input" id="movement-note" maxlength="500"></label>
+                  <button class="btn btn-primary" id="movement-submit" type="submit" disabled>Record movement</button>
+                </form>
+                <form class="form-grid" id="product-form" data-panel="product" hidden>
+                  <label class="field">Product name<input class="input" id="product-name" maxlength="200" required></label>
+                  <div class="form-row">
+                    <label class="field">SKU<input class="input" id="product-sku" maxlength="100" placeholder="Optional"></label>
+                    <label class="field">Unit<input class="input" id="product-unit" value="unit" maxlength="40" required></label>
+                  </div>
+                  <div class="form-row">
+                    <label class="field">Unit cost<input class="input" id="product-cost" type="number" min="0" step="0.01" placeholder="Optional"></label>
+                    <label class="field">Reorder level<input class="input" id="product-reorder" type="number" min="0" step="any" value="0" required></label>
+                  </div>
+                  <label class="field" id="product-opening-field">Opening stock<input class="input" id="product-opening" type="number" min="0" step="any" value="0"></label>
+                  <div class="button-row"><button class="btn btn-primary" id="product-submit" type="submit">Add product</button><button class="btn btn-ghost" id="product-cancel" type="button" hidden>Cancel edit</button></div>
+                </form>
+                <form class="form-grid" id="stocktake-form" data-panel="stocktake" hidden>
+                  <p class="body-sm muted">Upload a counted stock CSV to create products or reconcile on-hand quantities. Each difference is recorded as an auditable movement. Sales files never change stock.</p>
+                  <a class="btn btn-ghost btn-sm" id="stocktake-template" href="#"><span data-icon="download"></span>Download CSV template</a>
+                  <label class="field">Stocktake CSV<input class="input" id="stocktake-file" type="file" accept=".csv" required></label>
+                  <button class="btn btn-primary" id="stocktake-submit" type="submit" disabled>Import counted stock</button>
+                </form>
+                <p class="status-text" id="inventory-status" role="status" aria-live="polite"></p>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div><h2 class="card-title">Stock movements</h2><p class="card-subtitle">Opening stock, purchases, sales, adjustments and stocktakes — kept for audit</p></div></div>
+            <div class="table-wrap" id="movements-table"></div>
+          </div>
+        </section>
+
+        <!-- Financial position -->
+        <section class="view" data-view="position" hidden>
+          <div class="toolbar toolbar-plain">
+            <label class="field field-inline">As of<input class="input" id="position-date" type="date" required></label>
+            <span id="position-check"></span>
+          </div>
+          <div class="kpi-grid" id="position-kpis"></div>
+          <div id="position-warnings" class="stack-sm"></div>
+          <div class="grid-main">
+            <div class="stack" id="position-groups"></div>
+            <div class="stack">
+              <form class="card" id="balance-form">
+                <div class="card-header"><div><h2 class="card-title">Record a balance</h2><p class="card-subtitle">Enter zero explicitly when a balance is zero</p></div></div>
+                <div class="card-body form-grid">
+                  <label class="field">Balance date<input class="input" id="balance-date" type="date" required></label>
+                  <label class="field">Category<select class="select" id="balance-category" required></select></label>
+                  <label class="field">Account<input class="input" id="balance-account" maxlength="120" required placeholder="e.g. GCB current account"></label>
+                  <label class="field">Balance<input class="input" id="balance-amount" type="number" step="0.01" required></label>
+                  <label class="field">Note<input class="input" id="balance-note" maxlength="500" placeholder="Optional"></label>
+                  <button class="btn btn-primary" type="submit">Save balance</button>
+                  <p class="status-text" id="balance-status" role="status" aria-live="polite"></p>
+                </div>
+              </form>
+              <div class="card">
+                <div class="card-body body-sm muted stack-sm">
+                  <p><strong class="fg">How this works.</strong> Each account carries forward its latest balance on or before the report date. Missing categories stay visibly incomplete — zero is never assumed.</p>
+                  <p>This is an operational view, not a tax filing or full general ledger. Verify opening balances with your accountant.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div><h2 class="card-title">Balance history</h2><p class="card-subtitle">Dated entries behind every statement</p></div></div>
+            <div class="table-wrap" id="position-history"></div>
+          </div>
+        </section>
+
+        <!-- Data imports -->
+        <section class="view" data-view="data" hidden>
+          <div class="grid-main">
+            <div class="card">
+              <div class="card-header">
+                <div class="segmented" id="import-tabs" role="tablist" aria-label="Import method">
+                  <button type="button" role="tab" aria-selected="true" data-tab="file">Upload a file</button>
+                  <button type="button" role="tab" aria-selected="false" data-tab="momo">Mobile Money SMS</button>
+                </div>
+              </div>
+              <div class="card-body">
+                <form id="upload-form" data-panel="file">
+                  <label class="dropzone" id="dropzone">
+                    <input id="upload-file" type="file" accept=".csv,.xlsx,.tsv,.txt,.md">
+                    <span class="dropzone-icon" data-icon="upload"></span>
+                    <strong>Drop a file here, or browse</strong>
+                    <span class="muted">CSV, Excel, TSV, text or Markdown table · up to 10 MB</span>
+                    <span class="dropzone-file" id="upload-filename"></span>
+                  </label>
+                  <div class="button-row"><button class="btn btn-primary" id="upload-submit" type="submit" disabled>Import and check</button><p class="status-text" id="upload-status" role="status" aria-live="polite"></p></div>
+                </form>
+                <form class="form-grid" id="momo-form" data-panel="momo" hidden>
+                  <label class="field">Paste MoMo SMS alerts <span class="field-hint">MTN MoMo, Telecel Cash or AirtelTigo Money — one or many messages</span>
+                    <textarea class="textarea" id="momo-text" rows="6" required placeholder="Payment received for GHS 150.00 from Kweku Mensah. Current Balance: GHS 1,450.00. Financial Transaction Id: 18274910291."></textarea>
+                  </label>
+                  <div class="button-row"><button class="btn btn-primary" id="momo-submit" type="submit">Import transactions</button><p class="status-text" id="momo-status" role="status" aria-live="polite"></p></div>
+                </form>
+                <div id="import-result"></div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-header"><div><h2 class="card-title">What Ferlance reads</h2><p class="card-subtitle">Headers are matched loosely — “Order Date” and order_date are the same</p></div></div>
+              <div class="card-body">
+                <dl class="contract">
+                  <div><dt>Date <span class="pill pill-warning">Required</span></dt><dd>date, transaction_date, sale_date, order_date, invoice_date</dd></div>
+                  <div><dt>Money <span class="pill pill-warning">One required</span></dt><dd>amount, revenue, sales, total — or cost, expense, unit_cost</dd></div>
+                  <div><dt>Product</dt><dd>product, item, item_name, service_name</dd></div>
+                  <div><dt>Customer</dt><dd>customer, client, customer_name</dd></div>
+                  <div><dt>Quantity</dt><dd>quantity, qty, units</dd></div>
+                  <div><dt>Transaction ID</dt><dd>transaction_id, id, sale_id — enables duplicate detection</dd></div>
+                </dl>
+                <p class="body-sm muted">Rejected rows are never dropped silently: every one is listed with its reason.</p>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div><h2 class="card-title">Import history</h2><p class="card-subtitle">Switch a file off to leave it out of business-wide numbers without deleting it</p></div></div>
+            <div class="table-wrap" id="imports-table"></div>
+          </div>
+        </section>
+
+        <!-- Settings -->
+        <section class="view" data-view="settings" hidden>
+          <div class="settings">
+            <form class="card" id="profile-form">
+              <div class="card-header"><div><h2 class="card-title">Profile</h2><p class="card-subtitle">Your name and business details</p></div></div>
+              <div class="card-body form-grid">
+                <label class="field">Full name<input class="input" id="profile-name" maxlength="120" autocomplete="name"></label>
+                <label class="field">Business name<input class="input" id="profile-business" maxlength="120" required autocomplete="organization"></label>
+                <label class="field">Email<input class="input" id="profile-email" disabled></label>
+                <div class="button-row"><button class="btn btn-primary" type="submit">Save profile</button><p class="status-text" id="profile-status" role="status" aria-live="polite"></p></div>
+              </div>
+            </form>
+            <div class="card">
+              <div class="card-header"><div><h2 class="card-title">Appearance</h2><p class="card-subtitle">Choose how the workspace looks on this device</p></div></div>
+              <div class="card-body">
+                <div class="segmented" id="theme-picker" role="group" aria-label="Theme">
+                  <button type="button" data-theme-choice="system" aria-pressed="true">System</button>
+                  <button type="button" data-theme-choice="light" aria-pressed="false">Light</button>
+                  <button type="button" data-theme-choice="dark" aria-pressed="false">Dark</button>
+                </div>
+              </div>
+            </div>
+            <form class="card" id="brave-form">
+              <div class="card-header"><div><h2 class="card-title">Web research</h2><p class="card-subtitle">Brave Search API key for market context on declines and losses</p></div><span class="pill" id="brave-pill">Not connected</span></div>
+              <div class="card-body form-grid">
+                <label class="field">API key<input class="input" id="brave-key" type="password" autocomplete="off" placeholder="Paste a key to connect or replace"><span class="field-hint">Stored encrypted and never shown again. Provider usage may be billed by Brave.</span></label>
+                <div class="button-row"><button class="btn btn-primary" type="submit">Save key</button><button class="btn btn-danger" id="brave-remove" type="button" disabled>Disconnect</button><p class="status-text" id="brave-status" role="status" aria-live="polite"></p></div>
+              </div>
+            </form>
+            <div class="card" id="admin-card" hidden>
+              <div class="card-header"><div><h2 class="card-title">Administration</h2><p class="card-subtitle">Platform users and roles</p></div></div>
+              <div class="table-wrap" id="admin-users"></div>
+            </div>
+          </div>
+        </section>
+      </main>
     </div>
   </div>
 
-  <!-- Business Onboarding Wizard Modal -->
-  <div id="onboarding-modal" class="modal-overlay onboarding-overlay" hidden>
-    <div class="modal-dialog onboarding-dialog">
-      <div class="onboarding-steps">
-        <div class="onboarding-step active" data-step="1">
-          <span class="step-num">1</span>
-          <span class="step-label">Profile & Model</span>
-        </div>
-        <div class="onboarding-step" data-step="2">
-          <span class="step-num">2</span>
-          <span class="step-label">Goals & Metrics</span>
-        </div>
-        <div class="onboarding-step" data-step="3">
-          <span class="step-num">3</span>
-          <span class="step-label">Data Sources</span>
-        </div>
-      </div>
-
-      <div class="onboarding-content">
-        <!-- Step 1: Profile & Business Type -->
-        <div class="onboarding-pane active" id="onboard-pane-1">
-          <h3>Welcome to Ferlance! Let's tailor your workspace</h3>
-          <p class="section-caption">Furnish your business profile, operating currency, and whether you offer goods, services, or both.</p>
-          <div class="form-stack">
-            <label>Business / Enterprise Name
-              <input id="onboard-business-name" type="text" placeholder="e.g. Accra Harvest Ltd." required>
-            </label>
-            <label>Operating Currency
-              <select id="onboard-currency">
-                <option value="GHS">Ghanaian Cedi (GH₵ - GHS)</option>
-                <option value="USD">US Dollar ($ - USD)</option>
-                <option value="EUR">Euro (€ - EUR)</option>
-                <option value="GBP">British Pound (£ - GBP)</option>
-              </select>
-            </label>
-            <label>What does your enterprise offer?
-              <div class="chip-group single-select" id="onboard-biztype-group">
-                <button type="button" class="chip active" data-value="products">📦 Products Only (Physical Inventory)</button>
-                <button type="button" class="chip" data-value="services">💼 Services Only (Consulting, Labour, Fees)</button>
-                <button type="button" class="chip" data-value="both">🔄 Both Products & Services</button>
-              </div>
-            </label>
-          </div>
-        </div>
-
-        <!-- Step 2: Goals & Metrics -->
-        <div class="onboarding-pane" id="onboard-pane-2" hidden>
-          <h3>What are your core financial goals?</h3>
-          <p class="section-caption">Choose the key business outcomes and signals you want Ferlance to monitor.</p>
-          <div class="form-stack">
-            <label>Key Business Goals
-              <div class="chip-group multi-select" id="onboard-goals-group">
-                <button type="button" class="chip active" data-value="Revenue Growth">📈 Revenue Growth</button>
-                <button type="button" class="chip active" data-value="Profit Maximization">💰 Profit Maximization</button>
-                <button type="button" class="chip" data-value="Cost Control">✂️ Cost Control</button>
-                <button type="button" class="chip" data-value="Inventory Optimization">📦 Inventory Turnover</button>
-                <button type="button" class="chip" data-value="Cash Flow Stability">🛡️ Cash Flow Stability</button>
-                <button type="button" class="chip" data-value="Customer Retention">🤝 Customer Retention</button>
-              </div>
-            </label>
-            <label>Metrics You Count On
-              <div class="chip-group multi-select" id="onboard-metrics-group">
-                <button type="button" class="chip active" data-value="Gross Profit Margin">Gross Profit Margin</button>
-                <button type="button" class="chip active" data-value="ROI / Capital Return">ROI</button>
-                <button type="button" class="chip" data-value="Average Order Value">Average Order Value (AOV)</button>
-                <button type="button" class="chip" data-value="Stockout Risk">Stockout / Low Stock Alert</button>
-                <button type="button" class="chip" data-value="Daily Sales Volume">Daily Sales Volume</button>
-                <button type="button" class="chip" data-value="Customer Lifetime Value">Customer Lifetime Value</button>
-              </div>
-            </label>
-          </div>
-        </div>
-
-        <!-- Step 3: Data Sources -->
-        <div class="onboarding-pane" id="onboard-pane-3" hidden>
-          <h3>Where does your business data come from?</h3>
-          <p class="section-caption">Select all the data channels you operate with. You can upload spreadsheets, paste MoMo SMS alerts, or connect POS / databases anytime.</p>
-          <div class="chip-group multi-select" id="onboard-sources-group">
-            <button type="button" class="chip active" data-value="csv_excel">📊 CSV / Excel Spreadsheets</button>
-            <button type="button" class="chip active" data-value="momo_sms">📱 Mobile Money SMS (MTN MoMo, Telecel, AT)</button>
-            <button type="button" class="chip" data-value="pos_system">🏪 POS Systems (Loyverse, Square, Retail)</button>
-            <button type="button" class="chip" data-value="remote_db">🗄️ Remote Databases (Postgres, Mongo, SQLite)</button>
-            <button type="button" class="chip" data-value="text_markdown">📝 Text Logs & Markdown Tables</button>
-          </div>
-          <div class="onboarding-tip">
-            ✨ Once completed, we'll direct you straight to your unified business dashboard with live projections and performance metrics.
-          </div>
-        </div>
-      </div>
-
-      <div class="onboarding-footer">
-        <button type="button" class="secondary" id="onboard-back-btn" disabled>Back</button>
-        <div class="onboarding-footer-right">
-          <span id="onboard-status" class="form-status"></span>
-          <button type="button" id="onboard-next-btn">Next Step →</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <article id="print-report" class="print-report" hidden aria-label="Financial report"></article>
-  <div id="loading-state" class="empty">Checking your workspace session...</div>
-  <script type="module" src="/assets/app.js"></script>
+  <article class="print-report" id="print-report" hidden aria-label="Printable report"></article>
+  <div class="toast-region" id="toasts" aria-live="polite"></div>
+  <script type="module" src="/assets/js/app/main.js"></script>
 </body>
 </html>

@@ -1,5 +1,5 @@
 import json
-import traceback
+import logging
 from typing import Any
 
 import httpx
@@ -12,17 +12,15 @@ from .config import (
     GROQ_API_URL,
     GROQ_MODEL,
     GROQ_TIMEOUT_SECONDS,
-    OPENROUTER_KEY as CONFIG_OPENROUTER_KEY,
-    OPENROUTER_MODELS as CONFIG_OPENROUTER_MODELS,
-    OPENROUTER_URL as CONFIG_OPENROUTER_URL,
+    OPENROUTER_KEY,
     OPENROUTER_MAX_TOKENS,
+    OPENROUTER_MODELS,
     OPENROUTER_TIMEOUT_SECONDS,
+    OPENROUTER_URL,
     SERPAPI_KEY,
 )
 
-OPENROUTER_KEY = CONFIG_OPENROUTER_KEY or AGENTROUTER_API_KEY
-OPENROUTER_MODELS = CONFIG_OPENROUTER_MODELS or AGENTROUTER_MODELS
-OPENROUTER_URL = CONFIG_OPENROUTER_URL or AGENTROUTER_URL
+logger = logging.getLogger(__name__)
 
 # Snapshot limits (keep the whole request under the provider's tokens-per-minute cap).
 MAX_SNAPSHOT_CHARS = 12000
@@ -32,7 +30,6 @@ MAX_HISTORY_CHARS = 1500
 
 # Search limits.
 SERPAPI_URL = "https://serpapi.com/search"
-# SEARCH_TIMEOUT_SECONDS = 15.0
 SEARCH_TIMEOUT = httpx.Timeout(connect=20.0, read=40.0, write=20.0, pool=20.0)
 SEARCH_ATTEMPTS = 2
 MAX_TOOL_ROUNDS = 2
@@ -117,36 +114,9 @@ def _failure(response: httpx.Response) -> str:
     return str(message or f"HTTP {response.status_code}")
 
 
-# def _search(query: str) -> str:
-#     """Run one web search and return a short plain-text digest for the model."""
-#     if not SERPAPI_KEY:
-#         return "Search is unavailable because no search API key is configured."
-#     try:
-#         response = httpx.post(
-#             SERPAPI_URL,
-#             headers={"Authorization": f"Bearer {SERPAPI_KEY}", "Content-Type": "application/json"},
-#             json={
-#                 "query": query[:MAX_QUERY_CHARS],
-#                 "max_results": MAX_SEARCH_RESULTS,
-#                 "search_depth": "basic",
-#             },
-#             timeout=SEARCH_TIMEOUT_SECONDS,
-#         )
-#         response.raise_for_status()
-#         results = response.json().get("results", [])
-#     except (httpx.HTTPError, ValueError) as error:
-#         return f"Search failed ({type(error).__name__}). Answer without external data and say so."
-#     if not results:
-#         return "The search returned no results."
-#     return "\n".join(
-#         f"- {item.get('title', '')} ({item.get('url', '')}): {str(item.get('content', ''))[:MAX_RESULT_CHARS]}"
-#         for item in results
-#     )
-
-
 def _search(query: str) -> str:
     """Run one SerpAPI Google search and return a short plain-text digest for the model."""
-    print(f"[search] query={query!r}")
+    logger.info("Lance web search: %r", query)
     if not SERPAPI_KEY:
         return "Search is unavailable because no search API key is configured."
 
@@ -169,18 +139,18 @@ def _search(query: str) -> str:
             body = response.json()
             break
         except httpx.TimeoutException:
-            print(f"[search] timeout on attempt {attempt}/{SEARCH_ATTEMPTS}")
+            logger.warning("Lance web search: %s", f"timeout on attempt {attempt}/{SEARCH_ATTEMPTS}")
             if attempt == SEARCH_ATTEMPTS:
                 return "Search timed out. Answer without external data and say so."
         except httpx.HTTPStatusError as error:
-            print(f"[search] HTTP {error.response.status_code}: {error.response.text[:300]}")
+            logger.warning("Lance web search: %s", f"HTTP {error.response.status_code}: {error.response.text[:300]}")
             return f"Search failed (HTTP {error.response.status_code}). Answer without external data and say so."
         except (httpx.HTTPError, ValueError) as error:
-            print(f"[search] {type(error).__name__}")
+            logger.warning("Lance web search: %s", f"{type(error).__name__}")
             return f"Search failed ({type(error).__name__}). Answer without external data and say so."
 
     if body.get("error"):
-        print(f"[search] SerpAPI error: {body['error']}")
+        logger.warning("Lance web search: %s", f"SerpAPI error: {body['error']}")
         return f"Search failed: {body['error']}. Answer without external data and say so."
 
     lines: list[str] = []
@@ -272,6 +242,11 @@ def _complete(
 
 def ask_lance(question: str, analytics: dict[str, Any], history: list[dict[str, str]] | None = None) -> str:
     """Try OpenRouter models first, fallback to Groq, then AgentRouter, stopping early on authentication failures."""
+    if not (OPENROUTER_KEY or GROQ_API_KEY or AGENTROUTER_API_KEY):
+        raise RuntimeError(
+            "Ask Lance is not set up on this server yet: add an OpenRouter or Groq API key to the environment. "
+            "Instant answers still work without one."
+        )
     messages = _messages(question, analytics, history)
     errors: list[str] = []
 
@@ -290,7 +265,7 @@ def ask_lance(question: str, analytics: dict[str, Any], history: list[dict[str, 
             except (httpx.HTTPError, KeyError, IndexError, TypeError, ValueError) as error:
                 errors.append(f"OpenRouter {model}: {type(error).__name__}: {error}")
             except Exception:
-                traceback.print_exc()
+                logger.exception("Unexpected Lance provider failure")
                 errors.append(f"OpenRouter {model}: unexpected error")
     else:
         errors.append("OpenRouter: OPENROUTER_KEY is not configured")
@@ -326,7 +301,7 @@ def ask_lance(question: str, analytics: dict[str, Any], history: list[dict[str, 
             except (httpx.HTTPError, KeyError, IndexError, TypeError, ValueError) as error:
                 errors.append(f"AgentRouter {model}: {type(error).__name__}: {error}")
             except Exception:
-                traceback.print_exc()
+                logger.exception("Unexpected Lance provider failure")
                 errors.append(f"AgentRouter {model}: unexpected error")
 
     raise RuntimeError("Lance could not get a response from any provider. " + " | ".join(errors))

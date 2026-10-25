@@ -213,6 +213,9 @@ def process_file(path: Path, extension: str) -> ProcessingResult:
             seen_records.add(fingerprint)
             if output.get("amount") is None:
                 output["amount"] = 0.0
+            for optional in ("cost", "quantity"):
+                if optional in output and output[optional] is None:
+                    del output[optional]
             normalized.append(output)
         return ProcessingResult(
             normalized,

@@ -49,19 +49,6 @@ CREATE INDEX IF NOT EXISTS inventory_movements_business_date
     ON inventory_movements(business_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS inventory_movements_product_date
     ON inventory_movements(product_id, created_at DESC);
-CREATE TABLE IF NOT EXISTS business_fx_rates (
-    id TEXT PRIMARY KEY,
-    business_id TEXT NOT NULL,
-    source_currency TEXT NOT NULL,
-    target_currency TEXT NOT NULL,
-    effective_date TEXT NOT NULL,
-    rate REAL NOT NULL CHECK(rate > 0),
-    user_id TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    UNIQUE(business_id, source_currency, target_currency, effective_date),
-    FOREIGN KEY(business_id) REFERENCES businesses(id),
-    FOREIGN KEY(user_id) REFERENCES users(id)
-);
 CREATE TABLE IF NOT EXISTS business_integrations (
     id TEXT PRIMARY KEY,
     business_id TEXT NOT NULL,
@@ -86,25 +73,7 @@ CREATE TABLE IF NOT EXISTS financial_position_balances (
 );
 CREATE INDEX IF NOT EXISTS financial_position_lookup
     ON financial_position_balances(business_id, category, account_name, as_of_date DESC, created_at DESC);
-CREATE TABLE IF NOT EXISTS data_source_connections (
-    id TEXT PRIMARY KEY,
-    business_id TEXT NOT NULL,
-    source_type TEXT NOT NULL,
-    name TEXT NOT NULL,
-    config TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'connected',
-    last_synced_at TEXT,
-    created_at TEXT NOT NULL,
-    FOREIGN KEY(business_id) REFERENCES businesses(id)
-);
-CREATE TABLE IF NOT EXISTS dashboard_snapshots (
-    id TEXT PRIMARY KEY,
-    business_id TEXT NOT NULL UNIQUE,
-    snapshot_data TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    data_hash TEXT NOT NULL,
-    FOREIGN KEY(business_id) REFERENCES businesses(id)
-);
+CREATE INDEX IF NOT EXISTS datasets_business_date ON datasets(business_id, created_at DESC);
 CREATE VIRTUAL TABLE IF NOT EXISTS rag_documents_fts USING fts5(document_id UNINDEXED, business_id UNINDEXED, dataset_id UNINDEXED, content);
 """
 
@@ -115,7 +84,7 @@ def now() -> str:
 
 @contextmanager
 def connection(path: Path) -> Iterator[sqlite3.Connection]:
-    db = sqlite3.connect(path)
+    db = sqlite3.connect(path, timeout=10)
     db.row_factory = sqlite3.Row
     db.execute("PRAGMA foreign_keys = ON")
     try:
@@ -126,7 +95,9 @@ def connection(path: Path) -> Iterator[sqlite3.Connection]:
 
 
 def initialize(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
     with connection(path) as db:
+        db.execute("PRAGMA journal_mode = WAL")
         db.executescript(SCHEMA)
         user_columns = {row[1] for row in db.execute("PRAGMA table_info(users)").fetchall()}
         if "role" not in user_columns:
@@ -146,14 +117,6 @@ def initialize(path: Path) -> None:
         if "stock_value_after" not in movement_columns:
             db.execute("ALTER TABLE inventory_movements ADD COLUMN stock_value_after REAL")
         business_columns = {row[1] for row in db.execute("PRAGMA table_info(businesses)").fetchall()}
-        if "business_type" not in business_columns:
-            db.execute("ALTER TABLE businesses ADD COLUMN business_type TEXT NOT NULL DEFAULT 'both'")
-        if "goals" not in business_columns:
-            db.execute("ALTER TABLE businesses ADD COLUMN goals TEXT NOT NULL DEFAULT '[]'")
-        if "metrics_counted_on" not in business_columns:
-            db.execute("ALTER TABLE businesses ADD COLUMN metrics_counted_on TEXT NOT NULL DEFAULT '[]'")
-        if "onboarded" not in business_columns:
-            db.execute("ALTER TABLE businesses ADD COLUMN onboarded INTEGER NOT NULL DEFAULT 0")
         if "currency" not in business_columns:
             db.execute("ALTER TABLE businesses ADD COLUMN currency TEXT NOT NULL DEFAULT 'GHS'")
 

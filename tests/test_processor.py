@@ -101,3 +101,20 @@ def test_mixed_csv_sections_are_normalized_and_keep_domain_labels(tmp_path):
     assert result.rows[1]["cost"] == 50.0
     assert result.rows[2]["transaction_date"] is None
     assert result.rows[2]["shipping_line_usd"] == 100.0
+
+
+def test_csv_unit_cost_is_multiplied_by_quantity(tmp_path):
+    path = tmp_path / "unit_costs.csv"
+    path.write_text(
+        "transaction_id,date,amount,product,quantity,unit_cost\n"
+        "TX-1,2026-01-02,820,Rice 25kg,2,360\n"
+        "TX-2,2026-01-03,185,Frytol oil 5L,1,150\n"
+        "TX-3,2026-01-04,50,Sugar 1kg,,12.5\n",
+        encoding="utf-8",
+    )
+
+    result = process_file(path, ".csv")
+
+    assert [row["cost"] for row in result.rows] == [720.0, 150.0, 12.5]
+    metrics = analyze(result.rows)
+    assert metrics["profit"]["gross_profit"] == 1055.0 - 882.5
