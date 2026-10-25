@@ -178,10 +178,6 @@ def create_product(
                 "Opening stock", "manual", unit_cost,
             )
         product = _product(conn, product_id, business_id)
-        if "unit_cost" in values and _stock(conn, product_id) > 0:
-            raise InventoryError(
-                "Unit cost for stocked products is controlled by purchase or stocktake costs."
-            )
         return _product_response(conn, product)
 
 

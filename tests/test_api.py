@@ -75,7 +75,7 @@ def test_upload_rejects_unsupported_type(tmp_path, monkeypatch):
     signup = client.post("/api/auth/signup", json={"email": "owner2@example.com", "password": "password123", "business_name": "Kojo Shop"})
     headers = {"Authorization": "Bearer " + signup.json()["access_token"]}
     business_id = signup.json()["business"]["id"]
-    response = client.post(f"/api/businesses/{business_id}/datasets", headers=headers, files={"file": ("sales.txt", b"data", "text/plain")})
+    response = client.post(f"/api/businesses/{business_id}/datasets", headers=headers, files={"file": ("sales.pdf", b"data", "application/pdf")})
     assert response.status_code == 415
 
 

@@ -1,4 +1,5 @@
 import csv
+import hashlib
 import io
 import json
 import math
@@ -7,6 +8,7 @@ import shutil
 import uuid
 from datetime import date, datetime, timezone
 from pathlib import Path
+from typing import Any
 
 from fastapi import Cookie, Depends, FastAPI, File, Header, HTTPException, Query, Response, UploadFile
 from fastapi.responses import FileResponse
@@ -16,11 +18,14 @@ from pydantic import BaseModel, Field
 from . import db, financial_position, inventory, market_research
 from .analytics import analyze
 from .config import ADMIN_EMAILS, COOKIE_SECURE, DB_PATH, MAX_UPLOAD_BYTES, PROCESSED_DIR, RAW_DIR, SECRET_KEY, ensure_storage
+from .external_connectors import ExternalConnectorManager, ConnectorError
 from .insights import QUESTION_NAMES, answer_question, generate_insights
 from .llm import ask_lance
 from .processor import process_file
+from .projections import calculate_projections
 from .rag import DataAvailabilityError, all_records, context as rag_context
 from .security import create_access_token, create_refresh_token, hash_password, read_access_token, token_hash, verify_password
+from .sms_parser import MoMoSMSParser
 
 ensure_storage()
 db.initialize(DB_PATH)
@@ -100,6 +105,23 @@ class FinancialPositionBalanceRequest(BaseModel):
     account_name: str = Field(min_length=1, max_length=120)
     amount: float
     note: str = Field(default="", max_length=500)
+
+
+class OnboardingRequest(BaseModel):
+    business_type: str = Field(default="both", pattern="^(products|services|both)$")
+    goals: list[str] = Field(default_factory=list)
+    metrics_counted_on: list[str] = Field(default_factory=list)
+    data_sources: list[str] = Field(default_factory=list)
+
+
+class MoMoBatchRequest(BaseModel):
+    sms_text: str = Field(min_length=5)
+
+
+class ConnectionCreateRequest(BaseModel):
+    source_type: str = Field(pattern="^(sqlite_external|pos|postgres|mongodb)$")
+    name: str = Field(min_length=1, max_length=120)
+    config: dict[str, Any]
 
 
 def user_from_auth(authorization: str | None = Header(default=None)) -> dict:
@@ -189,7 +211,7 @@ def signup(payload: SignupRequest, response: Response) -> dict:
         raise HTTPException(409, "An account with that email already exists.")
     user_id, business_id = str(uuid.uuid4()), str(uuid.uuid4())
     db.insert(DB_PATH, "INSERT INTO users (id, email, password_hash, created_at, role, full_name) VALUES (?, ?, ?, ?, ?, ?)", (user_id, email, hash_password(payload.password), db.now(), "owner", ""))
-    db.insert(DB_PATH, "INSERT INTO businesses VALUES (?, ?, ?, ?)", (business_id, user_id, payload.business_name.strip(), db.now()))
+    db.insert(DB_PATH, "INSERT INTO businesses (id, user_id, name, created_at) VALUES (?, ?, ?, ?)", (business_id, user_id, payload.business_name.strip(), db.now()))
     return auth_response(user_id, {"id": business_id, "name": payload.business_name.strip()}, response)
 
 
@@ -299,8 +321,8 @@ def logout(response: Response, refresh_token: str | None = Cookie(default=None, 
 def upload_dataset(business_id: str, file: UploadFile = File(...), user: dict = Depends(user_from_auth)) -> dict:
     business_for_user(business_id, user)
     suffix = Path(file.filename or "").suffix.lower()
-    if suffix not in {".csv", ".xlsx"}:
-        raise HTTPException(415, "Unsupported file type. Upload a CSV or XLSX file.")
+    if suffix not in {".csv", ".xlsx", ".txt", ".md", ".tsv"}:
+        raise HTTPException(415, "Unsupported file type. Upload a CSV, XLSX, TXT, TSV, or Markdown file.")
     dataset_id = str(uuid.uuid4())
     raw_path = RAW_DIR / f"{dataset_id}{suffix}"
     try:
@@ -322,7 +344,15 @@ def upload_dataset(business_id: str, file: UploadFile = File(...), user: dict = 
         with processed_path.open("w", encoding="utf-8") as target:
             for row in result.rows:
                 target.write(json.dumps(row) + "\n")
-    db.insert(DB_PATH, "INSERT INTO datasets VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (dataset_id, business_id, file.filename or "dataset", suffix, str(raw_path), str(processed_path) if processed_path else None, status, result.source_rows, len(result.rows), result.rejected_rows, json.dumps(result.warnings), json.dumps(result.errors), db.now()))
+    db.insert(
+        DB_PATH,
+        "INSERT INTO datasets (id, business_id, filename, extension, raw_path, processed_path, status, source_rows, accepted_rows, rejected_rows, warnings, errors, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (dataset_id, business_id, file.filename or "dataset", suffix, str(raw_path), str(processed_path) if processed_path else None, status, result.source_rows, len(result.rows), result.rejected_rows, json.dumps(result.warnings), json.dumps(result.errors), db.now()),
+    )
+    try:
+        compute_and_cache_snapshot(business_id)
+    except Exception:
+        pass
     response = db.one(DB_PATH, "SELECT * FROM datasets WHERE id = ?", (dataset_id,))
     return dataset_response(response or {})
 
@@ -621,6 +651,64 @@ def dataset_records(business_id: str, dataset_id: str, user: dict = Depends(user
     return {"dataset_id": dataset_id, "status": dataset["status"], "count": len(records), "records": records}
 
 
+def compute_and_cache_snapshot(business_id: str) -> dict[str, Any]:
+    datasets = db.many(
+        DB_PATH,
+        "SELECT * FROM datasets WHERE business_id = ? AND status != 'failed' ORDER BY created_at DESC",
+        (business_id,),
+    )
+    all_recs: list[dict[str, Any]] = []
+    for d in datasets:
+        all_recs.extend(read_processed_records(d))
+
+    if all_recs:
+        analytics_data = analyze(all_recs)
+    else:
+        analytics_data = {
+            "period": {"from": None, "to": None},
+            "summary": "No business records uploaded yet.",
+            "profile": {"domain": "records", "label": "Records", "value_key": "amount", "value_label": "Recorded value"},
+            "currency": "GHS",
+            "available_period": {"from": None, "to": None},
+            "revenue": {"total": 0.0, "currency": "GHS", "transactions": 0, "average_sale": 0.0},
+            "trend": {"daily": [], "weekly": [], "monthly": [], "quarterly": [], "yearly": []},
+            "products": {"available": False, "reason": "No products recorded."},
+            "customers": {"available": False, "reason": "No customers recorded."},
+            "profit": {"available": False, "reason": "No financial records."},
+            "inventory": {"available": False, "reason": "No inventory recorded."},
+            "kpis": {"total_revenue": 0.0, "total_cost": 0.0, "primary_value": 0.0, "primary_label": "Revenue", "transactions": 0, "average_sale": 0.0, "top_product": None},
+            "projections": calculate_projections([], {"total_revenue": 0.0, "total_cost": 0.0, "transactions": 0}),
+            "warnings": [],
+        }
+
+    biz = db.one(DB_PATH, "SELECT * FROM businesses WHERE id = ?", (business_id,))
+    analytics_data["business_profile"] = {
+        "name": biz["name"] if biz else "",
+        "business_type": biz.get("business_type", "both") if biz else "both",
+        "goals": json.loads(biz.get("goals") or "[]") if biz else [],
+        "metrics_counted_on": json.loads(biz.get("metrics_counted_on") or "[]") if biz else [],
+        "onboarded": bool(biz.get("onboarded", 0)) if biz else False,
+    }
+    analytics_data["datasets_count"] = len(datasets)
+    analytics_data["synced_at"] = db.now()
+
+    raw_json = json.dumps(analytics_data, default=str)
+    data_hash = hashlib.sha256(raw_json.encode("utf-8")).hexdigest()
+    snapshot_id = str(uuid.uuid4())
+
+    with db.connection(DB_PATH) as conn:
+        conn.execute(
+            """INSERT INTO dashboard_snapshots (id, business_id, snapshot_data, updated_at, data_hash)
+               VALUES (?, ?, ?, ?, ?)
+               ON CONFLICT(business_id) DO UPDATE SET
+                   snapshot_data = excluded.snapshot_data,
+                   updated_at = excluded.updated_at,
+                   data_hash = excluded.data_hash""",
+            (snapshot_id, business_id, raw_json, db.now(), data_hash),
+        )
+    return analytics_data
+
+
 @app.get("/api/businesses/{business_id}/analytics")
 def dataset_analytics(
     business_id: str,
@@ -632,22 +720,180 @@ def dataset_analytics(
     business_for_user(business_id, user)
     if from_date and to_date and from_date > to_date:
         raise HTTPException(400, "The from date must be on or before the to date.")
-    dataset = db.one(
+
+    if dataset_id and dataset_id != "all":
+        dataset = db.one(
+            DB_PATH,
+            "SELECT * FROM datasets WHERE business_id = ? AND id = ?",
+            (business_id, dataset_id),
+        )
+        if not dataset:
+            raise HTTPException(404, "Dataset not found.")
+        if dataset["status"] == "failed":
+            raise HTTPException(409, "This dataset failed processing and has no analytics.")
+        records = read_processed_records(dataset)
+        try:
+            metrics = analyze(records, from_date, to_date)
+        except ValueError as error:
+            raise HTTPException(400, str(error))
+        metrics["dataset"] = dataset_response(dataset)
+        return metrics
+
+    datasets = db.many(
         DB_PATH,
-        "SELECT * FROM datasets WHERE business_id = ? AND (? IS NULL OR id = ?) ORDER BY created_at DESC LIMIT 1",
-        (business_id, dataset_id, dataset_id),
+        "SELECT * FROM datasets WHERE business_id = ? AND status != 'failed' ORDER BY created_at DESC",
+        (business_id,),
     )
-    if not dataset:
+    if not datasets:
         raise HTTPException(404, "Dataset not found.")
-    if dataset["status"] == "failed":
-        raise HTTPException(409, "This dataset failed processing and has no analytics.")
-    records = read_processed_records(dataset)
+
+    if len(datasets) == 1 and dataset_id != "all":
+        dataset = datasets[0]
+        records = read_processed_records(dataset)
+        try:
+            metrics = analyze(records, from_date, to_date)
+        except ValueError as error:
+            raise HTTPException(400, str(error))
+        metrics["dataset"] = dataset_response(dataset)
+        return metrics
+
+    all_recs: list[dict[str, Any]] = []
+    for d in datasets:
+        all_recs.extend(read_processed_records(d))
     try:
-        metrics = analyze(records, from_date, to_date)
+        metrics = analyze(all_recs, from_date, to_date)
     except ValueError as error:
         raise HTTPException(400, str(error))
-    metrics["dataset"] = dataset_response(dataset)
+
+    metrics["dataset"] = {
+        "id": "all",
+        "filename": "All Business Data",
+        "extension": "bulk",
+        "status": "processed",
+        "source_rows": sum(d["source_rows"] for d in datasets),
+        "accepted_rows": sum(d["accepted_rows"] for d in datasets),
+        "rejected_rows": sum(d["rejected_rows"] for d in datasets),
+        "warnings": [],
+        "errors": [],
+        "created_at": db.now(),
+    }
     return metrics
+
+
+@app.get("/api/businesses/{business_id}/dashboard-snapshot")
+def get_dashboard_snapshot(business_id: str, user: dict = Depends(user_from_auth)) -> dict:
+    business_for_user(business_id, user)
+    row = db.one(DB_PATH, "SELECT * FROM dashboard_snapshots WHERE business_id = ?", (business_id,))
+    if row and row.get("snapshot_data"):
+        try:
+            return json.loads(row["snapshot_data"])
+        except Exception:
+            pass
+    return compute_and_cache_snapshot(business_id)
+
+
+@app.post("/api/businesses/{business_id}/sync")
+def sync_business_data(business_id: str, user: dict = Depends(user_from_auth)) -> dict:
+    business_for_user(business_id, user)
+    snapshot = compute_and_cache_snapshot(business_id)
+    return {"status": "synced", "snapshot": snapshot}
+
+
+@app.get("/api/businesses/{business_id}/onboarding")
+def get_onboarding_status(business_id: str, user: dict = Depends(user_from_auth)) -> dict:
+    biz = business_for_user(business_id, user)
+    return {
+        "business_id": biz["id"],
+        "business_name": biz["name"],
+        "business_type": biz.get("business_type", "both"),
+        "goals": json.loads(biz.get("goals") or "[]"),
+        "metrics_counted_on": json.loads(biz.get("metrics_counted_on") or "[]"),
+        "onboarded": bool(biz.get("onboarded", 0)),
+    }
+
+
+@app.post("/api/businesses/{business_id}/onboarding")
+def save_onboarding(business_id: str, payload: OnboardingRequest, user: dict = Depends(user_from_auth)) -> dict:
+    business_for_user(business_id, user)
+    db.insert(
+        DB_PATH,
+        "UPDATE businesses SET business_type = ?, goals = ?, metrics_counted_on = ?, onboarded = 1 WHERE id = ?",
+        (payload.business_type, json.dumps(payload.goals), json.dumps(payload.metrics_counted_on), business_id),
+    )
+    compute_and_cache_snapshot(business_id)
+    updated = db.one(DB_PATH, "SELECT * FROM businesses WHERE id = ?", (business_id,))
+    return {
+        "status": "onboarded",
+        "business_type": updated["business_type"],
+        "goals": json.loads(updated["goals"]),
+        "metrics_counted_on": json.loads(updated["metrics_counted_on"]),
+        "onboarded": True,
+    }
+
+
+@app.post("/api/businesses/{business_id}/sources/momo")
+def import_momo_sms(business_id: str, payload: MoMoBatchRequest, user: dict = Depends(user_from_auth)) -> dict:
+    business_for_user(business_id, user)
+    txns = MoMoSMSParser.parse_batch(payload.sms_text)
+    if not txns:
+        single = MoMoSMSParser.parse_message(payload.sms_text)
+        if single:
+            txns = [single]
+        else:
+            raise HTTPException(400, "Could not detect any valid Mobile Money SMS transactions in the provided text.")
+
+    dataset_id = str(uuid.uuid4())
+    filename = f"Mobile Money SMS ({len(txns)} txns)"
+    processed_path = PROCESSED_DIR / f"{dataset_id}.jsonl"
+    rows = [tx.to_record() for tx in txns]
+    with processed_path.open("w", encoding="utf-8") as target:
+        for row in rows:
+            target.write(json.dumps(row) + "\n")
+
+    db.insert(
+        DB_PATH,
+        "INSERT INTO datasets (id, business_id, filename, extension, raw_path, processed_path, status, source_rows, accepted_rows, rejected_rows, warnings, errors, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (dataset_id, business_id, filename, ".txt", str(processed_path), str(processed_path), "processed", len(rows), len(rows), 0, json.dumps([f"Parsed {len(rows)} SMS transactions"]), json.dumps([]), db.now()),
+    )
+    compute_and_cache_snapshot(business_id)
+    return {"status": "imported", "transactions_count": len(rows), "dataset_id": dataset_id, "records": rows}
+
+
+@app.get("/api/businesses/{business_id}/sources/connections")
+def list_data_source_connections(business_id: str, user: dict = Depends(user_from_auth)) -> list[dict]:
+    business_for_user(business_id, user)
+    rows = db.many(DB_PATH, "SELECT id, business_id, source_type, name, config, status, last_synced_at, created_at FROM data_source_connections WHERE business_id = ? ORDER BY created_at DESC", (business_id,))
+    for row in rows:
+        try:
+            row["config"] = json.loads(row["config"])
+        except Exception:
+            pass
+    return rows
+
+
+@app.post("/api/businesses/{business_id}/sources/connections")
+def create_data_source_connection(business_id: str, payload: ConnectionCreateRequest, user: dict = Depends(user_from_auth)) -> dict:
+    business_for_user(business_id, user)
+    try:
+        test_res = ExternalConnectorManager.test_connection(payload.source_type, payload.config, app_db_path=DB_PATH)
+    except ConnectorError as exc:
+        raise HTTPException(400, str(exc))
+
+    conn_id = str(uuid.uuid4())
+    db.insert(
+        DB_PATH,
+        "INSERT INTO data_source_connections (id, business_id, source_type, name, config, status, last_synced_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (conn_id, business_id, payload.source_type, payload.name, json.dumps(payload.config), "connected", db.now(), db.now()),
+    )
+    row = db.one(DB_PATH, "SELECT * FROM data_source_connections WHERE id = ?", (conn_id,))
+    result = dict(row) if row else {}
+    if result.get("config"):
+        try:
+            result["config"] = json.loads(result["config"])
+        except Exception:
+            pass
+    result["test_result"] = test_res
+    return result
 
 
 def selected_records(business_id: str, dataset_id: str | None, user: dict) -> tuple[dict, list[dict]]:

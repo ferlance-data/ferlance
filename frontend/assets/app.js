@@ -90,42 +90,334 @@ function renderDashboardTrend() {
   renderChart(trend, isCost ? 'cost' : 'revenue');
 }
 
-function selectedDataset() { return $('#dataset-select').value; }
-function selectedDatasetDetails() { return state.datasets.find((item) => item.id === selectedDataset()); }
-function filterParams() {
-  const params = new URLSearchParams(); const selected = selectedDataset(); if (selected) params.set('dataset_id', selected); const preset = $('#date-preset').value; const bounds = state.datasetBounds || {}; const end = bounds.to ? new Date(`${bounds.to}T00:00:00`) : new Date(); const iso = (value) => `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
-  if (preset === 'today') { params.set('from', iso(end)); params.set('to', iso(end)); }
-  if (preset === '7' || preset === '30') { const start = new Date(end); start.setDate(start.getDate() - Number(preset) + 1); params.set('from', iso(start)); params.set('to', iso(end)); }
-  if (preset === 'week') { const start = new Date(end); start.setDate(start.getDate() - (start.getDay() + 6) % 7); params.set('from', iso(start)); params.set('to', iso(end)); }
-  if (preset === 'month') { params.set('from', iso(new Date(end.getFullYear(), end.getMonth(), 1))); params.set('to', iso(end)); }
-  if (preset === 'quarter') { params.set('from', iso(new Date(end.getFullYear(), Math.floor(end.getMonth() / 3) * 3, 1))); params.set('to', iso(end)); }
-  if (preset === 'year') { params.set('from', iso(new Date(end.getFullYear(), 0, 1))); params.set('to', iso(end)); }
-  if (preset === 'custom') { if ($('#from-date').value) params.set('from', $('#from-date').value); if ($('#to-date').value) params.set('to', $('#to-date').value); }
-  return params;
+function renderProjections(projections) {
+  const badge = $('#business-health-badge');
+  const grid = $('#projections-grid');
+  if (!projections) {
+    if (badge) badge.style.display = 'none';
+    if (grid) grid.innerHTML = '<p class="empty-list-note">Upload or connect business data to view grounded macroeconomic projections.</p>';
+    return;
+  }
+  if (badge) {
+    badge.style.display = 'inline-flex';
+    badge.textContent = projections.status || 'Steady Growth';
+    badge.className = 'badge-health';
+    const s = (projections.status || '').toLowerCase();
+    if (s.includes('strong')) badge.classList.add('badge-strong-growth');
+    else if (s.includes('steady')) badge.classList.add('badge-steady-growth');
+    else if (s.includes('danger')) badge.classList.add('badge-danger');
+    else badge.classList.add('badge-decline');
+  }
+
+  if (grid) {
+    grid.replaceChildren();
+
+    const cardGrowth = document.createElement('div');
+    cardGrowth.className = 'projection-card';
+    const growthVal = Number(projections.projected_growth_pct || 0);
+    cardGrowth.innerHTML = `
+      <span class="projection-card-label">Modeled Trajectory</span>
+      <span class="projection-card-value" style="color: ${growthVal >= 0 ? '#059669' : '#dc2626'}">${growthVal > 0 ? '+' : ''}${growthVal.toFixed(1)}%</span>
+      <p class="projection-card-narrative">${projections.summary || 'Estimated from business transaction momentum and macroeconomic drivers.'}</p>
+    `;
+
+    const cardInflation = document.createElement('div');
+    cardInflation.className = 'projection-card';
+    cardInflation.innerHTML = `
+      <span class="projection-card-label">Ghana CPI Inflation</span>
+      <span class="projection-card-value">${projections.gha_inflation_pct || 21.5}%</span>
+      <p class="projection-card-narrative">${projections.inflation_impact || 'Projections adjust nominal margins against Ghana headline price indexes.'}</p>
+    `;
+
+    const fx = projections.fx_rates || { USD: 15.5, EUR: 16.8, GBP: 19.8 };
+    const cardFx = document.createElement('div');
+    cardFx.className = 'projection-card';
+    cardFx.innerHTML = `
+      <span class="projection-card-label">Macro FX Benchmarks</span>
+      <span class="projection-card-value">$1 = GH₵${(fx.USD || 15.5).toFixed(2)}</span>
+      <div class="projection-factors">
+        <span>€1 = GH₵${(fx.EUR || 16.8).toFixed(2)}</span>
+        <span>£1 = GH₵${(fx.GBP || 19.8).toFixed(2)}</span>
+      </div>
+    `;
+
+    const cardSeason = document.createElement('div');
+    cardSeason.className = 'projection-card';
+    const factors = projections.seasonal_factors || ['Standard seasonal baseline'];
+    cardSeason.innerHTML = `
+      <span class="projection-card-label">Seasonal Factors</span>
+      <span class="projection-card-value">${projections.current_month || 'Active Cycle'}</span>
+      <div class="projection-factors">
+        ${factors.slice(0, 3).map(f => `<span>• ${f}</span>`).join('')}
+      </div>
+    `;
+
+    grid.append(cardGrowth, cardInflation, cardFx, cardSeason);
+  }
 }
 
-async function loadDashboard() {
-  if (!selectedDataset()) { state.lastAnalytics = null; $('#print-report-button').disabled = true; status('#dashboard-status', 'Upload a processed dataset to activate analytics.'); return; }
-  state.lastAnalytics = null;
-  $('#print-report-button').disabled = true;
-  status('#dashboard-status', 'Calculating metrics...');
-  const result = await request(`/api/businesses/${state.businessId}/analytics?${filterParams()}`);
+function renderTopAndWorstCards(products) {
+  const topList = $('#top-performers-list');
+  const worstList = $('#worst-performers-list');
+  if (!topList || !worstList) return;
+
+  topList.replaceChildren();
+  worstList.replaceChildren();
+
+  const isCost = state.lastAnalytics?.profile?.domain === 'cost';
+  const isServices = state.business?.business_type === 'services';
+  $('#top-performers-title').textContent = isCost ? 'Lowest Cost Items' : isServices ? 'Top Performing Services' : 'Leading Products';
+  $('#worst-performers-title').textContent = isCost ? 'Highest Cost Outflows' : isServices ? 'Underperforming Services' : 'Worst 5 Performers';
+
+  if (!products || !products.available || !products.items?.length) {
+    topList.append(cell('p', products?.reason || 'No product records available in this period.'));
+    worstList.append(cell('p', products?.reason || 'No product records available in this period.'));
+    return;
+  }
+
+  const topItems = products.top_5 || products.items.slice(0, 5);
+  const worstItems = products.worst_5 || [...products.items].reverse().slice(0, 5);
+
+  function createItemRow(item, index) {
+    const row = document.createElement('div');
+    row.className = 'performance-item';
+    const rank = document.createElement('span');
+    rank.className = 'performance-rank';
+    rank.textContent = index + 1;
+
+    const info = document.createElement('div');
+    info.className = 'performance-item-info';
+    const title = document.createElement('span');
+    title.className = 'performance-item-title';
+    title.textContent = item.product;
+    title.title = item.product;
+    const sub = document.createElement('span');
+    sub.className = 'performance-item-sub';
+    sub.textContent = `${Number(item.units || item.transactions || 0).toLocaleString()} ${item.units ? 'units' : 'records'}`;
+    info.append(title, sub);
+
+    const metrics = document.createElement('div');
+    metrics.className = 'performance-item-metrics';
+    const rev = document.createElement('span');
+    rev.className = 'performance-item-rev';
+    rev.textContent = money(item.revenue ?? item.metric_value ?? 0);
+    metrics.append(rev);
+
+    if (item.gross_profit !== undefined && products.profit_available) {
+      const margin = document.createElement('span');
+      const isPos = item.gross_profit >= 0;
+      margin.className = `performance-item-margin ${isPos ? 'margin-pos' : 'margin-neg'}`;
+      margin.textContent = `${isPos ? '+' : ''}${money(item.gross_profit)}`;
+      metrics.append(margin);
+    } else if (item.roi_pct !== undefined && item.roi_pct !== null) {
+      const roi = document.createElement('span');
+      roi.className = `performance-item-margin ${item.roi_pct >= 0 ? 'margin-pos' : 'margin-neg'}`;
+      roi.textContent = `ROI ${item.roi_pct.toFixed(1)}%`;
+      metrics.append(roi);
+    }
+
+    row.append(rank, info, metrics);
+    return row;
+  }
+
+  topItems.forEach((item, i) => topList.append(createItemRow(item, i)));
+  worstItems.forEach((item, i) => worstList.append(createItemRow(item, i)));
+}
+
+function openPerformanceModal(type = 'top') {
+  const modal = $('#performance-modal');
+  const title = $('#performance-modal-title');
+  const subtitle = $('#performance-modal-subtitle');
+  const searchInput = $('#perf-search');
+  const sortSelect = $('#perf-sort');
+
+  const products = state.lastAnalytics?.products;
+  if (!products || !products.all_ranked) {
+    if (products?.items) {
+      state.perfModalItems = products.items;
+    } else {
+      return;
+    }
+  } else {
+    state.perfModalItems = products.all_ranked;
+  }
+
+  if (searchInput) searchInput.value = '';
+
+  const isServices = state.business?.business_type === 'services';
+  if (type === 'top') {
+    if (title) title.textContent = isServices ? 'Top Performing Services' : 'Top Performing Products';
+    if (subtitle) subtitle.textContent = 'Highest grossing and margin contributors (Full Ranked List)';
+    if (sortSelect) sortSelect.value = 'revenue_desc';
+  } else {
+    if (title) title.textContent = isServices ? 'Underperforming Services' : 'Underperforming Products';
+    if (subtitle) subtitle.textContent = 'Items needing price review or operational attention (Full Ranked List)';
+    if (sortSelect) sortSelect.value = 'revenue_asc';
+  }
+
+  renderPerformanceModalTable();
+  if (modal) {
+    modal.hidden = false;
+    if (searchInput) searchInput.focus();
+  }
+}
+
+function closePerformanceModal() {
+  const modal = $('#performance-modal');
+  if (modal) modal.hidden = true;
+}
+
+function renderPerformanceModalTable() {
+  const container = $('#performance-modal-table');
+  if (!container) return;
+  const searchEl = $('#perf-search');
+  const sortEl = $('#perf-sort');
+  const query = (searchEl ? searchEl.value : '').toLowerCase().trim();
+  const sortMode = sortEl ? sortEl.value : 'revenue_desc';
+
+  let items = [...(state.perfModalItems || [])];
+  if (query) {
+    items = items.filter(item => (item.product || '').toLowerCase().includes(query));
+  }
+
+  items.sort((a, b) => {
+    switch (sortMode) {
+      case 'revenue_desc': return (b.revenue ?? 0) - (a.revenue ?? 0);
+      case 'revenue_asc': return (a.revenue ?? 0) - (b.revenue ?? 0);
+      case 'profit_desc': return (b.gross_profit ?? 0) - (a.gross_profit ?? 0);
+      case 'profit_asc': return (a.gross_profit ?? 0) - (b.gross_profit ?? 0);
+      case 'roi_desc': return (b.roi_pct ?? -999999) - (a.roi_pct ?? -999999);
+      case 'roi_asc': return (a.roi_pct ?? 999999) - (b.roi_pct ?? 999999);
+      case 'units_desc': return (b.units ?? 0) - (a.units ?? 0);
+      default: return 0;
+    }
+  });
+
+  if (!items.length) {
+    container.replaceChildren(cell('p', 'No matching products or services found.'));
+    return;
+  }
+
+  const rows = items.map((item, idx) => [
+    `#${idx + 1} ${item.product}`,
+    Number(item.units || item.transactions || 0).toLocaleString(),
+    money(item.revenue ?? item.metric_value ?? 0),
+    item.gross_profit !== undefined ? money(item.gross_profit) : 'Unavailable',
+    item.roi_pct !== undefined && item.roi_pct !== null ? `${item.roi_pct.toFixed(2)}%` : 'Unavailable',
+  ]);
+
+  renderTable(container, ['Product / Service', 'Units / Transactions', 'Revenue', 'Gross Profit', 'ROI'], rows);
+}
+
+function renderDashboardData(result, snapshotTime = null) {
   state.lastAnalytics = result;
   $('#print-report-button').disabled = false;
-  state.currency = result.currency || 'GHS';
+  state.currency = result.currency || state.business?.currency || 'GHS';
   state.datasetBounds = result.available_period;
   configureDomainView(result);
-  status('#dashboard-status', `${result.dataset.filename} · ${result.period.from || 'all dates'} to ${result.period.to || 'all dates'}`);
-  $('#summary').replaceChildren(cell('p', result.summary)); $('#dashboard-warnings').replaceChildren(...result.warnings.map((warning) => { const item = cell('div', warning); item.className = 'warning'; return item; }));
-  const isCost = result.profile?.domain === 'cost'; const primaryLabel = result.kpis.primary_label || 'Total revenue'; const primaryValue = result.kpis.primary_value ?? result.kpis.total_revenue; const cards = [[primaryLabel, money(primaryValue)], ['Records', result.kpis.transactions], [isCost ? 'Average cost record' : 'Average sale', money(isCost ? (result.kpis.total_cost / (result.kpis.transactions || 1)) : result.kpis.average_sale)], ['Top project / item', result.kpis.top_product || 'Unavailable']];
-  if (result.profit.available) {
+
+  const snapBadge = $('#snapshot-badge');
+  if (snapBadge) {
+    if (snapshotTime) {
+      const t = new Date(snapshotTime);
+      snapBadge.textContent = `Snapshot: ${t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    } else {
+      snapBadge.textContent = 'Snapshot: Unified Live';
+    }
+  }
+
+  status('#dashboard-status', `${result.dataset?.filename || 'Bulk Datasets'} · ${result.period?.from || 'all dates'} to ${result.period?.to || 'all dates'}`);
+  $('#summary').replaceChildren(cell('p', result.summary));
+  $('#dashboard-warnings').replaceChildren(...(result.warnings || []).map((warning) => {
+    const item = cell('div', warning);
+    item.className = 'warning';
+    return item;
+  }));
+
+  const isCost = result.profile?.domain === 'cost';
+  const primaryLabel = result.kpis?.primary_label || 'Total revenue';
+  const primaryValue = result.kpis?.primary_value ?? result.kpis?.total_revenue ?? 0;
+  const cards = [
+    [primaryLabel, money(primaryValue)],
+    ['Records', result.kpis?.transactions || 0],
+    [isCost ? 'Average cost record' : 'Average sale', money(isCost ? ((result.kpis?.total_cost || 0) / (result.kpis?.transactions || 1)) : (result.kpis?.average_sale || 0))],
+    ['Top offering', result.kpis?.top_product || 'Unavailable']
+  ];
+  if (result.profit?.available) {
     cards.push(['Profit / loss after costs', money(result.profit.gross_profit)]);
     cards.push(['Return on recorded cost', result.profit.cost > 0 ? `${(result.profit.gross_profit / result.profit.cost * 100).toFixed(2)}%` : 'Unavailable']);
   }
-  $('#kpis').replaceChildren(...cards.map(([label, value]) => { const card = document.createElement('div'); card.className = 'kpi'; card.append(cell('span', label), cell('strong', value)); return card; }));
-  renderDashboardTrend(); renderProducts(result.products);
-  if (result.customers.available) renderTable($('#customers'), ['Customer', result.profile?.domain === 'cost' ? 'Cost' : 'Revenue', 'Records'], result.customers.top_customers.map((item) => [item.customer, money(item.metric_value ?? item.revenue), item.transactions])); else $('#customers').replaceChildren(cell('p', result.customers.reason));
-  $('#conditional').replaceChildren(cell('p', result.profit.available ? `Profit after recorded costs is ${money(result.profit.gross_profit)} after ${money(result.profit.cost)} in costs.` : result.profile?.domain === 'cost' ? `Recorded costs total ${money(result.kpis.total_cost)}. Revenue is not present in this dataset, so profit cannot be calculated.` : result.profit.reason), cell('p', 'Inventory quantities are maintained separately in the Inventory workspace and are not inferred from this report.'));
+  $('#kpis').replaceChildren(...cards.map(([label, value]) => {
+    const card = document.createElement('div');
+    card.className = 'kpi';
+    card.append(cell('span', label), cell('strong', value));
+    return card;
+  }));
+
+  renderDashboardTrend();
+  renderProducts(result.products);
+  renderProjections(result.projections);
+  renderTopAndWorstCards(result.products);
+
+  if (result.customers?.available) {
+    renderTable($('#customers'), ['Customer', result.profile?.domain === 'cost' ? 'Cost' : 'Revenue', 'Records'], result.customers.top_customers.map((item) => [item.customer, money(item.metric_value ?? item.revenue), item.transactions]));
+  } else {
+    $('#customers').replaceChildren(cell('p', result.customers?.reason || 'No customer records'));
+  }
+
+  $('#conditional').replaceChildren(
+    cell('p', result.profit?.available ? `Profit after recorded costs is ${money(result.profit.gross_profit)} after ${money(result.profit.cost)} in costs.` : result.profile?.domain === 'cost' ? `Recorded costs total ${money(result.kpis?.total_cost || 0)}. Revenue is not present in this dataset, so profit cannot be calculated.` : (result.profit?.reason || '')),
+    cell('p', 'Inventory quantities are maintained separately in the Inventory workspace and are not inferred from this report.')
+  );
+}
+
+async function loadDashboard(preferSnapshot = false) {
+  if (preferSnapshot) {
+    try {
+      const snap = await request(`/api/businesses/${state.businessId}/dashboard-snapshot`);
+      if (snap && snap.data) {
+        renderDashboardData(snap.data, snap.created_at);
+        return;
+      }
+    } catch {
+      // Fall through to query
+    }
+  }
+
+  if (!selectedDataset() && !state.datasets.length) {
+    state.lastAnalytics = null;
+    $('#print-report-button').disabled = true;
+    status('#dashboard-status', 'Upload or connect business data sources to activate analytics.');
+    renderProjections(null);
+    renderTopAndWorstCards(null);
+    return;
+  }
+
+  state.lastAnalytics = null;
+  $('#print-report-button').disabled = true;
+  status('#dashboard-status', 'Calculating bulk business analytics...');
+  const result = await request(`/api/businesses/${state.businessId}/analytics?${filterParams()}`);
+  renderDashboardData(result, null);
+}
+
+async function syncDashboard() {
+  const syncBtn = $('#sync-dashboard-btn');
+  if (syncBtn) syncBtn.disabled = true;
+  status('#dashboard-status', 'Syncing external data sources & building snapshot...');
+  try {
+    const snapshot = await request(`/api/businesses/${state.businessId}/sync`, { method: 'POST' });
+    if (snapshot && snapshot.data) {
+      renderDashboardData(snapshot.data, snapshot.created_at);
+      status('#dashboard-status', 'Dashboard snapshot updated with all external sources.');
+    } else {
+      await loadDashboard(false);
+    }
+  } catch (err) {
+    status('#dashboard-status', `Sync error: ${err.message}`, true);
+    await loadDashboard(false);
+  } finally {
+    if (syncBtn) syncBtn.disabled = false;
+  }
 }
 
 function renderInsightCards(target, items) {
@@ -993,18 +1285,368 @@ async function loadProfile() {
   });
 }
 
+/* ==========================================================================
+   Feature Updates: Onboarding, Mobile Drawer, MoMo SMS, External Connectors
+   ========================================================================== */
+
+let onboardingStep = 1;
+
+function checkAndShowOnboarding() {
+  if (state.business && !state.business.onboarded) {
+    openOnboardingModal();
+  }
+}
+
+function openOnboardingModal() {
+  onboardingStep = 1;
+  const modal = $('#onboarding-modal');
+  if (!modal) return;
+  const nameInput = $('#onboard-business-name');
+  if (nameInput) nameInput.value = state.business?.name || '';
+  const currSelect = $('#onboard-currency');
+  if (currSelect && state.business?.currency) currSelect.value = state.business.currency;
+
+  updateOnboardingStepUI();
+  modal.hidden = false;
+}
+
+function updateOnboardingStepUI() {
+  $$('.onboarding-step').forEach((el) => {
+    const s = Number(el.dataset.step);
+    el.classList.toggle('active', s === onboardingStep);
+    el.classList.toggle('completed', s < onboardingStep);
+  });
+
+  const pane1 = $('#onboard-pane-1');
+  const pane2 = $('#onboard-pane-2');
+  const pane3 = $('#onboard-pane-3');
+  if (pane1) pane1.hidden = onboardingStep !== 1;
+  if (pane2) pane2.hidden = onboardingStep !== 2;
+  if (pane3) pane3.hidden = onboardingStep !== 3;
+
+  const backBtn = $('#onboard-back-btn');
+  const nextBtn = $('#onboard-next-btn');
+  if (backBtn) backBtn.disabled = onboardingStep === 1;
+  if (nextBtn) nextBtn.textContent = onboardingStep === 3 ? 'Launch Unified Dashboard ✨' : 'Next Step →';
+  status('#onboard-status', '');
+}
+
+async function handleOnboardingNext() {
+  if (onboardingStep === 1) {
+    const bizName = ($('#onboard-business-name')?.value || '').trim();
+    if (!bizName) {
+      status('#onboard-status', 'Please enter your business or enterprise name.', true);
+      return;
+    }
+    onboardingStep = 2;
+    updateOnboardingStepUI();
+    return;
+  }
+
+  if (onboardingStep === 2) {
+    onboardingStep = 3;
+    updateOnboardingStepUI();
+    return;
+  }
+
+  if (onboardingStep === 3) {
+    const submitBtn = $('#onboard-next-btn');
+    if (submitBtn) submitBtn.disabled = true;
+    status('#onboard-status', 'Setting up your business intelligence workspace...');
+
+    const activeBizType = $('#onboard-biztype-group .chip.active');
+    const businessType = activeBizType ? activeBizType.dataset.value : 'both';
+    const goals = $$('#onboard-goals-group .chip.active').map((c) => c.dataset.value);
+    const metrics = $$('#onboard-metrics-group .chip.active').map((c) => c.dataset.value);
+    const sources = $$('#onboard-sources-group .chip.active').map((c) => c.dataset.value);
+
+    const payload = {
+      business_name: ($('#onboard-business-name')?.value || '').trim(),
+      currency: $('#onboard-currency')?.value || 'GHS',
+      business_type: businessType,
+      goals,
+      metrics_counted_on: metrics,
+      data_sources: sources,
+    };
+
+    try {
+      const res = await request(`/api/businesses/${state.businessId}/onboarding`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      state.business = { ...state.business, ...res.business, onboarded: 1 };
+      state.currency = res.business?.currency || 'GHS';
+      $('#business-name').textContent = res.business?.name || 'Workspace';
+      const drawerBiz = $('#drawer-business-name');
+      if (drawerBiz) drawerBiz.textContent = res.business?.name || 'Workspace';
+
+      const modal = $('#onboarding-modal');
+      if (modal) modal.hidden = true;
+      status('#dashboard-status', 'Welcome! Workspace tailored to your business model.');
+      await syncDashboard();
+      navigate('dashboard');
+    } catch (err) {
+      status('#onboard-status', err.message, true);
+    } finally {
+      if (submitBtn) submitBtn.disabled = false;
+    }
+  }
+}
+
+function setupChipListeners() {
+  $$('.chip-group.single-select').forEach((group) => {
+    group.addEventListener('click', (e) => {
+      const chip = e.target.closest('.chip');
+      if (!chip) return;
+      group.querySelectorAll('.chip').forEach((c) => c.classList.remove('active'));
+      chip.classList.add('active');
+    });
+  });
+
+  $$('.chip-group.multi-select').forEach((group) => {
+    group.addEventListener('click', (e) => {
+      const chip = e.target.closest('.chip');
+      if (!chip) return;
+      chip.classList.toggle('active');
+    });
+  });
+}
+
+function setupPerformanceModalListeners() {
+  const topCard = $('#top-performers-card');
+  const worstCard = $('#worst-performers-card');
+  const closeBtn = $('#performance-modal-close');
+  const modal = $('#performance-modal');
+  const searchInput = $('#perf-search');
+  const sortSelect = $('#perf-sort');
+
+  if (topCard) {
+    topCard.addEventListener('click', () => openPerformanceModal('top'));
+    topCard.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openPerformanceModal('top'); } });
+  }
+  if (worstCard) {
+    worstCard.addEventListener('click', () => openPerformanceModal('worst'));
+    worstCard.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openPerformanceModal('worst'); } });
+  }
+  if (closeBtn) closeBtn.addEventListener('click', closePerformanceModal);
+  if (modal) {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closePerformanceModal();
+    });
+  }
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      closePerformanceModal();
+      const onb = $('#onboarding-modal');
+      if (onb && !onb.hidden && state.business?.onboarded) onb.hidden = true;
+    }
+  });
+
+  if (searchInput) searchInput.addEventListener('input', renderPerformanceModalTable);
+  if (sortSelect) sortSelect.addEventListener('change', renderPerformanceModalTable);
+}
+
+function setupMobileDrawer() {
+  const openBtn = $('#mobile-menu-btn');
+  const closeBtn = $('#drawer-close-btn');
+  const drawer = $('#mobile-drawer');
+  const backdrop = $('#drawer-backdrop');
+  const logoutBtn = $('#drawer-logout');
+
+  function openDrawer() {
+    if (!drawer || !backdrop) return;
+    drawer.hidden = false;
+    backdrop.hidden = false;
+    const nameEl = $('#drawer-business-name');
+    if (nameEl) nameEl.textContent = state.business?.name || 'Workspace';
+    const emailEl = $('#drawer-user-email');
+    if (emailEl) emailEl.textContent = state.user?.email || '';
+    const avatarEl = $('#drawer-avatar');
+    if (avatarEl) avatarEl.textContent = (state.business?.name || state.user?.email || 'F').slice(0, 1).toUpperCase();
+    $$('.drawer-link').forEach((link) => {
+      link.classList.toggle('active', link.dataset.page === state.page);
+    });
+  }
+
+  function closeDrawer() {
+    if (drawer) drawer.hidden = true;
+    if (backdrop) backdrop.hidden = true;
+  }
+
+  if (openBtn) openBtn.addEventListener('click', openDrawer);
+  if (closeBtn) closeBtn.addEventListener('click', closeDrawer);
+  if (backdrop) backdrop.addEventListener('click', closeDrawer);
+
+  $$('.drawer-link').forEach((link) => {
+    link.addEventListener('click', () => {
+      navigate(link.dataset.page);
+      closeDrawer();
+    });
+  });
+
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', async () => {
+      await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' });
+      window.location.replace('/');
+    });
+  }
+}
+
+async function handleMoMoIngestion(event) {
+  event.preventDefault();
+  const submitBtn = $('#momo-submit-btn');
+  const textEl = $('#momo-sms-text');
+  const chanEl = $('#momo-channel');
+  const smsText = (textEl ? textEl.value : '').trim();
+  const channel = chanEl ? chanEl.value || null : null;
+
+  if (!smsText) {
+    status('#momo-status', 'Please paste one or more SMS transaction messages.', true);
+    return;
+  }
+
+  if (submitBtn) submitBtn.disabled = true;
+  status('#momo-status', 'Detecting & parsing Mobile Money transactions...');
+  const preview = $('#momo-preview');
+  if (preview) preview.hidden = true;
+
+  try {
+    const res = await request(`/api/businesses/${state.businessId}/sources/momo`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sms_text: smsText, channel }),
+    });
+
+    status('#momo-status', `Successfully parsed & imported ${res.parsed_count} transactions!`);
+    if (textEl) textEl.value = '';
+
+    if (preview) {
+      preview.hidden = false;
+      preview.replaceChildren();
+      const header = cell('strong', `${res.parsed_count} MoMo Transactions Ingested (${res.channel})`);
+      const totalRow = cell('p', `Total Volume: ${money(res.total_volume)}`);
+      preview.append(header, totalRow);
+
+      if (res.transactions && res.transactions.length) {
+        const tableRows = res.transactions.map((t) => [
+          t.date || 'Today',
+          t.transaction_id || 'N/A',
+          t.customer || 'Unknown Customer',
+          money(t.amount || 0),
+          t.category || 'Payment Received',
+        ]);
+        renderTable(preview, ['Date', 'Txn ID', 'Customer', 'Amount', 'Category'], tableRows);
+      }
+    }
+
+    await loadHistory();
+    await syncDashboard();
+  } catch (err) {
+    status('#momo-status', err.message, true);
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
+  }
+}
+
+async function loadExternalConnections() {
+  const list = $('#connections-list');
+  if (!list) return;
+  try {
+    const conns = await request(`/api/businesses/${state.businessId}/sources/connections`);
+    list.replaceChildren();
+    if (!conns || !conns.length) {
+      list.innerHTML = '<p class="empty-list-note">No external database or POS connections configured yet.</p>';
+      return;
+    }
+    conns.forEach((conn) => {
+      const item = document.createElement('div');
+      item.className = 'connection-item';
+      item.innerHTML = `
+        <div>
+          <span class="conn-type-badge">${conn.connector_type}</span>
+          <strong>${conn.name}</strong>
+          <small>Status: ${conn.status || 'Active'} · Configured: ${new Date(conn.created_at).toLocaleDateString()}</small>
+        </div>
+      `;
+      list.append(item);
+    });
+  } catch (err) {
+    console.warn('Could not load connections:', err);
+  }
+}
+
+async function handleTestConnection() {
+  const type = $('#conn-type')?.value;
+  const name = ($('#conn-name')?.value || 'Test Connection').trim();
+  const connString = ($('#conn-string')?.value || '').trim();
+
+  if (!connString) {
+    status('#connection-form-status', 'Enter connection details first.', true);
+    return;
+  }
+
+  status('#connection-form-status', 'Testing connection handshake...');
+  try {
+    const res = await request(`/api/businesses/${state.businessId}/sources/connections`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ connector_type: type, name, connection_string: connString, test_only: true }),
+    });
+    status('#connection-form-status', res.message || 'Connection verified successfully!');
+  } catch (err) {
+    status('#connection-form-status', err.message, true);
+  }
+}
+
+async function handleSaveConnection(event) {
+  event.preventDefault();
+  const type = $('#conn-type')?.value;
+  const name = ($('#conn-name')?.value || '').trim();
+  const connString = ($('#conn-string')?.value || '').trim();
+
+  if (!name || !connString) {
+    status('#connection-form-status', 'Please fill in all connection fields.', true);
+    return;
+  }
+
+  status('#connection-form-status', 'Saving and registering connector...');
+  try {
+    await request(`/api/businesses/${state.businessId}/sources/connections`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ connector_type: type, name, connection_string: connString, test_only: false }),
+    });
+    status('#connection-form-status', 'Connector registered successfully!');
+    if ($('#conn-name')) $('#conn-name').value = '';
+    if ($('#conn-string')) $('#conn-string').value = '';
+    if ($('#new-connection-form')) $('#new-connection-form').hidden = true;
+    await loadExternalConnections();
+  } catch (err) {
+    status('#connection-form-status', err.message, true);
+  }
+}
+
 function navigate(page) { state.page = pages[page] ? page : 'dashboard'; location.hash = state.page; $$('.page-view').forEach((view) => { view.hidden = view.dataset.view !== state.page; }); $('#page-title').textContent = pages[state.page].title; $('#page-description').textContent = pages[state.page].description; $('#print-report-button').hidden = state.page !== 'dashboard'; $$('.nav-link').forEach((link) => link.classList.toggle('active', link.dataset.page === state.page)); }
 
 async function bootstrap() {
   try {
     const refresh = await fetch('/api/auth/refresh', { method: 'POST', credentials: 'same-origin' }); if (!refresh.ok) throw new Error('signed out'); state.token = (await refresh.json()).access_token;
-    const identity = await request('/api/auth/me'); state.user = identity.user; state.business = identity.business; state.businessId = identity.business?.id; $('#business-name').textContent = identity.business?.name || 'Workspace'; $('#user-email').textContent = identity.user.email; $('#user-avatar').textContent = (identity.business?.name || identity.user.email).slice(0, 1).toUpperCase(); $('#app-root').hidden = false; $('#loading-state').hidden = true; navigate(state.page);
+    const identity = await request('/api/auth/me'); state.user = identity.user; state.business = identity.business; state.businessId = identity.business?.id; $('#business-name').textContent = identity.business?.name || 'Workspace'; $('#user-email').textContent = identity.user.email; $('#user-avatar').textContent = (identity.business?.name || identity.user.email).slice(0, 1).toUpperCase(); $('#app-root').hidden = false; $('#loading-state').hidden = true;
+    setupMobileDrawer();
+    setupChipListeners();
+    setupPerformanceModalListeners();
+    navigate(state.page);
   } catch { window.location.replace('/'); return; }
   try {
     await loadHistory();
     await loadInventorySnapshot();
     await loadBraveSearchStatus();
+    await loadExternalConnections();
+    checkAndShowOnboarding();
     maybeRunPerformanceResearch();
+    if (state.page === 'dashboard') await loadDashboard(true);
     if (state.page === 'ask-lance') await loadConversations();
     if (state.page === 'catalogue') await loadCatalogue();
     if (state.page === 'inventory') await loadInventory();
@@ -1248,6 +1890,32 @@ $('#catalogue-search').addEventListener('input', renderCatalogue);
 $('#catalogue-sort').addEventListener('change', renderCatalogue);
 $('#ask-form').addEventListener('submit', async (event) => { event.preventDefault(); await askLance(); });
 $('#new-chat').addEventListener('click', startConversation);
+
+// Feature Updates Listeners
+const syncBtn = $('#sync-dashboard-btn');
+if (syncBtn) syncBtn.addEventListener('click', syncDashboard);
+
+const onboardBack = $('#onboard-back-btn');
+if (onboardBack) onboardBack.addEventListener('click', () => { if (onboardingStep > 1) { onboardingStep--; updateOnboardingStepUI(); } });
+
+const onboardNext = $('#onboard-next-btn');
+if (onboardNext) onboardNext.addEventListener('click', handleOnboardingNext);
+
+const momoForm = $('#momo-form');
+if (momoForm) momoForm.addEventListener('submit', handleMoMoIngestion);
+
+const toggleConnBtn = $('#toggle-new-connection-btn');
+if (toggleConnBtn) toggleConnBtn.addEventListener('click', () => {
+  const form = $('#new-connection-form');
+  if (form) form.hidden = !form.hidden;
+});
+
+const testConnBtn = $('#test-connection-btn');
+if (testConnBtn) testConnBtn.addEventListener('click', handleTestConnection);
+
+const newConnForm = $('#new-connection-form');
+if (newConnForm) newConnForm.addEventListener('submit', handleSaveConnection);
+
 window.addEventListener('hashchange', () => { navigate(location.hash.slice(1)); if (state.page === 'catalogue') loadCatalogue().catch((error) => { $('#catalogue-summary').textContent = error.message; }); if (state.page === 'inventory') loadInventory().catch((error) => status('#inventory-status', error.message, true)); if (state.page === 'financial-position') loadFinancialPosition(); if (state.page === 'insights') loadBraveSearchStatus().catch((error) => status('#research-settings-status', error.message, true)); if (state.page === 'profile') loadProfile().catch((error) => status('#profile-status', error.message, true)); if (state.page === 'ask-lance') loadConversations().catch((error) => status('#ask-status', error.message, true)); });
 $$('.nav-link').forEach((link) => link.addEventListener('click', () => { if (link.dataset.page === 'profile') loadProfile().catch((error) => status('#profile-status', error.message, true)); }));
 bootstrap();

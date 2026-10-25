@@ -12,10 +12,17 @@ from .config import (
     GROQ_API_URL,
     GROQ_MODEL,
     GROQ_TIMEOUT_SECONDS,
+    OPENROUTER_KEY as CONFIG_OPENROUTER_KEY,
+    OPENROUTER_MODELS as CONFIG_OPENROUTER_MODELS,
+    OPENROUTER_URL as CONFIG_OPENROUTER_URL,
     OPENROUTER_MAX_TOKENS,
     OPENROUTER_TIMEOUT_SECONDS,
     SERPAPI_KEY,
 )
+
+OPENROUTER_KEY = CONFIG_OPENROUTER_KEY or AGENTROUTER_API_KEY
+OPENROUTER_MODELS = CONFIG_OPENROUTER_MODELS or AGENTROUTER_MODELS
+OPENROUTER_URL = CONFIG_OPENROUTER_URL or AGENTROUTER_URL
 
 # Snapshot limits (keep the whole request under the provider's tokens-per-minute cap).
 MAX_SNAPSHOT_CHARS = 12000
@@ -264,9 +271,29 @@ def _complete(
 
 
 def ask_lance(question: str, analytics: dict[str, Any], history: list[dict[str, str]] | None = None) -> str:
-    """Try Groq first, then AgentRouter models, stopping early on authentication failures."""
+    """Try OpenRouter models first, fallback to Groq, then AgentRouter, stopping early on authentication failures."""
     messages = _messages(question, analytics, history)
     errors: list[str] = []
+
+    if OPENROUTER_KEY:
+        headers = {
+            "Authorization": f"Bearer {OPENROUTER_KEY}",
+            "Content-Type": "application/json",
+        }
+        for model in OPENROUTER_MODELS:
+            try:
+                return _complete(OPENROUTER_URL, headers, model, messages, OPENROUTER_TIMEOUT_SECONDS)
+            except httpx.HTTPStatusError as error:
+                errors.append(f"OpenRouter {model}: {_failure(error.response)}")
+                if error.response.status_code in (401, 403):
+                    break
+            except (httpx.HTTPError, KeyError, IndexError, TypeError, ValueError) as error:
+                errors.append(f"OpenRouter {model}: {type(error).__name__}: {error}")
+            except Exception:
+                traceback.print_exc()
+                errors.append(f"OpenRouter {model}: unexpected error")
+    else:
+        errors.append("OpenRouter: OPENROUTER_KEY is not configured")
 
     if GROQ_API_KEY:
         try:
@@ -284,7 +311,7 @@ def ask_lance(question: str, analytics: dict[str, Any], history: list[dict[str, 
     else:
         errors.append("Groq: GROQ_API_KEY is not configured")
 
-    if AGENTROUTER_API_KEY:
+    if AGENTROUTER_API_KEY and AGENTROUTER_API_KEY != OPENROUTER_KEY:
         headers = {
             "Authorization": f"Bearer {AGENTROUTER_API_KEY}",
             "Content-Type": "application/json",
@@ -301,7 +328,5 @@ def ask_lance(question: str, analytics: dict[str, Any], history: list[dict[str, 
             except Exception:
                 traceback.print_exc()
                 errors.append(f"AgentRouter {model}: unexpected error")
-    else:
-        errors.append("AgentRouter: AGENTROUTER_API_KEY is not configured")
 
     raise RuntimeError("Lance could not get a response from any provider. " + " | ".join(errors))

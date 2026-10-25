@@ -86,6 +86,25 @@ CREATE TABLE IF NOT EXISTS financial_position_balances (
 );
 CREATE INDEX IF NOT EXISTS financial_position_lookup
     ON financial_position_balances(business_id, category, account_name, as_of_date DESC, created_at DESC);
+CREATE TABLE IF NOT EXISTS data_source_connections (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    source_type TEXT NOT NULL,
+    name TEXT NOT NULL,
+    config TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'connected',
+    last_synced_at TEXT,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(business_id) REFERENCES businesses(id)
+);
+CREATE TABLE IF NOT EXISTS dashboard_snapshots (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL UNIQUE,
+    snapshot_data TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    data_hash TEXT NOT NULL,
+    FOREIGN KEY(business_id) REFERENCES businesses(id)
+);
 CREATE VIRTUAL TABLE IF NOT EXISTS rag_documents_fts USING fts5(document_id UNINDEXED, business_id UNINDEXED, dataset_id UNINDEXED, content);
 """
 
@@ -126,6 +145,17 @@ def initialize(path: Path) -> None:
             db.execute("ALTER TABLE inventory_movements ADD COLUMN unit_cost REAL")
         if "stock_value_after" not in movement_columns:
             db.execute("ALTER TABLE inventory_movements ADD COLUMN stock_value_after REAL")
+        business_columns = {row[1] for row in db.execute("PRAGMA table_info(businesses)").fetchall()}
+        if "business_type" not in business_columns:
+            db.execute("ALTER TABLE businesses ADD COLUMN business_type TEXT NOT NULL DEFAULT 'both'")
+        if "goals" not in business_columns:
+            db.execute("ALTER TABLE businesses ADD COLUMN goals TEXT NOT NULL DEFAULT '[]'")
+        if "metrics_counted_on" not in business_columns:
+            db.execute("ALTER TABLE businesses ADD COLUMN metrics_counted_on TEXT NOT NULL DEFAULT '[]'")
+        if "onboarded" not in business_columns:
+            db.execute("ALTER TABLE businesses ADD COLUMN onboarded INTEGER NOT NULL DEFAULT 0")
+        if "currency" not in business_columns:
+            db.execute("ALTER TABLE businesses ADD COLUMN currency TEXT NOT NULL DEFAULT 'GHS'")
 
 
 def repair_dataset_paths(path: Path, raw_dir: Path, processed_dir: Path) -> None:
