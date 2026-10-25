@@ -40,7 +40,7 @@ CANONICAL_ALIASES: dict[str, set[str]] = {
     "record_id": {"id", "recordid", "transactionid", "txnid", "saleid", "invoiceid", "po", "ponumber", "employeeid", "workerid", "expenseid", "serviceid", "referenceid", "paymentref", "bankchequeno", "batchid", "tripid", "blnumber", "orderid", "txid"},
     "date": {"date", "transactiondate", "saledate", "orderdate", "invoicedate", "expensedate", "usagedate", "effectivedate", "period", "month", "recorddate", "paymentdate", "logdate", "rentaldate", "entrydate"},
     "amount": {"amount", "salesamount", "amountpaid", "revenue", "revenuebilled", "sales", "total", "totalprice", "saleamount", "income", "grosssales", "value", "compensation", "salary", "freightfeebilled", "totalcollectedghs", "ordervalueghs"},
-    "cost": {"cost", "costamount", "unitcost", "unitcostusd", "actualcost", "actualcostusd", "totalcost", "totalcostusd", "expense", "expenseamount", "totalexpenseghs", "cogs", "subtotal", "directlaborcost", "thirdpartytoolingcost", "totaldeliverycost", "fuelcost", "customsdutyghs", "gphahandlingghs", "demurragefeeghs", "agentservicefeeghs", "operatorfee", "dieselcost", "lunchstipend", "amountremitted", "salary", "wage", "dailywageghs", "grosspay", "netpay"},
+    "cost": {"cost", "costamount", "unitcost", "unitcostusd", "costperunit", "costperunitusd", "actualcost", "actualcostusd", "totalcost", "totalcostusd", "expense", "expenseamount", "totalexpenseghs", "cogs", "subtotal", "directlaborcost", "thirdpartytoolingcost", "totaldeliverycost", "fuelcost", "customsdutyghs", "gphahandlingghs", "demurragefeeghs", "agentservicefeeghs", "operatorfee", "dieselcost", "lunchstipend", "amountremitted", "salary", "wage", "dailywageghs", "grosspay", "netpay"},
     "budget": {"budget", "budgeted", "budgetedcost", "budgetedcostusd", "planned", "plannedamount"},
     "variance": {"variance", "varianceusd", "variancepct", "variancepercent", "difference"},
     "quantity": {"quantity", "qty", "units", "unitssold", "usagequantity", "headcount", "count"},
@@ -53,6 +53,8 @@ CANONICAL_ALIASES: dict[str, set[str]] = {
 }
 
 NUMERIC_CANONICAL = {"amount", "cost", "budget", "variance", "quantity", "unit_price"}
+# Cost headers that hold a per-unit figure; the record cost is that figure times quantity.
+UNIT_COST_KEYS = {"unitcost", "unitcostusd", "costperunit", "costperunitusd"}
 DATE_CANONICAL = {"date"}
 NUMERIC_HEADER_HINTS = ("amount", "revenue", "sales", "cost", "fee", "price", "rate", "wage", "stipend", "deposit", "balance", "remit", "base", "gross", "margin", "percent", "pct", "quantity", "qty", "units", "days", "hours", "litres", "kwh", "overdue", "commission", "fund", "charge", "levy", "duty", "verified", "discrepancy", "collected", "paid", "ghs", "usd")
 NON_NUMERIC_HEADER_HINTS = ("phone", "mobile", "contact", "number", "cheque", "reference", "paymentref", "workerid", "employeeid", "accountid", "blnumber", "tripid", "batchid", "costcenter", "status", "flag")
@@ -309,6 +311,10 @@ class UniversalCSVIngestionEngine:
                 else:
                     text = "" if value is None else str(value).strip()
                     clean[target] = None if text.lower() in MISSING_TOKENS else text
+            cost_source = mapping.get("cost")
+            if cost_source and self._normal_key(cost_source) in UNIT_COST_KEYS and clean.get("cost") is not None:
+                quantity = clean.get("quantity")
+                clean["cost"] = clean["cost"] * (quantity if quantity is not None else 1)
             text_payload = {key: clean.get(key) for key in list(clean) if any(hint in self._normal_key(key) for hint in TEXT_HINTS) and clean.get(key) is not None}
             if text_payload:
                 clean["_text_payload"] = json.dumps(text_payload, ensure_ascii=False)

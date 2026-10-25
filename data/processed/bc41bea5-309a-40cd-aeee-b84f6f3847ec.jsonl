@@ -1,3 +1,0 @@
-{"transaction_date": "2026-01-02", "amount": 1250.5, "transaction_id": "sale-1", "product": "Rice", "customer": "Customer A", "quantity": 2.0}
-{"transaction_date": "2026-01-03", "amount": 850.0, "transaction_id": "sale-2", "product": "Rice", "customer": "Customer B", "quantity": 1.0}
-{"transaction_date": "2026-01-03", "amount": 500.0, "transaction_id": "sale-3", "product": "Beans", "customer": "Customer A", "quantity": 3.0}

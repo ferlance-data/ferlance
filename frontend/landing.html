@@ -1,24 +1,211 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Ferlance | Business clarity from your records</title>
-  <link rel="stylesheet" href="/assets/styles.css">
+  <title>Ferlance | Business intelligence for growing businesses</title>
+  <meta name="description" content="Ferlance turns the sales sheets, Mobile Money alerts and stock counts small businesses already keep into clear numbers, honest insights and answers you can act on.">
+  <meta name="theme-color" content="#0a1514">
+  <link rel="icon" href="/assets/img/mark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <link rel="stylesheet" href="/assets/css/landing.css">
 </head>
-<body>
-  <main class="public-page">
-    <nav class="public-nav"><span class="brand">Ferlance</span><span>Business intelligence for growing businesses</span></nav>
-    <section class="hero">
-      <div><h1>See what your records are telling you.</h1><p class="lede">Bring the sales file you already have. Ferlance turns it into clear performance signals, useful comparisons, and grounded next steps.</p></div>
-      <div class="auth-card">
-        <div class="tabs" role="tablist"><button class="tab active" id="login-tab" role="tab" aria-selected="true" type="button">Sign in</button><button class="tab" id="signup-tab" role="tab" aria-selected="false" type="button">Create workspace</button></div>
-        <form class="form-stack" id="login-form"><label>Email<input name="email" type="email" required autocomplete="email"></label><label>Password<input name="password" type="password" required autocomplete="current-password"></label><button>Sign in</button><div class="form-status" id="login-status" role="status" aria-live="polite"></div></form>
-        <form class="form-stack" id="signup-form" hidden><label>Email<input name="email" type="email" required autocomplete="email"></label><label>Password<input name="password" type="password" minlength="8" required autocomplete="new-password"></label><label>Business name<input name="business_name" required maxlength="120" autocomplete="organization"></label><button>Create workspace</button><div class="form-status" id="signup-status" role="status" aria-live="polite"></div></form>
+<body class="landing">
+  <header class="site-nav" id="site-nav">
+    <div class="site-nav-inner">
+      <a class="brand" href="/" aria-label="Ferlance home">
+        <svg class="brand-mark" viewBox="0 0 20 20" aria-hidden="true"><rect x="1" y="12" width="5" height="5" rx="1"/><rect x="7.5" y="7.5" width="5" height="5" rx="1"/><rect x="14" y="3" width="5" height="5" rx="1"/></svg>
+        Ferlance
+      </a>
+      <nav class="site-links" aria-label="Primary">
+        <a href="#product">Product</a>
+        <a href="#lance">Ask Lance</a>
+        <a href="#use-cases">Use cases</a>
+        <a href="#security">Security</a>
+      </nav>
+      <div class="site-actions">
+        <button class="btn btn-outline-dark btn-sm" type="button" data-auth="login">Sign in</button>
+        <button class="btn btn-mint btn-sm" type="button" data-auth="signup">Get started</button>
+        <button class="site-menu-btn" id="site-menu-btn" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="site-menu"><span></span><span></span></button>
+      </div>
+    </div>
+    <nav class="site-menu" id="site-menu" aria-label="Mobile" hidden>
+      <a href="#product">Product</a>
+      <a href="#lance">Ask Lance</a>
+      <a href="#use-cases">Use cases</a>
+      <a href="#security">Security</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="hero-scene" aria-hidden="true">
+        <svg class="hero-skyline" id="hero-skyline" preserveAspectRatio="xMidYMax slice"></svg>
+        <div class="hero-haze"></div>
+      </div>
+      <div class="hero-content">
+        <h1 id="hero-title">Do less guesswork.<br>Grow with your numbers.</h1>
+        <p>Ferlance turns the sales sheets, Mobile Money alerts and stock counts your business already keeps into clear numbers, honest insights and answers you can act on.</p>
+        <div class="hero-actions">
+          <button class="btn btn-mint btn-lg" type="button" data-auth="signup">Get started free</button>
+          <button class="btn btn-outline-dark btn-lg" type="button" data-auth="login">Sign in</button>
+        </div>
+      </div>
+      <a class="scroll-cue" href="#product"><span class="scroll-mouse" aria-hidden="true"></span>Explore</a>
+    </section>
+
+    <section class="strip" aria-label="Who Ferlance is for">
+      <p class="eyebrow">Built for the businesses that keep Ghana moving</p>
+      <ul class="strip-list">
+        <li>Provision shops</li><li>Pharmacies</li><li>Wholesalers</li><li>Chop bars</li><li>Boutiques</li><li>Agro-input dealers</li><li>Salons</li>
+      </ul>
+    </section>
+
+    <section class="section" id="product" aria-labelledby="product-title">
+      <h2 class="section-title" id="product-title">Purpose built for the way small businesses actually keep records.</h2>
+      <div class="feature-grid">
+        <article class="feature">
+          <header><h3><strong>Import</strong> the records you already keep.</h3><span class="feature-arrow" aria-hidden="true">↗</span></header>
+          <div class="mock mock-import" aria-hidden="true">
+            <div class="mock-bubble">Here's March — the shop sheet and our MoMo alerts.</div>
+            <div class="mock-file"><span class="mock-file-icon">XLSX</span><div><b>march_sales.xlsx</b><small>1,204 rows · 1,201 accepted</small></div><span class="tag tag-ok">Processed</span></div>
+            <div class="mock-file"><span class="mock-file-icon mock-file-momo">SMS</span><div><b>Mobile Money alerts</b><small>42 MTN &amp; Telecel transactions</small></div><span class="tag tag-ok">Processed</span></div>
+            <div class="mock-note">3 rows need attention — <u>row 88: date is invalid</u></div>
+          </div>
+        </article>
+        <article class="feature">
+          <header><h3><strong>See</strong> what's working in seconds.</h3><span class="feature-arrow" aria-hidden="true">↗</span></header>
+          <div class="mock mock-kpis" aria-hidden="true">
+            <div class="mock-kpi"><small>Revenue</small><b>GH₵48,260</b><span class="tag tag-ok">▲ 12.4% vs prior 30 days</span></div>
+            <div class="mock-kpi"><small>Profit after costs</small><b>GH₵11,905</b><span class="tag tag-ok">▲ 6.1%</span></div>
+            <svg class="mock-spark" viewBox="0 0 300 70" preserveAspectRatio="none"><defs><linearGradient id="spark-fill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#7af0c2" stop-opacity=".35"/><stop offset="1" stop-color="#7af0c2" stop-opacity="0"/></linearGradient></defs><path d="M0 58 L25 52 L50 55 L75 44 L100 47 L125 36 L150 40 L175 30 L200 33 L225 22 L250 25 L275 14 L300 10 L300 70 L0 70Z" fill="url(#spark-fill)"/><path d="M0 58 L25 52 L50 55 L75 44 L100 47 L125 36 L150 40 L175 30 L200 33 L225 22 L250 25 L275 14 L300 10" fill="none" stroke="#7af0c2" stroke-width="2"/></svg>
+          </div>
+        </article>
+        <article class="feature">
+          <header><h3><strong>Stay ahead</strong> of stock before it runs out.</h3><span class="feature-arrow" aria-hidden="true">↗</span></header>
+          <div class="mock mock-list" aria-hidden="true">
+            <div class="mock-row"><div><b>Rice 25kg</b><small>4 bags on hand · reorder at 10</small></div><span class="tag tag-warn">Low stock</span></div>
+            <div class="mock-row"><div><b>Frytol oil 5L</b><small>2 tins on hand · reorder at 6</small></div><span class="tag tag-warn">Low stock</span></div>
+            <div class="mock-row"><div><b>Milo 400g</b><small>Sold below cost this month</small></div><span class="tag tag-bad">Loss · GH₵-120</span></div>
+            <div class="mock-row"><div><b>Sugar 1kg</b><small>36 packs on hand</small></div><span class="tag">In stock</span></div>
+          </div>
+        </article>
+        <article class="feature">
+          <header><h3><strong>Know</strong> where the business stands.</h3><span class="feature-arrow" aria-hidden="true">↗</span></header>
+          <div class="mock mock-statement" aria-hidden="true">
+            <div class="mock-statement-head"><b>Statement of financial position</b><small>As of 31 March 2026</small></div>
+            <div class="mock-line"><span>Total assets</span><b>GH₵126,400</b></div>
+            <div class="mock-line"><span>Total liabilities</span><b>GH₵38,150</b></div>
+            <div class="mock-line"><span>Equity</span><b>GH₵88,250</b></div>
+            <div class="mock-line mock-line-check"><span>Assets = liabilities + equity</span><span class="tag tag-ok">Balances</span></div>
+          </div>
+        </article>
       </div>
     </section>
-    <section class="feature-strip"><article><h2>One clear workspace</h2><p>Keep uploads, processing status, and business performance together.</p></article><article><h2>Trust the numbers</h2><p>Deterministic metrics show exactly what the accepted records support.</p></article><article><h2>Start where you are</h2><p>Bring a CSV or Excel sales file and build from the data already in your business.</p></article></section>
+
+    <section class="section section-lance" id="lance" aria-labelledby="lance-title">
+      <h2 class="section-title section-title-center" id="lance-title">Knowledge is power.<br><span>Your numbers. Private. Grounded. Explained.</span></h2>
+      <div class="agent-demo">
+        <div class="agent-tabs" role="tablist" aria-label="Ask Lance examples">
+          <button role="tab" type="button" aria-selected="true" data-agent-tab="summary">Weekly summary</button>
+          <button role="tab" type="button" aria-selected="false" data-agent-tab="margin">Margin check</button>
+          <button role="tab" type="button" aria-selected="false" data-agent-tab="stock">Stock risk</button>
+        </div>
+        <div class="agent-window">
+          <div class="agent-thread" id="agent-thread" aria-live="polite"></div>
+          <div class="agent-composer" aria-hidden="true">
+            <span>Ask a follow-up…</span>
+            <div class="agent-composer-row"><span class="agent-at">@ All business data</span><span class="agent-chip">Lance</span><span class="agent-send">↑</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="use-cases" aria-labelledby="use-title">
+      <h2 class="section-title section-title-center" id="use-title">Ferlance is built for the business you run, <span>the way you run it.</span></h2>
+      <div class="usecase">
+        <div class="usecase-tabs" role="tablist" aria-label="Business types">
+          <button role="tab" type="button" aria-selected="true" data-usecase="retail">Retail &amp; provisions</button>
+          <button role="tab" type="button" aria-selected="false" data-usecase="wholesale">Wholesale</button>
+          <button role="tab" type="button" aria-selected="false" data-usecase="pharmacy">Pharmacy</button>
+          <button role="tab" type="button" aria-selected="false" data-usecase="food">Food &amp; hospitality</button>
+          <button role="tab" type="button" aria-selected="false" data-usecase="services">Services</button>
+        </div>
+        <div class="usecase-panel" id="usecase-panel" role="tabpanel"></div>
+      </div>
+    </section>
+
+    <section class="section section-facts" aria-labelledby="facts-title">
+      <h2 class="section-title" id="facts-title">Messy records in.<br><span>Trustworthy numbers out.</span></h2>
+      <div class="facts">
+        <div class="fact"><b class="mono">5</b><span>file formats — CSV, Excel, TSV, text and Markdown tables</span></div>
+        <div class="fact"><b class="mono">3</b><span>Mobile Money networks parsed from SMS — MTN, Telecel, AirtelTigo</span></div>
+        <div class="fact"><b class="mono">6</b><span>instant business questions answered without any AI</span></div>
+        <div class="fact"><b class="mono">0</b><span>rows dropped silently — every rejected row comes with a reason</span></div>
+      </div>
+      <svg class="facts-curve" viewBox="0 0 1200 220" preserveAspectRatio="none" aria-hidden="true"><path d="M0 210 C 300 205, 520 190, 700 150 S 1000 40, 1200 10" fill="none" stroke="#7af0c2" stroke-width="2" stroke-dasharray="1400" stroke-dashoffset="1400" class="facts-curve-path"/></svg>
+    </section>
+
+    <section class="section" id="security" aria-labelledby="security-title">
+      <div class="security-head">
+        <h2 class="section-title" id="security-title">Like a locked cash box.<br><span>Your records stay yours.</span></h2>
+        <p>We never sell your data. Ask Lance sends a summarised snapshot to your configured AI provider only when you ask it something, and web research sends product names and dates — never amounts or customers.</p>
+      </div>
+      <div class="security-grid">
+        <div><h3>Identity and access</h3><ul><li>Salted PBKDF2 password hashing</li><li>Short-lived access tokens</li><li>Single-use, rotating refresh sessions in HttpOnly cookies</li></ul></div>
+        <div><h3>Data protection</h3><ul><li>Every workspace is tenant-isolated</li><li>Integration keys encrypted at rest</li><li>Raw uploads kept for audit, never shared</li></ul></div>
+        <div><h3>Numbers you can trust</h3><ul><li>Deterministic metrics are the source of truth</li><li>Missing data is shown as missing — never zero</li><li>AI answers grounded in your own records</li></ul></div>
+      </div>
+    </section>
+
+    <section class="final-cta" aria-labelledby="cta-title">
+      <div class="final-cta-scene" aria-hidden="true"></div>
+      <h2 id="cta-title">Import, understand and decide —<br>in Ferlance.</h2>
+      <div class="hero-actions">
+        <button class="btn btn-mint btn-lg" type="button" data-auth="signup">Get started free</button>
+        <button class="btn btn-outline-dark btn-lg" type="button" data-auth="login">Sign in</button>
+      </div>
+    </section>
   </main>
-  <script type="module" src="/assets/landing.js"></script>
+
+  <footer class="site-footer">
+    <div class="footer-cols">
+      <div><h4>Product</h4><a href="#product">Overview</a><a href="#lance">Ask Lance</a><a href="#product">Inventory</a><a href="#product">Financial position</a></div>
+      <div><h4>Your data</h4><a href="#product">Spreadsheets</a><a href="#product">Mobile Money SMS</a><a href="#product">Stocktakes</a></div>
+      <div><h4>Company</h4><a href="#security">Security</a><a href="#use-cases">Use cases</a><a href="/app">Open workspace</a></div>
+    </div>
+    <div class="footer-base">
+      <a class="brand" href="/"><svg class="brand-mark" viewBox="0 0 20 20" aria-hidden="true"><rect x="1" y="12" width="5" height="5" rx="1"/><rect x="7.5" y="7.5" width="5" height="5" rx="1"/><rect x="14" y="3" width="5" height="5" rx="1"/></svg>Ferlance</a>
+      <small>© <span id="year">2026</span> Ferlance. Built in Accra for growing businesses.</small>
+    </div>
+  </footer>
+
+  <dialog class="dialog auth-dialog" id="auth-dialog" aria-labelledby="auth-title">
+    <form method="dialog" class="auth-close-form"><button class="btn btn-ghost btn-icon" aria-label="Close">✕</button></form>
+    <div class="auth-body">
+      <svg class="brand-mark" viewBox="0 0 20 20" aria-hidden="true"><rect x="1" y="12" width="5" height="5" rx="1"/><rect x="7.5" y="7.5" width="5" height="5" rx="1"/><rect x="14" y="3" width="5" height="5" rx="1"/></svg>
+      <h2 id="auth-title">Welcome back</h2>
+      <p class="muted" id="auth-subtitle">Sign in to your Ferlance workspace.</p>
+      <div class="segmented auth-switch" role="tablist">
+        <button type="button" role="tab" aria-selected="true" data-auth-mode="login">Sign in</button>
+        <button type="button" role="tab" aria-selected="false" data-auth-mode="signup">Create account</button>
+      </div>
+      <form class="form-grid" id="login-form">
+        <label class="field">Email<input class="input" name="email" type="email" required autocomplete="email"></label>
+        <label class="field">Password<input class="input" name="password" type="password" required autocomplete="current-password"></label>
+        <button class="btn btn-mint btn-lg" type="submit">Sign in</button>
+        <p class="status-text" id="login-status" role="status" aria-live="polite"></p>
+      </form>
+      <form class="form-grid" id="signup-form" hidden>
+        <label class="field">Business name<input class="input" name="business_name" required maxlength="120" autocomplete="organization" placeholder="e.g. Ama's Provisions"></label>
+        <label class="field">Email<input class="input" name="email" type="email" required autocomplete="email"></label>
+        <label class="field">Password<input class="input" name="password" type="password" minlength="8" required autocomplete="new-password"><span class="field-hint">At least 8 characters.</span></label>
+        <button class="btn btn-mint btn-lg" type="submit">Create workspace</button>
+        <p class="status-text" id="signup-status" role="status" aria-live="polite"></p>
+      </form>
+    </div>
+  </dialog>
+
+  <script type="module" src="/assets/js/landing.js"></script>
 </body>
 </html>

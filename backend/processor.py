@@ -1,5 +1,6 @@
 import csv
 import hashlib
+import io
 import json
 import math
 import re
@@ -12,6 +13,7 @@ from typing import Any
 from openpyxl import load_workbook
 from openpyxl.utils.exceptions import InvalidFileException
 
+from backend.sms_parser import MoMoSMSParser
 from backend.universal_ingestion import UniversalCSVIngestionEngine
 
 REQUIRED_ALIASES = {
@@ -57,14 +59,37 @@ def _key(value: Any) -> str:
     return re.sub(r"[^a-z0-9]", "", str(value or "").strip().lower())
 
 
+def _extract_markdown_table(text: str) -> list[dict[str, Any]]:
+    lines = [line.strip() for line in text.splitlines() if line.strip().startswith("|")]
+    if len(lines) < 2:
+        return []
+    # Header is line 0
+    header_cols = [c.strip() for c in lines[0].strip("|").split("|")]
+    # Line 1 is usually separator (| --- | --- |)
+    data_lines = lines[2:] if len(lines) > 2 and all(set(c.strip()).issubset({"-", ":", " "}) for c in lines[1].strip("|").split("|")) else lines[1:]
+    rows = []
+    for line in data_lines:
+        vals = [c.strip() for c in line.strip("|").split("|")]
+        if len(vals) == len(header_cols):
+            rows.append(dict(zip(header_cols, vals)))
+    return rows
+
+
 def _read_rows(path: Path, extension: str) -> list[dict[str, Any]]:
-    if extension == ".csv":
+    if extension in (".csv", ".tsv", ".txt"):
         with path.open("r", encoding="utf-8-sig", newline="") as handle:
-            reader = csv.DictReader(handle)
+            text = handle.read()
+            if not text.strip():
+                return []
+            delimiter = "\t" if extension == ".tsv" or "\t" in text.splitlines()[0] else ","
+            reader = csv.DictReader(io.StringIO(text), delimiter=delimiter)
             headers = [_key(header) for header in reader.fieldnames or []]
             if len(headers) != len(set(headers)):
-                raise DuplicateColumnError("The CSV file contains duplicate column names.")
+                raise DuplicateColumnError("The file contains duplicate column names.")
             return list(reader)
+    if extension == ".md":
+        with path.open("r", encoding="utf-8-sig") as handle:
+            return _extract_markdown_table(handle.read())
     if extension == ".xlsx":
         workbook = load_workbook(path, read_only=True, data_only=True)
         sheet = workbook.active
@@ -77,7 +102,7 @@ def _read_rows(path: Path, extension: str) -> list[dict[str, Any]]:
         if len(normalized_headers) != len(set(normalized_headers)):
             raise DuplicateColumnError("The XLSX file contains duplicate column names.")
         return [dict(zip(headers, row)) for row in values[1:]]
-    raise ValueError("Unsupported file type. Upload a CSV or XLSX file.")
+    raise ValueError("Unsupported file type. Upload CSV, TSV, XLSX, TXT, or Markdown.")
 
 
 def _columns(rows: list[dict[str, Any]]) -> dict[str, str]:
@@ -126,6 +151,25 @@ def _date(value: Any) -> str:
 
 
 def process_file(path: Path, extension: str) -> ProcessingResult:
+    if extension in (".txt", ".md"):
+        try:
+            content = path.read_text(encoding="utf-8-sig")
+        except UnicodeDecodeError:
+            content = path.read_text(encoding="latin-1", errors="replace")
+        momo_txns = MoMoSMSParser.parse_batch(content)
+        if momo_txns:
+            records = [tx.to_record() for tx in momo_txns]
+            return ProcessingResult(
+                records,
+                source_rows=len(records),
+                rejected_rows=0,
+                warnings=[f"Detected and parsed {len(records)} Mobile Money SMS transactions."],
+            )
+        if extension == ".md":
+            md_rows = _extract_markdown_table(content)
+            if not md_rows:
+                return ProcessingResult([], 0, 0, errors=["No markdown table or Mobile Money transactions found in file."])
+
     if extension == ".csv":
         try:
             if path.stat().st_size == 0:
@@ -140,11 +184,21 @@ def process_file(path: Path, extension: str) -> ProcessingResult:
             for item in universal["quarantined_rows"]
         ]
         rejected_rows = len(universal["quarantined_rows"])
+        is_usd = any(
+            "usd" in str(col).lower() or "$" in str(col)
+            for col in (
+                list(universal.get("schema_summary", {}).get("column_mapping", {}).values())
+                + list(universal.get("schema_summary", {}).get("headers", []))
+                + [str(k) for k in universal["clean_df"].columns]
+            )
+        )
         for source in universal["clean_df"].to_dict(orient="records"):
             output = {
                 key: None if isinstance(value, float) and math.isnan(value) else value
                 for key, value in source.items()
             }
+            if is_usd and "currency" not in output:
+                output["currency"] = "USD"
             if "date" in output:
                 output["transaction_date"] = output.pop("date")
             else:
@@ -159,6 +213,9 @@ def process_file(path: Path, extension: str) -> ProcessingResult:
             seen_records.add(fingerprint)
             if output.get("amount") is None:
                 output["amount"] = 0.0
+            for optional in ("cost", "quantity"):
+                if optional in output and output[optional] is None:
+                    del output[optional]
             normalized.append(output)
         return ProcessingResult(
             normalized,

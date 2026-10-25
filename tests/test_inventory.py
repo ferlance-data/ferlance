@@ -2,16 +2,16 @@ from concurrent.futures import ThreadPoolExecutor
 from fastapi.testclient import TestClient
 from pathlib import Path
 
-from backend import main
+from backend import config, db, main
 
 
 def _client(tmp_path, monkeypatch, email="inventory@example.com"):
-    monkeypatch.setattr(main, "DB_PATH", tmp_path / "inventory.sqlite3")
-    monkeypatch.setattr(main, "RAW_DIR", tmp_path / "raw")
-    monkeypatch.setattr(main, "PROCESSED_DIR", tmp_path / "processed")
-    main.RAW_DIR.mkdir()
-    main.PROCESSED_DIR.mkdir()
-    main.db.initialize(main.DB_PATH)
+    monkeypatch.setattr(config, "DB_PATH", tmp_path / "inventory.sqlite3")
+    monkeypatch.setattr(config, "RAW_DIR", tmp_path / "raw")
+    monkeypatch.setattr(config, "PROCESSED_DIR", tmp_path / "processed")
+    config.RAW_DIR.mkdir()
+    config.PROCESSED_DIR.mkdir()
+    db.initialize(config.DB_PATH)
     client = TestClient(main.app)
     signup = client.post(
         "/api/auth/signup",

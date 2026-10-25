@@ -8,16 +8,17 @@ from fastapi.testclient import TestClient
 from openpyxl import Workbook
 import jwt
 
-from backend import main
+from backend import config, db, main
+from backend.routers import auth, lance
 
 
 def test_signup_upload_and_history_are_tenant_scoped(tmp_path, monkeypatch):
-    monkeypatch.setattr(main, "DB_PATH", tmp_path / "test.sqlite3")
-    monkeypatch.setattr(main, "RAW_DIR", tmp_path / "raw")
-    monkeypatch.setattr(main, "PROCESSED_DIR", tmp_path / "processed")
-    main.RAW_DIR.mkdir()
-    main.PROCESSED_DIR.mkdir()
-    main.db.initialize(main.DB_PATH)
+    monkeypatch.setattr(config, "DB_PATH", tmp_path / "test.sqlite3")
+    monkeypatch.setattr(config, "RAW_DIR", tmp_path / "raw")
+    monkeypatch.setattr(config, "PROCESSED_DIR", tmp_path / "processed")
+    config.RAW_DIR.mkdir()
+    config.PROCESSED_DIR.mkdir()
+    db.initialize(config.DB_PATH)
     client = TestClient(main.app)
 
     signup = client.post("/api/auth/signup", json={"email": "owner@example.com", "password": "password123", "business_name": "Ama Retail"})
@@ -46,47 +47,53 @@ def test_signup_upload_and_history_are_tenant_scoped(tmp_path, monkeypatch):
 
 
 def test_public_and_app_pages_serve_structured_frontend(tmp_path, monkeypatch):
-    monkeypatch.setattr(main, "DB_PATH", tmp_path / "test.sqlite3")
-    monkeypatch.setattr(main, "RAW_DIR", tmp_path / "raw")
-    monkeypatch.setattr(main, "PROCESSED_DIR", tmp_path / "processed")
-    main.RAW_DIR.mkdir()
-    main.PROCESSED_DIR.mkdir()
-    main.db.initialize(main.DB_PATH)
+    monkeypatch.setattr(config, "DB_PATH", tmp_path / "test.sqlite3")
+    monkeypatch.setattr(config, "RAW_DIR", tmp_path / "raw")
+    monkeypatch.setattr(config, "PROCESSED_DIR", tmp_path / "processed")
+    config.RAW_DIR.mkdir()
+    config.PROCESSED_DIR.mkdir()
+    db.initialize(config.DB_PATH)
     client = TestClient(main.app)
 
     landing = client.get("/")
     app_shell = client.get("/app")
-    styles = client.get("/assets/styles.css")
+    base_styles = client.get("/assets/css/base.css")
+    app_script = client.get("/assets/js/app/main.js")
 
-    assert "Business clarity from your records" in landing.text
+    assert landing.status_code == 200
+    assert "Business intelligence for growing businesses" in landing.text
+    assert "/assets/js/landing.js" in landing.text
     assert "Ferlance | Workspace" in app_shell.text
-    assert styles.status_code == 200
-    assert ".app-nav" in styles.text
+    assert 'data-view="overview"' in app_shell.text
+    assert base_styles.status_code == 200
+    assert "--mint-glow" in base_styles.text
+    assert app_script.status_code == 200
+    assert app_script.headers["cache-control"] == "no-cache"
 
 
 def test_upload_rejects_unsupported_type(tmp_path, monkeypatch):
-    monkeypatch.setattr(main, "DB_PATH", tmp_path / "test.sqlite3")
-    monkeypatch.setattr(main, "RAW_DIR", tmp_path / "raw")
-    monkeypatch.setattr(main, "PROCESSED_DIR", tmp_path / "processed")
-    main.RAW_DIR.mkdir()
-    main.PROCESSED_DIR.mkdir()
-    main.db.initialize(main.DB_PATH)
+    monkeypatch.setattr(config, "DB_PATH", tmp_path / "test.sqlite3")
+    monkeypatch.setattr(config, "RAW_DIR", tmp_path / "raw")
+    monkeypatch.setattr(config, "PROCESSED_DIR", tmp_path / "processed")
+    config.RAW_DIR.mkdir()
+    config.PROCESSED_DIR.mkdir()
+    db.initialize(config.DB_PATH)
     client = TestClient(main.app)
     signup = client.post("/api/auth/signup", json={"email": "owner2@example.com", "password": "password123", "business_name": "Kojo Shop"})
     headers = {"Authorization": "Bearer " + signup.json()["access_token"]}
     business_id = signup.json()["business"]["id"]
-    response = client.post(f"/api/businesses/{business_id}/datasets", headers=headers, files={"file": ("sales.txt", b"data", "text/plain")})
+    response = client.post(f"/api/businesses/{business_id}/datasets", headers=headers, files={"file": ("sales.pdf", b"data", "application/pdf")})
     assert response.status_code == 415
 
 
 def test_upload_rejects_files_over_configured_limit(tmp_path, monkeypatch):
-    monkeypatch.setattr(main, "DB_PATH", tmp_path / "test.sqlite3")
-    monkeypatch.setattr(main, "RAW_DIR", tmp_path / "raw")
-    monkeypatch.setattr(main, "PROCESSED_DIR", tmp_path / "processed")
-    monkeypatch.setattr(main, "MAX_UPLOAD_BYTES", 4)
-    main.RAW_DIR.mkdir()
-    main.PROCESSED_DIR.mkdir()
-    main.db.initialize(main.DB_PATH)
+    monkeypatch.setattr(config, "DB_PATH", tmp_path / "test.sqlite3")
+    monkeypatch.setattr(config, "RAW_DIR", tmp_path / "raw")
+    monkeypatch.setattr(config, "PROCESSED_DIR", tmp_path / "processed")
+    monkeypatch.setattr(config, "MAX_UPLOAD_BYTES", 4)
+    config.RAW_DIR.mkdir()
+    config.PROCESSED_DIR.mkdir()
+    db.initialize(config.DB_PATH)
     client = TestClient(main.app)
     signup = client.post("/api/auth/signup", json={"email": "large@example.com", "password": "password123", "business_name": "Kojo Shop"})
     headers = {"Authorization": f"Bearer {signup.json()['access_token']}"}
@@ -108,12 +115,12 @@ def _xlsx_bytes():
 
 
 def test_valid_xlsx_upload_has_readable_records(tmp_path, monkeypatch):
-    monkeypatch.setattr(main, "DB_PATH", tmp_path / "test.sqlite3")
-    monkeypatch.setattr(main, "RAW_DIR", tmp_path / "raw")
-    monkeypatch.setattr(main, "PROCESSED_DIR", tmp_path / "processed")
-    main.RAW_DIR.mkdir()
-    main.PROCESSED_DIR.mkdir()
-    main.db.initialize(main.DB_PATH)
+    monkeypatch.setattr(config, "DB_PATH", tmp_path / "test.sqlite3")
+    monkeypatch.setattr(config, "RAW_DIR", tmp_path / "raw")
+    monkeypatch.setattr(config, "PROCESSED_DIR", tmp_path / "processed")
+    config.RAW_DIR.mkdir()
+    config.PROCESSED_DIR.mkdir()
+    db.initialize(config.DB_PATH)
     client = TestClient(main.app)
     signup = client.post("/api/auth/signup", json={"email": "xlsx@example.com", "password": "password123", "business_name": "Ama Retail"})
     headers = {"Authorization": f"Bearer {signup.json()['access_token']}"}
@@ -128,12 +135,12 @@ def test_valid_xlsx_upload_has_readable_records(tmp_path, monkeypatch):
 
 
 def test_malformed_xlsx_is_failed_and_persisted(tmp_path, monkeypatch):
-    monkeypatch.setattr(main, "DB_PATH", tmp_path / "test.sqlite3")
-    monkeypatch.setattr(main, "RAW_DIR", tmp_path / "raw")
-    monkeypatch.setattr(main, "PROCESSED_DIR", tmp_path / "processed")
-    main.RAW_DIR.mkdir()
-    main.PROCESSED_DIR.mkdir()
-    main.db.initialize(main.DB_PATH)
+    monkeypatch.setattr(config, "DB_PATH", tmp_path / "test.sqlite3")
+    monkeypatch.setattr(config, "RAW_DIR", tmp_path / "raw")
+    monkeypatch.setattr(config, "PROCESSED_DIR", tmp_path / "processed")
+    config.RAW_DIR.mkdir()
+    config.PROCESSED_DIR.mkdir()
+    db.initialize(config.DB_PATH)
     client = TestClient(main.app)
     signup = client.post("/api/auth/signup", json={"email": "broken@example.com", "password": "password123", "business_name": "Ama Retail"})
     headers = {"Authorization": f"Bearer {signup.json()['access_token']}"}
@@ -150,12 +157,12 @@ def test_malformed_xlsx_is_failed_and_persisted(tmp_path, monkeypatch):
 
 
 def test_partial_upload_reports_rejected_rows(tmp_path, monkeypatch):
-    monkeypatch.setattr(main, "DB_PATH", tmp_path / "test.sqlite3")
-    monkeypatch.setattr(main, "RAW_DIR", tmp_path / "raw")
-    monkeypatch.setattr(main, "PROCESSED_DIR", tmp_path / "processed")
-    main.RAW_DIR.mkdir()
-    main.PROCESSED_DIR.mkdir()
-    main.db.initialize(main.DB_PATH)
+    monkeypatch.setattr(config, "DB_PATH", tmp_path / "test.sqlite3")
+    monkeypatch.setattr(config, "RAW_DIR", tmp_path / "raw")
+    monkeypatch.setattr(config, "PROCESSED_DIR", tmp_path / "processed")
+    config.RAW_DIR.mkdir()
+    config.PROCESSED_DIR.mkdir()
+    db.initialize(config.DB_PATH)
     client = TestClient(main.app)
     signup = client.post("/api/auth/signup", json={"email": "partial@example.com", "password": "password123", "business_name": "Ama Retail"})
     headers = {"Authorization": f"Bearer {signup.json()['access_token']}"}
@@ -172,12 +179,12 @@ def test_partial_upload_reports_rejected_rows(tmp_path, monkeypatch):
 
 
 def test_analytics_returns_filtered_metrics_and_unavailable_states(tmp_path, monkeypatch):
-    monkeypatch.setattr(main, "DB_PATH", tmp_path / "test.sqlite3")
-    monkeypatch.setattr(main, "RAW_DIR", tmp_path / "raw")
-    monkeypatch.setattr(main, "PROCESSED_DIR", tmp_path / "processed")
-    main.RAW_DIR.mkdir()
-    main.PROCESSED_DIR.mkdir()
-    main.db.initialize(main.DB_PATH)
+    monkeypatch.setattr(config, "DB_PATH", tmp_path / "test.sqlite3")
+    monkeypatch.setattr(config, "RAW_DIR", tmp_path / "raw")
+    monkeypatch.setattr(config, "PROCESSED_DIR", tmp_path / "processed")
+    config.RAW_DIR.mkdir()
+    config.PROCESSED_DIR.mkdir()
+    db.initialize(config.DB_PATH)
     client = TestClient(main.app)
     signup = client.post("/api/auth/signup", json={"email": "analytics@example.com", "password": "password123", "business_name": "Ama Retail"})
     headers = {"Authorization": f"Bearer {signup.json()['access_token']}"}
@@ -204,12 +211,12 @@ def test_analytics_returns_filtered_metrics_and_unavailable_states(tmp_path, mon
 
 
 def test_analytics_rejects_invalid_date_range_and_failed_dataset(tmp_path, monkeypatch):
-    monkeypatch.setattr(main, "DB_PATH", tmp_path / "test.sqlite3")
-    monkeypatch.setattr(main, "RAW_DIR", tmp_path / "raw")
-    monkeypatch.setattr(main, "PROCESSED_DIR", tmp_path / "processed")
-    main.RAW_DIR.mkdir()
-    main.PROCESSED_DIR.mkdir()
-    main.db.initialize(main.DB_PATH)
+    monkeypatch.setattr(config, "DB_PATH", tmp_path / "test.sqlite3")
+    monkeypatch.setattr(config, "RAW_DIR", tmp_path / "raw")
+    monkeypatch.setattr(config, "PROCESSED_DIR", tmp_path / "processed")
+    config.RAW_DIR.mkdir()
+    config.PROCESSED_DIR.mkdir()
+    db.initialize(config.DB_PATH)
     client = TestClient(main.app)
     signup = client.post("/api/auth/signup", json={"email": "analytics-errors@example.com", "password": "password123", "business_name": "Ama Retail"})
     headers = {"Authorization": f"Bearer {signup.json()['access_token']}"}
@@ -224,12 +231,12 @@ def test_analytics_rejects_invalid_date_range_and_failed_dataset(tmp_path, monke
 
 
 def test_analytics_is_tenant_scoped(tmp_path, monkeypatch):
-    monkeypatch.setattr(main, "DB_PATH", tmp_path / "test.sqlite3")
-    monkeypatch.setattr(main, "RAW_DIR", tmp_path / "raw")
-    monkeypatch.setattr(main, "PROCESSED_DIR", tmp_path / "processed")
-    main.RAW_DIR.mkdir()
-    main.PROCESSED_DIR.mkdir()
-    main.db.initialize(main.DB_PATH)
+    monkeypatch.setattr(config, "DB_PATH", tmp_path / "test.sqlite3")
+    monkeypatch.setattr(config, "RAW_DIR", tmp_path / "raw")
+    monkeypatch.setattr(config, "PROCESSED_DIR", tmp_path / "processed")
+    config.RAW_DIR.mkdir()
+    config.PROCESSED_DIR.mkdir()
+    db.initialize(config.DB_PATH)
     client = TestClient(main.app)
     first = client.post("/api/auth/signup", json={"email": "analytics-first@example.com", "password": "password123", "business_name": "First"})
     second = client.post("/api/auth/signup", json={"email": "analytics-second@example.com", "password": "password123", "business_name": "Second"})
@@ -246,17 +253,17 @@ def test_analytics_is_tenant_scoped(tmp_path, monkeypatch):
 
 
 def test_jwt_session_refresh_logout_and_me_flow(tmp_path, monkeypatch):
-    monkeypatch.setattr(main, "DB_PATH", tmp_path / "test.sqlite3")
-    monkeypatch.setattr(main, "RAW_DIR", tmp_path / "raw")
-    monkeypatch.setattr(main, "PROCESSED_DIR", tmp_path / "processed")
-    main.RAW_DIR.mkdir()
-    main.PROCESSED_DIR.mkdir()
-    main.db.initialize(main.DB_PATH)
+    monkeypatch.setattr(config, "DB_PATH", tmp_path / "test.sqlite3")
+    monkeypatch.setattr(config, "RAW_DIR", tmp_path / "raw")
+    monkeypatch.setattr(config, "PROCESSED_DIR", tmp_path / "processed")
+    config.RAW_DIR.mkdir()
+    config.PROCESSED_DIR.mkdir()
+    db.initialize(config.DB_PATH)
     client = TestClient(main.app)
 
     signup = client.post("/api/auth/signup", json={"email": " Owner@Example.com ", "password": "password123", "business_name": "Ama Retail"})
     token = signup.json()["access_token"]
-    assert jwt.decode(token, main.SECRET_KEY, algorithms=["HS256"])["type"] == "access"
+    assert jwt.decode(token, config.SECRET_KEY, algorithms=["HS256"])["type"] == "access"
     assert client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"}).status_code == 200
 
     refreshed = client.post("/api/auth/refresh")
@@ -267,12 +274,12 @@ def test_jwt_session_refresh_logout_and_me_flow(tmp_path, monkeypatch):
 
 
 def test_refresh_token_is_single_use_under_concurrent_requests(tmp_path, monkeypatch):
-    monkeypatch.setattr(main, "DB_PATH", tmp_path / "test.sqlite3")
-    monkeypatch.setattr(main, "RAW_DIR", tmp_path / "raw")
-    monkeypatch.setattr(main, "PROCESSED_DIR", tmp_path / "processed")
-    main.RAW_DIR.mkdir()
-    main.PROCESSED_DIR.mkdir()
-    main.db.initialize(main.DB_PATH)
+    monkeypatch.setattr(config, "DB_PATH", tmp_path / "test.sqlite3")
+    monkeypatch.setattr(config, "RAW_DIR", tmp_path / "raw")
+    monkeypatch.setattr(config, "PROCESSED_DIR", tmp_path / "processed")
+    config.RAW_DIR.mkdir()
+    config.PROCESSED_DIR.mkdir()
+    db.initialize(config.DB_PATH)
     client = TestClient(main.app)
     signup = client.post(
         "/api/auth/signup",
@@ -284,7 +291,7 @@ def test_refresh_token_is_single_use_under_concurrent_requests(tmp_path, monkeyp
     def rotate():
         barrier.wait()
         try:
-            main.refresh(Response(), refresh_token=refresh_token)
+            auth.refresh(Response(), refresh_token=refresh_token)
             return 200
         except HTTPException as error:
             return error.status_code
@@ -296,12 +303,12 @@ def test_refresh_token_is_single_use_under_concurrent_requests(tmp_path, monkeyp
 
 
 def test_profile_update_and_admin_capabilities(tmp_path, monkeypatch):
-    monkeypatch.setattr(main, "DB_PATH", tmp_path / "test.sqlite3")
-    monkeypatch.setattr(main, "RAW_DIR", tmp_path / "raw")
-    monkeypatch.setattr(main, "PROCESSED_DIR", tmp_path / "processed")
-    main.RAW_DIR.mkdir()
-    main.PROCESSED_DIR.mkdir()
-    main.db.initialize(main.DB_PATH)
+    monkeypatch.setattr(config, "DB_PATH", tmp_path / "test.sqlite3")
+    monkeypatch.setattr(config, "RAW_DIR", tmp_path / "raw")
+    monkeypatch.setattr(config, "PROCESSED_DIR", tmp_path / "processed")
+    config.RAW_DIR.mkdir()
+    config.PROCESSED_DIR.mkdir()
+    db.initialize(config.DB_PATH)
     client = TestClient(main.app)
     signup = client.post("/api/auth/signup", json={"email": "admin@example.com", "password": "password123", "business_name": "Old Name"})
     headers = {"Authorization": f"Bearer {signup.json()['access_token']}"}
@@ -312,26 +319,32 @@ def test_profile_update_and_admin_capabilities(tmp_path, monkeypatch):
     assert profile.json()["business"]["name"] == "New Name"
     assert client.get("/api/admin/capabilities", headers=headers).status_code == 403
 
-    main.db.insert(main.DB_PATH, "UPDATE users SET role = 'admin' WHERE email = ?", ("admin@example.com",))
+    db.insert(config.DB_PATH, "UPDATE users SET role = 'admin' WHERE email = ?", ("admin@example.com",))
     capabilities = client.get("/api/admin/capabilities", headers=headers)
     assert capabilities.status_code == 200
     assert "manage_roles" in capabilities.json()["capabilities"]
     users = client.get("/api/admin/users", headers=headers)
     assert users.status_code == 200
-    user_id = users.json()[0]["id"]
-    changed = client.patch(f"/api/admin/users/{user_id}/role", headers=headers, json={"role": "member"})
+    admin_id = users.json()[0]["id"]
+    self_demotion = client.patch(f"/api/admin/users/{admin_id}/role", headers=headers, json={"role": "member"})
+    assert self_demotion.status_code == 400
+
+    client.post("/api/auth/signup", json={"email": "staff@example.com", "password": "password123", "business_name": "Staff Shop"})
+    client.post("/api/auth/login", json={"email": "admin@example.com", "password": "password123"})
+    staff_id = next(item["id"] for item in client.get("/api/admin/users", headers=headers).json() if item["email"] == "staff@example.com")
+    changed = client.patch(f"/api/admin/users/{staff_id}/role", headers=headers, json={"role": "member"})
     assert changed.status_code == 200
     assert changed.json()["role"] == "member"
 
 
 def test_ask_lance_saves_two_way_conversation_history(tmp_path, monkeypatch):
-    monkeypatch.setattr(main, "DB_PATH", tmp_path / "test.sqlite3")
-    monkeypatch.setattr(main, "RAW_DIR", tmp_path / "raw")
-    monkeypatch.setattr(main, "PROCESSED_DIR", tmp_path / "processed")
-    main.RAW_DIR.mkdir()
-    main.PROCESSED_DIR.mkdir()
-    main.db.initialize(main.DB_PATH)
-    monkeypatch.setattr(main, "ask_lance", lambda question, snapshot, history: f"Answer to: {question}")
+    monkeypatch.setattr(config, "DB_PATH", tmp_path / "test.sqlite3")
+    monkeypatch.setattr(config, "RAW_DIR", tmp_path / "raw")
+    monkeypatch.setattr(config, "PROCESSED_DIR", tmp_path / "processed")
+    config.RAW_DIR.mkdir()
+    config.PROCESSED_DIR.mkdir()
+    db.initialize(config.DB_PATH)
+    monkeypatch.setattr(lance, "ask_lance", lambda question, snapshot, history: f"Answer to: {question}")
     client = TestClient(main.app)
     signup = client.post("/api/auth/signup", json={"email": "chat@example.com", "password": "password123", "business_name": "Ama Retail"})
     headers = {"Authorization": f"Bearer {signup.json()['access_token']}"}
@@ -360,19 +373,19 @@ def test_ask_lance_saves_two_way_conversation_history(tmp_path, monkeypatch):
 
 
 def test_ask_lance_retrieves_across_all_business_datasets(tmp_path, monkeypatch):
-    monkeypatch.setattr(main, "DB_PATH", tmp_path / "test.sqlite3")
-    monkeypatch.setattr(main, "RAW_DIR", tmp_path / "raw")
-    monkeypatch.setattr(main, "PROCESSED_DIR", tmp_path / "processed")
-    main.RAW_DIR.mkdir()
-    main.PROCESSED_DIR.mkdir()
-    main.db.initialize(main.DB_PATH)
+    monkeypatch.setattr(config, "DB_PATH", tmp_path / "test.sqlite3")
+    monkeypatch.setattr(config, "RAW_DIR", tmp_path / "raw")
+    monkeypatch.setattr(config, "PROCESSED_DIR", tmp_path / "processed")
+    config.RAW_DIR.mkdir()
+    config.PROCESSED_DIR.mkdir()
+    db.initialize(config.DB_PATH)
     captured = {}
 
     def fake_lance(question, snapshot, history):
         captured["snapshot"] = snapshot
         return "Cross-dataset answer"
 
-    monkeypatch.setattr(main, "ask_lance", fake_lance)
+    monkeypatch.setattr(lance, "ask_lance", fake_lance)
     client = TestClient(main.app)
     signup = client.post("/api/auth/signup", json={"email": "rag@example.com", "password": "password123", "business_name": "Ama Retail"})
     headers = {"Authorization": f"Bearer {signup.json()['access_token']}"}
@@ -399,17 +412,17 @@ def test_ask_lance_retrieves_across_all_business_datasets(tmp_path, monkeypatch)
 
 
 def test_ask_lance_does_not_create_empty_conversation_when_provider_fails(tmp_path, monkeypatch):
-    monkeypatch.setattr(main, "DB_PATH", tmp_path / "test.sqlite3")
-    monkeypatch.setattr(main, "RAW_DIR", tmp_path / "raw")
-    monkeypatch.setattr(main, "PROCESSED_DIR", tmp_path / "processed")
-    main.RAW_DIR.mkdir()
-    main.PROCESSED_DIR.mkdir()
-    main.db.initialize(main.DB_PATH)
+    monkeypatch.setattr(config, "DB_PATH", tmp_path / "test.sqlite3")
+    monkeypatch.setattr(config, "RAW_DIR", tmp_path / "raw")
+    monkeypatch.setattr(config, "PROCESSED_DIR", tmp_path / "processed")
+    config.RAW_DIR.mkdir()
+    config.PROCESSED_DIR.mkdir()
+    db.initialize(config.DB_PATH)
 
     def unavailable(*args, **kwargs):
         raise RuntimeError("Model provider unavailable.")
 
-    monkeypatch.setattr(main, "ask_lance", unavailable)
+    monkeypatch.setattr(lance, "ask_lance", unavailable)
     client = TestClient(main.app)
     signup = client.post("/api/auth/signup", json={"email": "failed-chat@example.com", "password": "password123", "business_name": "Ama Retail"})
     headers = {"Authorization": "Bearer " + signup.json()["access" + "_token"]}
@@ -429,20 +442,20 @@ def test_ask_lance_does_not_create_empty_conversation_when_provider_fails(tmp_pa
 
 
 def test_ask_lance_reports_unavailable_processed_records(tmp_path, monkeypatch):
-    monkeypatch.setattr(main, "DB_PATH", tmp_path / "test.sqlite3")
-    monkeypatch.setattr(main, "RAW_DIR", tmp_path / "raw")
-    monkeypatch.setattr(main, "PROCESSED_DIR", tmp_path / "processed")
-    main.RAW_DIR.mkdir()
-    main.PROCESSED_DIR.mkdir()
-    main.db.initialize(main.DB_PATH)
-    monkeypatch.setattr(main, "ask_lance", lambda *args, **kwargs: "Should not run.")
+    monkeypatch.setattr(config, "DB_PATH", tmp_path / "test.sqlite3")
+    monkeypatch.setattr(config, "RAW_DIR", tmp_path / "raw")
+    monkeypatch.setattr(config, "PROCESSED_DIR", tmp_path / "processed")
+    config.RAW_DIR.mkdir()
+    config.PROCESSED_DIR.mkdir()
+    db.initialize(config.DB_PATH)
+    monkeypatch.setattr(lance, "ask_lance", lambda *args, **kwargs: "Should not run.")
     client = TestClient(main.app)
     signup = client.post("/api/auth/signup", json={"email": "missing-records@example.com", "password": "password123", "business_name": "Ama Retail"})
     headers = {"Authorization": "Bearer " + signup.json()["access" + "_token"]}
     business_id = signup.json()["business"]["id"]
     fixture = Path(__file__).parent / "fixtures" / "valid_sales.csv"
     upload = client.post(f"/api/businesses/{business_id}/datasets", headers=headers, files={"file": ("sales.csv", fixture.read_bytes(), "text/csv")})
-    dataset = main.db.one(main.DB_PATH, "SELECT processed_path FROM datasets WHERE id = ?", (upload.json()["id"],))
+    dataset = db.one(config.DB_PATH, "SELECT processed_path FROM datasets WHERE id = ?", (upload.json()["id"],))
     Path(dataset["processed_path"]).write_text("{not-json}\n", encoding="utf-8")
 
     response = client.post(
@@ -458,27 +471,27 @@ def test_ask_lance_reports_unavailable_processed_records(tmp_path, monkeypatch):
 
 
 def test_auth_rejects_forged_and_expired_tokens(tmp_path, monkeypatch):
-    monkeypatch.setattr(main, "DB_PATH", tmp_path / "test.sqlite3")
-    monkeypatch.setattr(main, "RAW_DIR", tmp_path / "raw")
-    monkeypatch.setattr(main, "PROCESSED_DIR", tmp_path / "processed")
-    main.RAW_DIR.mkdir()
-    main.PROCESSED_DIR.mkdir()
-    main.db.initialize(main.DB_PATH)
+    monkeypatch.setattr(config, "DB_PATH", tmp_path / "test.sqlite3")
+    monkeypatch.setattr(config, "RAW_DIR", tmp_path / "raw")
+    monkeypatch.setattr(config, "PROCESSED_DIR", tmp_path / "processed")
+    config.RAW_DIR.mkdir()
+    config.PROCESSED_DIR.mkdir()
+    db.initialize(config.DB_PATH)
     client = TestClient(main.app)
     forged = jwt.encode({"sub": "missing", "type": "access"}, "wrong", algorithm="HS256")
-    expired = jwt.encode({"sub": "missing", "type": "access", "exp": 1}, main.SECRET_KEY, algorithm="HS256")
+    expired = jwt.encode({"sub": "missing", "type": "access", "exp": 1}, config.SECRET_KEY, algorithm="HS256")
 
     assert client.get("/api/auth/me", headers={"Authorization": f"Bearer {forged}"}).status_code == 401
     assert client.get("/api/auth/me", headers={"Authorization": f"Bearer {expired}"}).status_code == 401
 
 
 def test_insights_and_predefined_questions_are_tenant_scoped(tmp_path, monkeypatch):
-    monkeypatch.setattr(main, "DB_PATH", tmp_path / "test.sqlite3")
-    monkeypatch.setattr(main, "RAW_DIR", tmp_path / "raw")
-    monkeypatch.setattr(main, "PROCESSED_DIR", tmp_path / "processed")
-    main.RAW_DIR.mkdir()
-    main.PROCESSED_DIR.mkdir()
-    main.db.initialize(main.DB_PATH)
+    monkeypatch.setattr(config, "DB_PATH", tmp_path / "test.sqlite3")
+    monkeypatch.setattr(config, "RAW_DIR", tmp_path / "raw")
+    monkeypatch.setattr(config, "PROCESSED_DIR", tmp_path / "processed")
+    config.RAW_DIR.mkdir()
+    config.PROCESSED_DIR.mkdir()
+    db.initialize(config.DB_PATH)
     client = TestClient(main.app)
     signup = client.post("/api/auth/signup", json={"email": "insights@example.com", "password": "password123", "business_name": "Ama Retail"})
     headers = {"Authorization": f"Bearer {signup.json()['access_token']}"}

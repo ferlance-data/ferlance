@@ -1,7 +1,7 @@
-from datetime import date, timedelta
+from datetime import date
 from typing import Any, Callable
 
-from .analytics import analyze
+from .analytics import analyze, previous_period
 
 QUESTION_NAMES = {
     "sales-summary": "Sales Summary",
@@ -22,9 +22,7 @@ def _previous_period(records: list[dict[str, Any]], from_date: date | None, to_d
     start, end = _period_bounds(records, from_date, to_date)
     if not start or not end:
         return None, None
-    length = (end - start).days + 1
-    previous_end = start - timedelta(days=1)
-    return previous_end - timedelta(days=length - 1), previous_end
+    return previous_period(start, end)
 
 
 def _change(current: float, previous: float) -> dict[str, Any]:
@@ -36,11 +34,11 @@ def _change(current: float, previous: float) -> dict[str, Any]:
 
 def _change_message(label: str, change: dict[str, Any]) -> str:
     if change["direction"] == "new":
-        return f"{label} is new in this period at {change['current']:.2f}; there was no comparable prior-period value."
+        return f"{label} is new in this period at {change['current']:,.2f}; there was no comparable prior-period value."
     if change["direction"] == "flat":
-        return f"{label} was unchanged at {change['current']:.2f} compared with the previous period."
+        return f"{label} was unchanged at {change['current']:,.2f} compared with the previous period."
     direction = "increased" if change["direction"] == "up" else "declined"
-    return f"{label} {direction} by {abs(change['percent']):.2f}% from {change['previous']:.2f} to {change['current']:.2f}."
+    return f"{label} {direction} by {abs(change['percent']):.2f}% from {change['previous']:,.2f} to {change['current']:,.2f}."
 
 
 def generate_insights(records: list[dict[str, Any]], from_date: date | None = None, to_date: date | None = None) -> dict[str, Any]:
@@ -71,7 +69,7 @@ def generate_insights(records: list[dict[str, Any]], from_date: date | None = No
         losses = current["products"]["rankings"]["loss"]
         if losses:
             worst = losses[0]
-            insights.append({"type": "anomaly", "title": "Item operating at a loss", "message": f"{worst['product']} recorded a loss after item costs of {abs(worst['gross_profit']):.2f} in this period.", "severity": "attention", "supporting_metric": worst, "limitations": ["This calculation uses the supplied item costs and excludes costs not attached to the item, taxes, and financing."]})
+            insights.append({"type": "anomaly", "title": "Item operating at a loss", "message": f"{worst['product']} recorded a loss after item costs of {abs(worst['gross_profit']):,.2f} in this period.", "severity": "attention", "supporting_metric": worst, "limitations": ["This calculation uses the supplied item costs and excludes costs not attached to the item, taxes, and financing."]})
         roi_items = [item for item in current["products"]["items"] if item["roi_pct"] is not None]
         if roi_items:
             best_roi = max(roi_items, key=lambda item: (item["roi_pct"], item["product"]))

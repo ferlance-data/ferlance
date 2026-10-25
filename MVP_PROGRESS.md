@@ -1,8 +1,7 @@
 # Ferlance MVP Progress Log
 
-Last updated: 2026-10-01
-Current branch: `feature/auth-shell-and-sprint-5`
-Current commit: working tree changes on the auth and insights branch
+Last updated: 2026-10-25
+Current branch: `feat/lev-redesign-architecture`
 
 This file tracks repository evidence. A Trello completion flag is not treated as proof that a feature works.
 
@@ -56,6 +55,18 @@ These items are intentionally deferred beyond the ingestion milestone:
 - The optional natural-language assistant, LLM, and RAG remain deferred; deterministic insights are the source of truth.
 - F-049 is treated as the deterministic Insight Engine scope because the exported backlog begins Sprint 5 with F-050; the engine covers summaries, comparisons, grounded recommendations, and structured evidence.
 - Business profile enrichment, roles, business switching, and audit logging remain deferred beyond the current MVP boundary.
+
+## October 2026 redesign and architecture pass
+
+Branch `feat/lev-redesign-architecture`. Evidence: `pytest -q` → 76 passed; browser-verified sign-in, every workspace page, light/dark themes, 375px mobile layout, and all three print reports against a seeded sample workspace.
+
+- **Interface:** landing page and workspace rebuilt on a Lev-derived design system (IBM Plex, ink-green, mint accent, pill controls). Workspace pages: Overview, Products, Insights, Ask Lance, Inventory, Financial position, Data imports, Settings.
+- **Architecture:** `main.py` split into domain routers with shared dependencies (`deps.py`) and one data-scope rule (`dataset_store.py`); frontend split into ES modules per view.
+- **Product:** previous-period comparison on every KPI, "Needs attention" list, state-driven setup guide, include/exclude switch per import, duplicate-upload detection, instant (no-AI) answers inside Ask Lance.
+- **Removed:** fake external connectors (including an arbitrary server-file read), snapshot cache/sync, hard-coded macroeconomic projections, unused onboarding questionnaire, duplicate catalogue page, runtime data tracked in git.
+- **Fixed:** broken workspace JavaScript (undefined helpers), CSV unit cost not multiplied by quantity, crashes on blank quantities, concurrent refresh sign-outs, AgentRouter model parsing, Lance history window, admin self-demotion.
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for details.
 
 ## Next bounded slice
 

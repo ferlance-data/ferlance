@@ -49,19 +49,6 @@ CREATE INDEX IF NOT EXISTS inventory_movements_business_date
     ON inventory_movements(business_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS inventory_movements_product_date
     ON inventory_movements(product_id, created_at DESC);
-CREATE TABLE IF NOT EXISTS business_fx_rates (
-    id TEXT PRIMARY KEY,
-    business_id TEXT NOT NULL,
-    source_currency TEXT NOT NULL,
-    target_currency TEXT NOT NULL,
-    effective_date TEXT NOT NULL,
-    rate REAL NOT NULL CHECK(rate > 0),
-    user_id TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    UNIQUE(business_id, source_currency, target_currency, effective_date),
-    FOREIGN KEY(business_id) REFERENCES businesses(id),
-    FOREIGN KEY(user_id) REFERENCES users(id)
-);
 CREATE TABLE IF NOT EXISTS business_integrations (
     id TEXT PRIMARY KEY,
     business_id TEXT NOT NULL,
@@ -86,6 +73,7 @@ CREATE TABLE IF NOT EXISTS financial_position_balances (
 );
 CREATE INDEX IF NOT EXISTS financial_position_lookup
     ON financial_position_balances(business_id, category, account_name, as_of_date DESC, created_at DESC);
+CREATE INDEX IF NOT EXISTS datasets_business_date ON datasets(business_id, created_at DESC);
 CREATE VIRTUAL TABLE IF NOT EXISTS rag_documents_fts USING fts5(document_id UNINDEXED, business_id UNINDEXED, dataset_id UNINDEXED, content);
 """
 
@@ -96,7 +84,7 @@ def now() -> str:
 
 @contextmanager
 def connection(path: Path) -> Iterator[sqlite3.Connection]:
-    db = sqlite3.connect(path)
+    db = sqlite3.connect(path, timeout=10)
     db.row_factory = sqlite3.Row
     db.execute("PRAGMA foreign_keys = ON")
     try:
@@ -107,7 +95,9 @@ def connection(path: Path) -> Iterator[sqlite3.Connection]:
 
 
 def initialize(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
     with connection(path) as db:
+        db.execute("PRAGMA journal_mode = WAL")
         db.executescript(SCHEMA)
         user_columns = {row[1] for row in db.execute("PRAGMA table_info(users)").fetchall()}
         if "role" not in user_columns:
@@ -126,6 +116,9 @@ def initialize(path: Path) -> None:
             db.execute("ALTER TABLE inventory_movements ADD COLUMN unit_cost REAL")
         if "stock_value_after" not in movement_columns:
             db.execute("ALTER TABLE inventory_movements ADD COLUMN stock_value_after REAL")
+        business_columns = {row[1] for row in db.execute("PRAGMA table_info(businesses)").fetchall()}
+        if "currency" not in business_columns:
+            db.execute("ALTER TABLE businesses ADD COLUMN currency TEXT NOT NULL DEFAULT 'GHS'")
 
 
 def repair_dataset_paths(path: Path, raw_dir: Path, processed_dir: Path) -> None:

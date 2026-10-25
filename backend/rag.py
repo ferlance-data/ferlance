@@ -1,51 +1,32 @@
-import json
+"""Business-scoped retrieval over accepted records for Ask Lance (SQLite FTS5)."""
+
 import re
 from datetime import date
 from pathlib import Path
 from typing import Any
 
-from . import db
-from .config import PROCESSED_DIR
+from . import dataset_store, db
 
-
-class DataAvailabilityError(RuntimeError):
-    pass
-
-
-def resolve_processed_path(stored_path: str | None) -> Path | None:
-    if not stored_path:
-        return None
-    path = Path(stored_path)
-    if path.is_file():
-        return path
-    fallback = PROCESSED_DIR / path.name
-    if fallback.is_file():
-        return fallback
-    return path
+DataAvailabilityError = dataset_store.RecordsUnavailableError
+all_records = dataset_store.records_for
 
 
 def _record_text(record: dict[str, Any]) -> str:
     return " ".join(f"{key} {value}" for key, value in record.items() if value not in (None, ""))
 
 
-def _read_dataset_records(dataset: dict[str, Any]) -> list[dict[str, Any]]:
-    path = resolve_processed_path(dataset.get("processed_path"))
-    if path is None:
-        raise DataAvailabilityError(
-            f"Processed records for {dataset['filename']} are unavailable. Re-upload the dataset before asking Lance."
+def _is_indexed(db_path: Path, business_id: str, dataset_id: str) -> bool:
+    return bool(
+        db.one(
+            db_path,
+            "SELECT rowid FROM rag_documents_fts WHERE business_id = ? AND dataset_id = ? LIMIT 1",
+            (business_id, dataset_id),
         )
-    try:
-        with path.open("r", encoding="utf-8") as source:
-            return [json.loads(line) for line in source if line.strip()]
-    except (OSError, json.JSONDecodeError) as error:
-        raise DataAvailabilityError(
-            f"Processed records for {dataset['filename']} are unavailable. Re-upload the dataset before asking Lance."
-        ) from error
+    )
 
 
 def index_dataset(db_path: Path, business_id: str, dataset_id: str, records: list[dict[str, Any]]) -> None:
-    existing = db.one(db_path, "SELECT rowid FROM rag_documents_fts WHERE business_id = ? AND dataset_id = ? LIMIT 1", (business_id, dataset_id))
-    if existing or not records:
+    if not records or _is_indexed(db_path, business_id, dataset_id):
         return
     with db.connection(db_path) as connection:
         connection.executemany(
@@ -60,36 +41,42 @@ def _query(question: str) -> str:
 
 
 def retrieve(db_path: Path, business_id: str, question: str, datasets: list[dict[str, Any]], limit: int = 20) -> list[dict[str, Any]]:
+    """Return the most relevant rows from the given datasets only (excluded files never leak in)."""
+    if not datasets:
+        return []
     for dataset in datasets:
-        existing = db.one(
-            db_path,
-            "SELECT rowid FROM rag_documents_fts WHERE business_id = ? AND dataset_id = ? LIMIT 1",
-            (business_id, dataset["id"]),
-        )
-        if not existing:
-            index_dataset(
-                db_path,
-                business_id,
-                dataset["id"],
-                _read_dataset_records(dataset),
-            )
+        if not _is_indexed(db_path, business_id, dataset["id"]):
+            index_dataset(db_path, business_id, dataset["id"], dataset_store.read_records(dataset))
+    dataset_ids = [dataset["id"] for dataset in datasets]
+    in_clause = ",".join("?" for _ in dataset_ids)
     match = _query(question)
     if match:
-        rows = db.many(db_path, "SELECT dataset_id, content FROM rag_documents_fts WHERE business_id = ? AND rag_documents_fts MATCH ? ORDER BY rank LIMIT ?", (business_id, match, limit))
+        rows = db.many(
+            db_path,
+            f"SELECT dataset_id, content FROM rag_documents_fts WHERE business_id = ? AND dataset_id IN ({in_clause}) "
+            "AND rag_documents_fts MATCH ? ORDER BY rank LIMIT ?",
+            (business_id, *dataset_ids, match, limit),
+        )
     else:
-        rows = db.many(db_path, "SELECT dataset_id, content FROM rag_documents_fts WHERE business_id = ? ORDER BY rowid DESC LIMIT ?", (business_id, limit))
-    dataset_names = {dataset["id"]: dataset["filename"] for dataset in datasets}
-    return [{"dataset": dataset_names.get(row["dataset_id"], "Unknown dataset"), "evidence": row["content"]} for row in rows]
+        rows = db.many(
+            db_path,
+            f"SELECT dataset_id, content FROM rag_documents_fts WHERE business_id = ? AND dataset_id IN ({in_clause}) "
+            "ORDER BY rowid DESC LIMIT ?",
+            (business_id, *dataset_ids, limit),
+        )
+    names = {dataset["id"]: dataset["filename"] for dataset in datasets}
+    return [{"dataset": names.get(row["dataset_id"], "Unknown dataset"), "evidence": row["content"]} for row in rows]
 
 
-def all_records(datasets: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    records: list[dict[str, Any]] = []
-    for dataset in datasets:
-        records.extend(_read_dataset_records(dataset))
-    return records
-
-
-def context(db_path: Path, business_id: str, question: str, datasets: list[dict[str, Any]], from_date: date | None, to_date: date | None, analytics: dict[str, Any]) -> dict[str, Any]:
+def context(
+    db_path: Path,
+    business_id: str,
+    question: str,
+    datasets: list[dict[str, Any]],
+    from_date: date | None,
+    to_date: date | None,
+    analytics: dict[str, Any],
+) -> dict[str, Any]:
     return {
         "scope": "all accepted records across this business",
         "datasets": [{"filename": dataset["filename"], "accepted_rows": dataset["accepted_rows"]} for dataset in datasets],

@@ -1,18 +1,18 @@
 import httpx
 from fastapi.testclient import TestClient
 
-from backend import main
+from backend import config, db, main
 from backend import market_research
 
 
 def _client(tmp_path, monkeypatch, email="research@example.com"):
-    monkeypatch.setattr(main, "DB_PATH", tmp_path / "research.sqlite3")
-    monkeypatch.setattr(main, "RAW_DIR", tmp_path / "raw")
-    monkeypatch.setattr(main, "PROCESSED_DIR", tmp_path / "processed")
+    monkeypatch.setattr(config, "DB_PATH", tmp_path / "research.sqlite3")
+    monkeypatch.setattr(config, "RAW_DIR", tmp_path / "raw")
+    monkeypatch.setattr(config, "PROCESSED_DIR", tmp_path / "processed")
     monkeypatch.setattr(market_research, "SECRET_KEY", "test-secret-key-longer-than-thirty-two-characters")
-    main.RAW_DIR.mkdir()
-    main.PROCESSED_DIR.mkdir()
-    main.db.initialize(main.DB_PATH)
+    config.RAW_DIR.mkdir()
+    config.PROCESSED_DIR.mkdir()
+    db.initialize(config.DB_PATH)
     client = TestClient(main.app)
     signup = client.post(
         "/api/auth/signup",
@@ -31,13 +31,13 @@ def test_search_key_is_encrypted_tenant_scoped_and_removable(tmp_path, monkeypat
     saved = client.put(endpoint, headers=headers, json={"api_key": key})
     assert saved.status_code == 200
     assert saved.json()["configured"] is True
-    stored = main.db.one(
-        main.DB_PATH,
+    stored = db.one(
+        config.DB_PATH,
         "SELECT encrypted_api_key FROM business_integrations WHERE business_id = ?",
         (business_id,),
     )
     assert stored["encrypted_api_key"] != key
-    assert market_research._brave_key(main.DB_PATH, business_id) == key
+    assert market_research._brave_key(config.DB_PATH, business_id) == key
     removed = client.delete(endpoint, headers=headers)
     assert removed.json() == {"configured": False}
     assert client.get(endpoint, headers=headers).json()["configured"] is False

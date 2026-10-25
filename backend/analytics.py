@@ -1,8 +1,21 @@
 from collections import defaultdict
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 
 from .config import DEFAULT_CURRENCY
+
+
+def _present(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Treat blank optional values as absent, so "cost" in record means a cost was recorded."""
+    cleaned = []
+    for record in records:
+        if any(record.get(key) is None and key in record for key in ("cost", "quantity", "amount")):
+            record = {key: value for key, value in record.items() if not (value is None and key in ("cost", "quantity"))}
+            record.setdefault("amount", 0.0)
+            if record["amount"] is None:
+                record["amount"] = 0.0
+        cleaned.append(record)
+    return cleaned
 
 
 def _periods(records: list[dict[str, Any]], key, field: str = "amount", output: str = "revenue") -> list[dict[str, Any]]:
@@ -56,13 +69,18 @@ def _product_metrics(records: list[dict[str, Any]], profile: dict[str, Any] | No
         item["metric_label"] = "Cost" if cost_mode else "Revenue"
         item["metric_value"] = item["cost"] if cost_mode and cost_available else item["revenue"]
         items.append(item)
+    ranked_desc = sorted(items, key=lambda item: (-item["metric_value"], item["product"]))
+    ranked_asc = sorted(items, key=lambda item: (item["metric_value"], item["product"]))
     return {
         "available": True,
         "quantity_available": quantity_available,
         "metric_label": "Cost" if cost_mode else "Revenue",
-        "items": sorted(items, key=lambda item: (-item["metric_value"], item["product"])),
-        "best_sellers": sorted(items, key=lambda item: (-item["metric_value"], item["product"])),
-        "worst_sellers": sorted(items, key=lambda item: (item["metric_value"], item["product"])),
+        "items": ranked_desc,
+        "best_sellers": ranked_desc,
+        "worst_sellers": ranked_asc,
+        "top_5": ranked_desc[:5],
+        "worst_5": ranked_asc[:5],
+        "all_ranked": ranked_desc,
         "rankings": {
             "revenue": sorted(items, key=lambda item: (-item["revenue"], item["product"])),
             "transactions": sorted(items, key=lambda item: (-item["transactions"], item["product"])),
@@ -111,6 +129,7 @@ def _data_profile(records: list[dict[str, Any]]) -> dict[str, Any]:
 def analyze(records: list[dict[str, Any]], from_date: date | None = None, to_date: date | None = None) -> dict[str, Any]:
     if from_date and to_date and from_date > to_date:
         raise ValueError("The from date must be on or before the to date.")
+    records = _present(records)
     available_dates = [date.fromisoformat(record["transaction_date"]) for record in records if record.get("transaction_date")]
     profile = _data_profile(records)
     start = from_date or (min(available_dates) if available_dates else None)
@@ -142,29 +161,90 @@ def analyze(records: list[dict[str, Any]], from_date: date | None = None, to_dat
         warnings.append("Cost trends are unavailable because cost is missing from some accepted records.")
     if len(currencies) > 1:
         warnings.append("Multiple currencies are present in this period; totals have not been converted to a common currency.")
+    trend_dict = {
+        "daily": _periods(filtered, lambda value: value.isoformat()),
+        "weekly": _periods(filtered, lambda value: f"{value.isocalendar().year}-W{value.isocalendar().week:02d}"),
+        "monthly": _periods(filtered, lambda value: value.strftime("%Y-%m")),
+        "quarterly": _periods(filtered, lambda value: f"{value.year}-Q{(value.month - 1) // 3 + 1}"),
+        "cost_daily": _periods(filtered, lambda value: value.isoformat(), "cost", "cost") if costs_complete else [],
+        "yearly": _periods(filtered, lambda value: value.strftime("%Y")),
+        "cost_quarterly": _periods(filtered, lambda value: f"{value.year}-Q{(value.month - 1) // 3 + 1}", "cost", "cost") if costs_complete else [],
+        "cost_weekly": _periods(filtered, lambda value: f"{value.isocalendar().year}-W{value.isocalendar().week:02d}", "cost", "cost") if costs_complete else [],
+        "cost_monthly": _periods(filtered, lambda value: value.strftime("%Y-%m"), "cost", "cost") if costs_complete else [],
+        "cost_yearly": _periods(filtered, lambda value: value.strftime("%Y"), "cost", "cost") if costs_complete else [],
+    }
+    kpi_dict = {"total_revenue": round(total, 2), "total_cost": round(costs, 2), "primary_value": round(costs if profile["domain"] == "cost" else total, 2), "primary_label": profile["value_label"], "transactions": transactions, "average_sale": round(total / transactions, 2) if transactions else 0.0, "top_product": top_product}
     return {
         "period": {"from": start.isoformat() if start else None, "to": end.isoformat() if end else None},
-        "summary": (f"Revenue was {currency} {total:.2f} across {transactions} transaction{'s' if transactions != 1 else ''}." if profile["domain"] == "sales" else f"{profile['label']} recorded {currency} {costs if profile['domain'] == 'cost' else total:.2f} across {transactions} records.") if transactions else f"No accepted {profile['label'].lower()} records fall within this period.",
+        "summary": (f"Revenue was {currency} {total:,.2f} across {transactions} transaction{'s' if transactions != 1 else ''}." if profile["domain"] == "sales" else f"{profile['label']} recorded {currency} {costs if profile['domain'] == 'cost' else total:,.2f} across {transactions} records.") if transactions else f"No accepted {profile['label'].lower()} records fall within this period.",
         "profile": profile,
         "currency": currency,
         "available_period": {"from": min(available_dates).isoformat() if available_dates else None, "to": max(available_dates).isoformat() if available_dates else None},
         "revenue": {"total": round(total, 2), "currency": currency, "transactions": transactions, "average_sale": round(total / transactions, 2) if transactions else 0.0},
-        "trend": {
-            "daily": _periods(filtered, lambda value: value.isoformat()),
-            "weekly": _periods(filtered, lambda value: f"{value.isocalendar().year}-W{value.isocalendar().week:02d}"),
-            "monthly": _periods(filtered, lambda value: value.strftime("%Y-%m")),
-            "quarterly": _periods(filtered, lambda value: f"{value.year}-Q{(value.month - 1) // 3 + 1}"),
-            "cost_daily": _periods(filtered, lambda value: value.isoformat(), "cost", "cost") if costs_complete else [],
-            "yearly": _periods(filtered, lambda value: value.strftime("%Y")),
-            "cost_quarterly": _periods(filtered, lambda value: f"{value.year}-Q{(value.month - 1) // 3 + 1}", "cost", "cost") if costs_complete else [],
-            "cost_weekly": _periods(filtered, lambda value: f"{value.isocalendar().year}-W{value.isocalendar().week:02d}", "cost", "cost") if costs_complete else [],
-            "cost_monthly": _periods(filtered, lambda value: value.strftime("%Y-%m"), "cost", "cost") if costs_complete else [],
-            "cost_yearly": _periods(filtered, lambda value: value.strftime("%Y"), "cost", "cost") if costs_complete else [],
-        },
+        "trend": trend_dict,
         "products": products,
         "customers": _customer_metrics(filtered, profile),
         "profit": {"available": True, "revenue": round(total, 2), "cost": round(costs, 2), "gross_profit": round(total - costs, 2)} if costs_complete and profile["domain"] != "cost" else {"available": False, "reason": "Profit requires revenue and cost data for every accepted record in this period." if any("cost" in record for record in filtered) else "Accepted records contain revenue but no cost or expense fields."},
         "inventory": {"available": False, "reason": "No inventory snapshot or stock movement data is present."},
-        "kpis": {"total_revenue": round(total, 2), "total_cost": round(costs, 2), "primary_value": round(costs if profile["domain"] == "cost" else total, 2), "primary_label": profile["value_label"], "transactions": transactions, "average_sale": round(total / transactions, 2) if transactions else 0.0, "top_product": top_product},
+        "kpis": kpi_dict,
         "warnings": warnings,
+    }
+
+
+def previous_period(start: date, end: date) -> tuple[date, date]:
+    """The window of equal length that ends the day before ``start``."""
+    length = (end - start).days + 1
+    previous_end = start - timedelta(days=1)
+    return previous_end - timedelta(days=length - 1), previous_end
+
+
+def _window_totals(records: list[dict[str, Any]], start: date, end: date) -> dict[str, Any]:
+    window = [
+        record for record in records
+        if record.get("transaction_date") and start.isoformat() <= record["transaction_date"] <= end.isoformat()
+    ]
+    revenue = sum(record.get("amount", 0.0) for record in window)
+    cost = sum(record.get("cost", 0.0) for record in window)
+    costs_complete = bool(window) and all("cost" in record for record in window)
+    return {
+        "revenue": round(revenue, 2),
+        "cost": round(cost, 2),
+        "gross_profit": round(revenue - cost, 2) if costs_complete else None,
+        "transactions": len(window),
+        "average_sale": round(revenue / len(window), 2) if window else 0.0,
+    }
+
+
+def _delta(current: float | None, previous: float | None) -> dict[str, Any]:
+    if current is None or previous is None:
+        return {"current": current, "previous": previous, "change_pct": None}
+    change = round((current - previous) / abs(previous) * 100, 2) if previous else None
+    return {"current": current, "previous": previous, "change_pct": change}
+
+
+def compare(records: list[dict[str, Any]], from_date: date | None = None, to_date: date | None = None) -> dict[str, Any]:
+    """Compare the selected period with the equal-length period immediately before it.
+
+    Mirrors the "vs previous period" chips used by mainstream commerce dashboards,
+    but only reports a change when the earlier window actually contains records.
+    """
+    records = _present(records)
+    dates = [date.fromisoformat(record["transaction_date"]) for record in records if record.get("transaction_date")]
+    if not dates:
+        return {"available": False, "reason": "No dated records to compare."}
+    start, end = from_date or min(dates), to_date or max(dates)
+    previous_start, previous_end = previous_period(start, end)
+    current = _window_totals(records, start, end)
+    previous = _window_totals(records, previous_start, previous_end)
+    if not previous["transactions"]:
+        return {
+            "available": False,
+            "reason": "There are no records in the preceding period of the same length.",
+            "previous_period": {"from": previous_start.isoformat(), "to": previous_end.isoformat()},
+        }
+    return {
+        "available": True,
+        "period": {"from": start.isoformat(), "to": end.isoformat()},
+        "previous_period": {"from": previous_start.isoformat(), "to": previous_end.isoformat()},
+        "metrics": {key: _delta(current[key], previous[key]) for key in current},
     }
