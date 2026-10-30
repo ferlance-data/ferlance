@@ -9,3 +9,4 @@ frontend/node_modules/
 test.py
 .env
 backend/.venv/**
+backend/routers/__pycache__/**
