@@ -18,6 +18,7 @@ For the latest end-to-end stress-test results, corrected defects, and remaining 
 - Create an account and initial business workspace.
 - Authenticate with a signed bearer token.
 - Upload CSV and XLSX sales files.
+- Automatically import new or changed XLSX workbooks from a business-specific local folder.
 - Normalize supported dates and currency-like numeric formats.
 - Reject duplicate transaction IDs while preserving identical rows that lack IDs, since repeated same-value sales can be legitimate.
 - Preserve accepted records as normalized JSONL.
@@ -59,6 +60,8 @@ Open http://127.0.0.1:8000.
 The public landing page is at `/`; authenticated workspaces run at `/app`. Access tokens are short-lived JWTs held in the app session, while refresh sessions are rotated and revoked server-side through an HttpOnly cookie.
 
 The service uses SQLite metadata and local files under `data/` by default. Set `FERLANCE_DATA_DIR` to change the storage directory.
+
+Excel folder imports are enabled by default. Each workspace's folder is created under `data/incoming/<business-id>/` (or under `FERLANCE_IMPORT_DIR` when configured); the exact path is shown on the **Data** page. Copy `.xlsx` workbooks there and Ferlance checks for stable files every five seconds. Updated workbooks are imported as new datasets; the source files remain in place, repeated scans of an unchanged file do not create duplicates, and Excel lock files are ignored. The backend must be running and have access to the folder. Folder imports obey the same 10 MB limit and row validation as regular uploads.
 
 ## Market research and financial position
 
