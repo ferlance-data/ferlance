@@ -23,7 +23,7 @@ DATA_DIR = Path(os.getenv("FERLANCE_DATA_DIR", BASE_DIR / "data"))
 DB_PATH = DATA_DIR / "ferlance.sqlite3"
 RAW_DIR = DATA_DIR / "raw"
 PROCESSED_DIR = DATA_DIR / "processed"
-
+IMPORT_DIR = Path(os.getenv("FERLANCE_IMPORT_DIR", DATA_DIR / "incoming"))
 SECRET_KEY = os.getenv("FERLANCE_SECRET_KEY", "development-only-change-me")
 MAX_UPLOAD_BYTES = int(os.getenv("FERLANCE_MAX_UPLOAD_BYTES", str(10 * 1024 * 1024)))
 ACCESS_TOKEN_SECONDS = int(os.getenv("FERLANCE_ACCESS_TOKEN_SECONDS", "900"))
@@ -56,5 +56,7 @@ SERPAPI_KEY = os.getenv("SERPAPI_KEY", "")
 
 
 def ensure_storage() -> None:
-    for directory in (DATA_DIR, RAW_DIR, PROCESSED_DIR):
-        directory.mkdir(parents=True, exist_ok=True)
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    RAW_DIR.mkdir(parents=True, exist_ok=True)
+    PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
+    IMPORT_DIR.mkdir(parents=True, exist_ok=True)

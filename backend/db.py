@@ -8,6 +8,19 @@ SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL, created_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS businesses (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, name TEXT NOT NULL, created_at TEXT NOT NULL, FOREIGN KEY(user_id) REFERENCES users(id));
 CREATE TABLE IF NOT EXISTS datasets (id TEXT PRIMARY KEY, business_id TEXT NOT NULL, filename TEXT NOT NULL, extension TEXT NOT NULL, raw_path TEXT NOT NULL, processed_path TEXT, status TEXT NOT NULL, source_rows INTEGER NOT NULL, accepted_rows INTEGER NOT NULL, rejected_rows INTEGER NOT NULL, warnings TEXT NOT NULL, errors TEXT NOT NULL, created_at TEXT NOT NULL, FOREIGN KEY(business_id) REFERENCES businesses(id));
+CREATE TABLE IF NOT EXISTS folder_imports (
+    business_id TEXT NOT NULL,
+    filename TEXT NOT NULL,
+    file_size INTEGER NOT NULL,
+    modified_ns INTEGER NOT NULL,
+    checksum TEXT NOT NULL,
+    status TEXT NOT NULL,
+    error TEXT NOT NULL DEFAULT '',
+    dataset_id TEXT,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY(business_id, filename),
+    FOREIGN KEY(business_id) REFERENCES businesses(id)
+);
 CREATE TABLE IF NOT EXISTS refresh_sessions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, token_hash TEXT UNIQUE NOT NULL, expires_at TEXT NOT NULL, revoked_at TEXT, created_at TEXT NOT NULL, FOREIGN KEY(user_id) REFERENCES users(id));
 CREATE TABLE IF NOT EXISTS chat_conversations (id TEXT PRIMARY KEY, business_id TEXT NOT NULL, user_id TEXT NOT NULL, dataset_id TEXT NOT NULL, title TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, FOREIGN KEY(business_id) REFERENCES businesses(id), FOREIGN KEY(user_id) REFERENCES users(id), FOREIGN KEY(dataset_id) REFERENCES datasets(id));
 CREATE TABLE IF NOT EXISTS chat_messages (id TEXT PRIMARY KEY, conversation_id TEXT NOT NULL, role TEXT NOT NULL CHECK(role IN ('user', 'assistant')), content TEXT NOT NULL, created_at TEXT NOT NULL, FOREIGN KEY(conversation_id) REFERENCES chat_conversations(id));

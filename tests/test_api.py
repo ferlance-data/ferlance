@@ -13,12 +13,22 @@ from backend.routers import auth, lance
 
 
 def test_signup_upload_and_history_are_tenant_scoped(tmp_path, monkeypatch):
+<<<<<<< HEAD
     monkeypatch.setattr(config, "DB_PATH", tmp_path / "test.sqlite3")
     monkeypatch.setattr(config, "RAW_DIR", tmp_path / "raw")
     monkeypatch.setattr(config, "PROCESSED_DIR", tmp_path / "processed")
     config.RAW_DIR.mkdir()
     config.PROCESSED_DIR.mkdir()
     db.initialize(config.DB_PATH)
+=======
+    monkeypatch.setattr(main, "DB_PATH", tmp_path / "test.sqlite3")
+    monkeypatch.setattr(main, "RAW_DIR", tmp_path / "raw")
+    monkeypatch.setattr(main, "PROCESSED_DIR", tmp_path / "processed")
+    monkeypatch.setattr(main, "IMPORT_DIR", tmp_path / "incoming")
+    main.RAW_DIR.mkdir()
+    main.PROCESSED_DIR.mkdir()
+    main.db.initialize(main.DB_PATH)
+>>>>>>> feat/dashboard-enterprise-trends
     client = TestClient(main.app)
 
     signup = client.post("/api/auth/signup", json={"email": "owner@example.com", "password": "password123", "business_name": "Ama Retail"})
@@ -43,6 +53,29 @@ def test_signup_upload_and_history_are_tenant_scoped(tmp_path, monkeypatch):
     assert len(history.json()) == 1
 
     forbidden = client.get("/api/businesses/not-owned/datasets", headers=headers)
+    assert forbidden.status_code == 404
+
+
+def test_folder_import_status_is_scoped_to_business(tmp_path, monkeypatch):
+    monkeypatch.setattr(main, "DB_PATH", tmp_path / "test.sqlite3")
+    monkeypatch.setattr(main, "RAW_DIR", tmp_path / "raw")
+    monkeypatch.setattr(main, "PROCESSED_DIR", tmp_path / "processed")
+    monkeypatch.setattr(main, "IMPORT_DIR", tmp_path / "incoming")
+    main.RAW_DIR.mkdir()
+    main.PROCESSED_DIR.mkdir()
+    main.db.initialize(main.DB_PATH)
+    client = TestClient(main.app)
+
+    signup = client.post("/api/auth/signup", json={"email": "folder@example.com", "password": "password123", "business_name": "Folder Shop"})
+    headers = {"Authorization": f"Bearer {signup.json()['access_token']}"}
+    business_id = signup.json()["business"]["id"]
+
+    response = client.get(f"/api/businesses/{business_id}/folder-imports", headers=headers)
+    forbidden = client.get("/api/businesses/not-owned/folder-imports", headers=headers)
+
+    assert response.status_code == 200
+    assert response.json()["folder"] == str((tmp_path / "incoming" / business_id).resolve())
+    assert response.json()["imports"] == []
     assert forbidden.status_code == 404
 
 

@@ -9,8 +9,12 @@ frontend/node_modules/
 test.py
 .env
 backend/.venv/**
+<<<<<<< HEAD
 # Local runtime data (SQLite metadata, raw uploads, processed records)
 data/
 *.sqlite3
 __pycache__/
 .claude/
+=======
+backend/routers/__pycache__/**
+>>>>>>> feat/dashboard-enterprise-trends
