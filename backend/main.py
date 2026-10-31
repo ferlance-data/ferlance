@@ -52,6 +52,9 @@ def import_watched_file(business_id: str, source_path: Path) -> dict:
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    config.ensure_storage()
+    db.initialize(config.DB_PATH)
+    db.repair_dataset_paths(config.DB_PATH, config.RAW_DIR, config.PROCESSED_DIR)
     stop_event = threading.Event()
     importer = FolderImporter(config.IMPORT_DIR, config.DB_PATH, import_watched_file)
     worker = threading.Thread(target=importer.run, args=(stop_event,), name="excel-folder-importer", daemon=True)
