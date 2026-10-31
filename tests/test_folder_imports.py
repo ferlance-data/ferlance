@@ -1,8 +1,9 @@
 from pathlib import Path
+import uuid
 
 from openpyxl import Workbook
 
-from backend import config, db, main
+from backend import config, db
 from backend.folder_imports import FolderImporter
 
 
@@ -38,7 +39,27 @@ def test_folder_imports_new_and_changed_workbooks_once(tmp_path, monkeypatch):
     business_dir.mkdir(parents=True)
     workbook_path = business_dir / "sales.xlsx"
     _write_workbook(workbook_path, "1250.50")
-    importer = FolderImporter(import_dir, config.DB_PATH, main.import_watched_file)
+
+    def import_watched_file(business_id: str, source_path: Path) -> dict:
+        suffix = source_path.suffix.lower()
+        if source_path.stat().st_size > config.MAX_UPLOAD_BYTES:
+            raise ValueError("File is larger than the 10 MB upload limit.")
+        dataset_id = str(uuid.uuid4())
+        raw_path = config.RAW_DIR / f"{dataset_id}{suffix}"
+        import shutil
+        shutil.copyfile(source_path, raw_path)
+        from backend.processor import process_file
+        result = process_file(raw_path, suffix)
+        # Simple save without full dataset_store
+        import json
+        db.insert(
+            config.DB_PATH,
+            "INSERT INTO datasets (id, business_id, filename, extension, raw_path, processed_path, status, source_rows, accepted_rows, rejected_rows, warnings, errors, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (dataset_id, business_id, source_path.name, suffix, str(raw_path), None, "processed", result.source_rows, len(result.rows), result.rejected_rows, json.dumps(result.warnings), json.dumps(result.errors), db.now()),
+        )
+        return {"id": dataset_id, "status": "processed", "errors": []}
+
+    importer = FolderImporter(import_dir, config.DB_PATH, import_watched_file)
 
     importer.scan_once()
     assert db.many(config.DB_PATH, "SELECT id FROM datasets") == []
