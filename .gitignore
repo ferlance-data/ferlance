@@ -1,7 +1,7 @@
 .github/
 *.csv
 *docx
-backend/__pycache__/
+__pycache__/
 tests/__pycache__/
 frontend/node_modules/
 .venv/
@@ -12,6 +12,4 @@ backend/.venv/**
 # Local runtime data (SQLite metadata, raw uploads, processed records)
 data/
 *.sqlite3
-__pycache__/
-backend/routers/__pycache__/
 .claude/
