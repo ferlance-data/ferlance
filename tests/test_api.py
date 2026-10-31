@@ -13,22 +13,12 @@ from backend.routers import auth, lance
 
 
 def test_signup_upload_and_history_are_tenant_scoped(tmp_path, monkeypatch):
-<<<<<<< HEAD
     monkeypatch.setattr(config, "DB_PATH", tmp_path / "test.sqlite3")
     monkeypatch.setattr(config, "RAW_DIR", tmp_path / "raw")
     monkeypatch.setattr(config, "PROCESSED_DIR", tmp_path / "processed")
     config.RAW_DIR.mkdir()
     config.PROCESSED_DIR.mkdir()
     db.initialize(config.DB_PATH)
-=======
-    monkeypatch.setattr(main, "DB_PATH", tmp_path / "test.sqlite3")
-    monkeypatch.setattr(main, "RAW_DIR", tmp_path / "raw")
-    monkeypatch.setattr(main, "PROCESSED_DIR", tmp_path / "processed")
-    monkeypatch.setattr(main, "IMPORT_DIR", tmp_path / "incoming")
-    main.RAW_DIR.mkdir()
-    main.PROCESSED_DIR.mkdir()
-    main.db.initialize(main.DB_PATH)
->>>>>>> feat/dashboard-enterprise-trends
     client = TestClient(main.app)
 
     signup = client.post("/api/auth/signup", json={"email": "owner@example.com", "password": "password123", "business_name": "Ama Retail"})
@@ -57,13 +47,13 @@ def test_signup_upload_and_history_are_tenant_scoped(tmp_path, monkeypatch):
 
 
 def test_folder_import_status_is_scoped_to_business(tmp_path, monkeypatch):
-    monkeypatch.setattr(main, "DB_PATH", tmp_path / "test.sqlite3")
-    monkeypatch.setattr(main, "RAW_DIR", tmp_path / "raw")
-    monkeypatch.setattr(main, "PROCESSED_DIR", tmp_path / "processed")
-    monkeypatch.setattr(main, "IMPORT_DIR", tmp_path / "incoming")
-    main.RAW_DIR.mkdir()
-    main.PROCESSED_DIR.mkdir()
-    main.db.initialize(main.DB_PATH)
+    monkeypatch.setattr(config, "DB_PATH", tmp_path / "test.sqlite3")
+    monkeypatch.setattr(config, "RAW_DIR", tmp_path / "raw")
+    monkeypatch.setattr(config, "PROCESSED_DIR", tmp_path / "processed")
+    monkeypatch.setattr(config, "IMPORT_DIR", tmp_path / "incoming")
+    config.RAW_DIR.mkdir()
+    config.PROCESSED_DIR.mkdir()
+    db.initialize(config.DB_PATH)
     client = TestClient(main.app)
 
     signup = client.post("/api/auth/signup", json={"email": "folder@example.com", "password": "password123", "business_name": "Folder Shop"})

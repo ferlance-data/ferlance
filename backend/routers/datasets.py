@@ -6,7 +6,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
-from .. import config, dataset_store
+from .. import config, dataset_store, db
 from ..deps import owned_business, read_scope_records
 from ..processor import ProcessingResult, process_file
 from ..sms_parser import MoMoSMSParser
@@ -108,3 +108,16 @@ def dataset_records(dataset_id: str, business: dict = Depends(owned_business)) -
         raise HTTPException(404, "Dataset not found.")
     records = read_scope_records([dataset])
     return {"dataset_id": dataset_id, "status": dataset["status"], "count": len(records), "records": records}
+
+
+@router.get("/folder-imports")
+def folder_import_status(business: dict = Depends(owned_business)) -> dict:
+    """Report inbox workbooks that the background folder importer has picked up."""
+    folder = config.IMPORT_DIR / business["id"]
+    folder.mkdir(parents=True, exist_ok=True)
+    imports = db.many(
+        config.DB_PATH,
+        "SELECT filename, status, error, dataset_id, updated_at FROM folder_imports WHERE business_id = ? ORDER BY updated_at DESC LIMIT 10",
+        (business["id"],),
+    )
+    return {"folder": str(folder.resolve()), "imports": imports}
