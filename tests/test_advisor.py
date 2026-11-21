@@ -233,7 +233,7 @@ def test_insights_include_advice_and_explain_is_server_built_and_cached(client, 
 
 
 def test_lance_news_tool_replaces_paid_search(monkeypatch):
-    monkeypatch.setattr(news_context, "search", lambda query, *args, **kwargs: [{"title": f"News about {query}", "source": "news.test", "date": "20261010", "url": "https://news.test"}])
+    monkeypatch.setattr(news_context, "lookup", lambda query, *args, **kwargs: [{"title": f"News about {query}", "source": "news.test", "date": "20261010", "url": "https://news.test"}])
     assert "News about rice prices" in llm._news("rice prices")
     assert llm.NEWS_TOOL["function"]["name"] == "news_search"
     assert not hasattr(llm, "SERPAPI_KEY")
@@ -271,3 +271,10 @@ def test_old_explanations_are_pruned(client, monkeypatch):
     assert client.post(f"{base}/insights/{decline['id']}/explain?{window}", headers=headers).status_code == 200
     keys_left = [row["cache_key"] for row in db.many(config.DB_PATH, "SELECT cache_key FROM insight_explanations", ())]
     assert "old" not in keys_left and len(keys_left) == 1
+
+
+def test_lance_distinguishes_unavailable_news_from_no_news(monkeypatch):
+    monkeypatch.setattr(news_context, "lookup", lambda *args, **kwargs: None)
+    assert "could not be reached" in llm._news("rice")
+    monkeypatch.setattr(news_context, "lookup", lambda *args, **kwargs: [])
+    assert llm._news("rice") == "No news results."

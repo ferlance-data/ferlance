@@ -266,7 +266,7 @@ def build(records: list[dict[str, Any]], from_date: date | None = None, to_date:
         evidence = [
             _evidence("Revenue this period", round(now.revenue, 2), "money"),
             _evidence("Revenue the period before", round(before.revenue, 2), "money"),
-            _evidence("Sales this period", now.sales, "number"),
+            _evidence("Number of sales this period", now.sales, "number"),
         ]
         if change is not None:
             evidence.append(_evidence("Change", round(change, 1), "percent"))
@@ -338,7 +338,7 @@ def build(records: list[dict[str, Any]], from_date: date | None = None, to_date:
                 reasons.append(_reason(f"{name} is out of stock in your inventory now.", "likely", "stock"))
             out.add("stopped", name, "attention", f"No sales of {name} this period",
                     f"It sold {before.sales} times ({money(before.revenue)}) in the period before.", before.revenue, product=name,
-                    evidence=[_evidence("Revenue the period before", round(before.revenue, 2), "money"), _evidence("Sales the period before", before.sales, "number")],
+                    evidence=[_evidence("Revenue the period before", round(before.revenue, 2), "money"), _evidence("Number of sales the period before", before.sales, "number")],
                     reasons=reasons, actions=[f"Check that {name} is in stock and on display.", f"If you have stopped selling {name}, archive it so it stops showing here."])
 
     if days >= SLOW_STOCK_MIN_DAYS:
@@ -367,14 +367,14 @@ def build(records: list[dict[str, Any]], from_date: date | None = None, to_date:
             margin = best.margin or 0
             out.add("star", name, "opportunity", f"Sell more {name}",
                     f"Your biggest earner: {money(profit)} profit at a {margin:.0f}% margin.", profit, product=name,
-                    evidence=[_evidence("Profit this period", round(profit, 2), "money"), _evidence("Margin", round(margin, 1), "percent"), _evidence("Sales", best.sales, "number")],
+                    evidence=[_evidence("Profit this period", round(profit, 2), "money"), _evidence("Margin", round(margin, 1), "percent"), _evidence("Number of sales", best.sales, "number")],
                     reasons=[_reason(f"It brought in {profit / max(whole_now.revenue - whole_now.cost, 1) * 100:.0f}% of your item profit.", "likely", "profit")] if whole_now.cost_complete and whole_now.revenue > whole_now.cost else [],
                     actions=[f"Keep {name} in stock and put it where customers see it first.", f"Offer {name} to customers buying your other products."])
         elif len(candidates) > 1:
             name, best = max(candidates.items(), key=lambda pair: (pair[1].revenue, pair[0]))
             out.add("star", name, "opportunity", f"{name} is your best seller",
                     f"{money(best.revenue)} from {best.sales} sales.", best.revenue, product=name,
-                    evidence=[_evidence("Revenue this period", round(best.revenue, 2), "money"), _evidence("Sales", best.sales, "number")],
+                    evidence=[_evidence("Revenue this period", round(best.revenue, 2), "money"), _evidence("Number of sales", best.sales, "number")],
                     reasons=[], actions=[f"Keep {name} in stock.", "Add item costs to find out which product actually earns you the most."])
 
         ranked = sorted(now_products.items(), key=lambda pair: pair[1].revenue, reverse=True)

@@ -43,6 +43,12 @@ def _keywords(text: str) -> str:
 
 def search(topic: str, start: date | None = None, end: date | None = None, client: Any = httpx) -> list[dict[str, str]]:
     """Recent Ghanaian news about a topic, newest first. Returns [] when nothing useful comes back."""
+    return lookup(topic, start, end, client=client) or []
+
+
+def lookup(topic: str, start: date | None = None, end: date | None = None, *, client: Any = httpx,
+           max_wait: float = MAX_WAIT_SECONDS) -> list[dict[str, str]] | None:
+    """Like search(), but None means "could not ask" (rate limit, timeout, offline) and [] means "no news"."""
     global _last_request
     keywords = _keywords(topic)
     if not keywords:
@@ -60,12 +66,12 @@ def search(topic: str, start: date | None = None, end: date | None = None, clien
     else:
         params["timespan"] = "3months"
 
-    if not _lock.acquire(timeout=MAX_WAIT_SECONDS):
-        return []  # another lookup is in flight; skip rather than queue the user behind it
+    if not _lock.acquire(timeout=max_wait):
+        return None  # another lookup is in flight; skip rather than queue the user behind it
     try:
         wait = MIN_SPACING_SECONDS - (time.monotonic() - _last_request)
-        if wait > MAX_WAIT_SECONDS:
-            return []
+        if wait > max_wait:
+            return None
         if wait > 0:
             time.sleep(wait)
         _last_request = time.monotonic()
@@ -76,7 +82,7 @@ def search(topic: str, start: date | None = None, end: date | None = None, clien
         except (httpx.HTTPError, ValueError) as error:
             # GDELT answers rate-limit notices as plain text, which fails JSON parsing.
             logger.info("News context unavailable: %s", type(error).__name__)
-            return []
+            return None
     finally:
         _lock.release()
 

@@ -39,7 +39,7 @@ NEWS_TOOL = {
         "description": (
             "Search recent Ghanaian news (free GDELT index) for context on a product, supply, prices or events: "
             "for example a shortage, a price rise, a festival or the weather. Results are headlines only. "
-            "Use it only when outside context would change the advice."
+            "Use it only when outside context would change the advice, and at most twice per answer."
         ),
         "parameters": {
             "type": "object",
@@ -102,9 +102,16 @@ def _failure(response: httpx.Response) -> str:
     return str(message or f"HTTP {response.status_code}")
 
 
+MAX_NEWS_CALLS = 2
+
+
 def _news(query: str) -> str:
     logger.info("Lance news search: %r", query)
-    return news_context.digest(news_context.search(query[:MAX_QUERY_CHARS]))
+    # Lance's user is already waiting on the model, so allow one full GDELT spacing interval.
+    results = news_context.lookup(query[:MAX_QUERY_CHARS], max_wait=news_context.MIN_SPACING_SECONDS + 0.5)
+    if results is None:
+        return "The news index could not be reached right now (it is rate-limited). Say news was unavailable; do not say there is no news."
+    return news_context.digest(results)
 
 
 def _chat(
@@ -148,6 +155,7 @@ def _complete(
     """Run the model, executing any requested searches, until a final text answer is produced."""
     conversation = list(messages)
     tools_enabled = use_tools
+    news_calls = 0
 
     for round_number in range(MAX_TOOL_ROUNDS + 1):
         # The last round never offers tools, which forces a final text answer.
@@ -172,6 +180,7 @@ def _complete(
             {"role": "assistant", "content": message.get("content") or "", "tool_calls": calls}
         )
         for call in calls:
+            news_calls += 1
             function = call.get("function", {})
             if function.get("name") != "news_search":
                 result = "Unknown tool."
@@ -180,7 +189,12 @@ def _complete(
                     query = str(json.loads(function.get("arguments") or "{}").get("query", "")).strip()
                 except (ValueError, AttributeError):
                     query = ""
-                result = _news(query) if query else "No query was provided."
+                if not query:
+                    result = "No query was provided."
+                elif news_calls > MAX_NEWS_CALLS:
+                    result = "Search limit reached for this answer; answer with what you have."
+                else:
+                    result = _news(query)
             conversation.append({"role": "tool", "tool_call_id": call.get("id", ""), "content": result})
 
     raise ValueError("The model did not produce a final answer.")
