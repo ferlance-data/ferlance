@@ -7,6 +7,7 @@ import { BrowserRouter } from 'react-router';
 import '../styles/base.css';
 import '../styles/app.css';
 import { ApiError, navigation, refreshSession, request } from '../lib/api';
+import { followSystemTheme } from '../lib/theme';
 import { toast, Toasts } from '../lib/toast';
 import type { Business, BalanceHistoryRow, ConversationSummary, Identity, User } from '../lib/types';
 import { pagePath, resolvePageName } from './routes';
@@ -91,6 +92,9 @@ function App() {
     </>
   );
 }
+
+// While the saved choice is "system", keep following the OS theme on every page.
+followSystemTheme();
 
 // Old links such as /app#inventory become /app/inventory before the router reads the URL.
 if (window.location.hash.length > 1 && /^\/app\/?$/.test(window.location.pathname)) {
