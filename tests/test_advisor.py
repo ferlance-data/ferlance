@@ -238,3 +238,36 @@ def test_lance_news_tool_replaces_paid_search(monkeypatch):
     assert llm.NEWS_TOOL["function"]["name"] == "news_search"
     assert not hasattr(llm, "SERPAPI_KEY")
     _ = httpx  # imported for the fake responses above
+
+
+def test_placeholder_customers_are_never_regular_buyers():
+    records = (
+        daily("Bread", START, 30, amount=10, customer="Walk-in")
+        + daily("Bread", CUR[0], 30, every=3, amount=10, customer="Kojo")
+    )
+    item = kinds(advisor.build(records, *CUR))["decline:Bread"]
+    assert not any(reason["basis"] == "customers" for reason in item["reasons"])
+
+
+def test_calendar_reasons_use_the_matching_window(monkeypatch):
+    christmas = ghana_calendar.Event("Christmas and New Year season", date(2026, 12, 1), date(2027, 1, 6), "festive")
+    others = [("current", ghana_calendar.Event(f"Season {n}", CUR[0], CUR[1], "school")) for n in range(2)]
+    monkeypatch.setattr(ghana_calendar, "notable_difference", lambda *args: others + [("previous", christmas)])
+    records = daily("Rice", START, 30, amount=100) + daily("Rice", CUR[0], 30, every=3, amount=100)
+    reasons = [r["text"] for r in kinds(advisor.build(records, *CUR))["decline:Rice"]["reasons"] if r["basis"] == "calendar"]
+    assert reasons == ["The previous period included Christmas and New Year season, which often lifts sales."]
+
+
+def test_old_explanations_are_pruned(client, monkeypatch):
+    headers, base = _signup(client)
+    window = "from=2026-10-01&to=2026-10-30"
+    decline = next(item for item in client.get(f"{base}/insights?{window}", headers=headers).json()["advice"]["items"] if item["kind"] == "decline")
+    business_id = base.rsplit("/", 1)[1]
+    db.insert(config.DB_PATH, "INSERT INTO insight_explanations (business_id, cache_key, text, created_at) VALUES (?, 'old', '{}', '2020-01-01T00:00:00+00:00')", (business_id,))
+    monkeypatch.setattr(llm, "OPENROUTER_KEY", "key")
+    monkeypatch.setattr(llm, "OPENROUTER_MODELS", ("m",))
+    monkeypatch.setattr(news_context, "search", lambda *args, **kwargs: [])
+    monkeypatch.setattr(llm.httpx, "post", lambda url, headers, json, timeout: _Response({"choices": [{"message": {"content": "ok"}}]}))
+    assert client.post(f"{base}/insights/{decline['id']}/explain?{window}", headers=headers).status_code == 200
+    keys_left = [row["cache_key"] for row in db.many(config.DB_PATH, "SELECT cache_key FROM insight_explanations", ())]
+    assert "old" not in keys_left and len(keys_left) == 1

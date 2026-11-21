@@ -2,9 +2,9 @@
 
 import hashlib
 import json
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.concurrency import run_in_threadpool
 
 from .. import advisor, config, db, inventory, llm, news_context
 from ..analytics import analyze, compare
@@ -46,15 +46,19 @@ def business_insights(
 _NEWS_KINDS = {"decline", "stopped", "loss", "margin"}
 
 
+# Old explanations are dropped after this long; they are cheap to regenerate if needed.
+EXPLANATION_RETENTION_DAYS = 90
+
+
 @router.post("/insights/{insight_id}/explain")
-async def explain_insight(
+def explain_insight(
     insight_id: str,
     dates: DateRange = Depends(date_range),
     data: Scope = Depends(scope),
     business: dict = Depends(owned_business),
 ) -> dict:
     """AI explanation of one advice item. The item is rebuilt on the server from the scope, never taken from the client."""
-    advice = await run_in_threadpool(_advice, business["id"], dates, data)
+    advice = _advice(business["id"], dates, data)
     item = next((entry for entry in advice["items"] if entry["id"] == insight_id), None)
     if item is None:
         raise HTTPException(404, "That suggestion no longer applies to this data. Refresh the page.")
@@ -70,12 +74,14 @@ async def explain_insight(
 
     news = []
     if item["kind"] in _NEWS_KINDS and item.get("product"):
-        news = await run_in_threadpool(news_context.search, item["product"], dates.start, dates.end)
+        news = news_context.search(item["product"], dates.start, dates.end)
     try:
-        text = await run_in_threadpool(llm.explain, advisor.EXPLAIN_SYSTEM, advisor.explain_prompt(item, advice, news))
+        text = llm.explain(advisor.EXPLAIN_SYSTEM, advisor.explain_prompt(item, advice, news))
     except RuntimeError as error:
         raise HTTPException(503, str(error))
     created = db.now()
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=EXPLANATION_RETENTION_DAYS)).isoformat()
+    db.insert(config.DB_PATH, "DELETE FROM insight_explanations WHERE business_id = ? AND created_at < ?", (business["id"], cutoff))
     db.insert(
         config.DB_PATH,
         "INSERT OR REPLACE INTO insight_explanations (business_id, cache_key, text, created_at) VALUES (?, ?, ?, ?)",

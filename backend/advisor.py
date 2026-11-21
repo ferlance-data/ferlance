@@ -37,6 +37,8 @@ URGENT_COVER_DAYS = 7
 SLOW_STOCK_MIN_DAYS = 30
 CONCENTRATION_SHARE = 0.5
 CUSTOMER_CONCENTRATION_SHARE = 0.4
+# Placeholder customer labels for anonymous sales; never treated as a named buyer.
+GENERIC_CUSTOMERS = {"walk-in", "walk in", "walkin", "cash", "customer", "anonymous", "unknown", "n/a", "-"}
 WEEKDAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
 
 
@@ -184,7 +186,7 @@ def _change_reasons(name: str, now: _Totals, before: _Totals, money, inventory_i
             reasons.append(_reason(f"Each sale was {abs(average_change):.0f}% {moved} on average ({money(average_before)} → {money(average_now)}).", "likely", "basket"))
 
     if falling and before.customers:
-        regulars = {customer for customer, count in before.customers.items() if count >= 2}
+        regulars = {customer for customer, count in before.customers.items() if count >= 2 and customer.strip().casefold() not in GENERIC_CUSTOMERS}
         lapsed = [customer for customer in regulars if customer not in now.customers]
         if lapsed:
             share = sum(before.customers[c] for c in lapsed) / max(before.sales, 1)
@@ -206,11 +208,10 @@ def _change_reasons(name: str, now: _Totals, before: _Totals, money, inventory_i
             reasons.append(_reason(f"The same thing happened at this time last year ({ly_change:+.0f}%), so it may be seasonal.", "possible", "seasonal"))
             actions.append(f"Plan stock of {name} around this seasonal pattern next year.")
 
-    for side, event in calendar[:2]:
-        if falling and side == "previous":
-            reasons.append(_reason(f"The previous period included {event.name}, which often lifts sales.", "possible", "calendar"))
-        elif not falling and side == "current":
-            reasons.append(_reason(f"This period includes {event.name}, which often lifts sales.", "possible", "calendar"))
+    wanted = "previous" if falling else "current"
+    for event in [event for side, event in calendar if side == wanted][:2]:
+        where = "The previous period included" if falling else "This period includes"
+        reasons.append(_reason(f"{where} {event.name}, which often lifts sales.", "possible", "calendar"))
     return reasons, actions
 
 
@@ -392,7 +393,7 @@ def build(records: list[dict[str, Any]], from_date: date | None = None, to_date:
             if record.get("customer"):
                 customer_revenue[str(record["customer"])] += record["amount"]
         top_customer, top_revenue = max(customer_revenue.items(), key=lambda pair: (pair[1], pair[0]))
-        if top_customer.casefold() not in {"walk-in", "walk in", "cash", "customer"} and top_revenue / whole_now.revenue >= CUSTOMER_CONCENTRATION_SHARE:
+        if top_customer.strip().casefold() not in GENERIC_CUSTOMERS and top_revenue / whole_now.revenue >= CUSTOMER_CONCENTRATION_SHARE:
             share = top_revenue / whole_now.revenue * 100
             out.add("customer_concentration", "customers", "attention", "One customer brings in a large share of sales",
                     f"{share:.0f}% of revenue came from a single customer.", top_revenue - whole_now.revenue / len(customer_revenue),
