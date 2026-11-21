@@ -1,6 +1,11 @@
 {
   "version": "0.0.1",
   "configurations": [
-    { "name": "ferlance", "runtimeExecutable": "/tmp/claude-1000/-home-primeyloa-Code-databloom-ferlance/328c26c1-5777-402d-b000-d29f1c813c2f/scratchpad/serve.sh", "runtimeArgs": [], "port": 8765 }
+    {
+      "name": "ferlance",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "npm --prefix frontend run build && .venv/bin/uvicorn backend.main:app --port 8765"],
+      "port": 8765
+    }
   ]
 }
