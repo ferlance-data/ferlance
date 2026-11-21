@@ -23,7 +23,10 @@ for (const file of files(src)) {
     const text = fs.readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, ' '));
     text.split('\n').forEach((line, i) => {
       // Inline data: URIs encode '#' as %23, so they never match.
-      if (CSS_COLOR.test(line) && !line.trim().startsWith('--')) problems.push(`${rel}:${i + 1}: ${line.trim()}`);
+      const trimmed = line.trim();
+      // Selector lines (`#feed .item {`, `#bad,`) can look like hex; only declarations carry colours.
+      if (trimmed.startsWith('--') || /[{,]$/.test(trimmed)) return;
+      if (CSS_COLOR.test(trimmed)) problems.push(`${rel}:${i + 1}: ${trimmed}`);
     });
   } else if (/\.(ts|tsx)$/.test(file) && !/\.test\.tsx?$/.test(file)) {
     fs.readFileSync(file, 'utf8')

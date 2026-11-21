@@ -841,7 +841,7 @@ textarea {
 
   /* The first column names the row: full width, no label. */
   .table-stack td:first-child {
-    justify-content: flex-start;
+    display: block; /* full width, so share bars and sub-lines inside it keep their size */
     font-weight: 500;
     text-align: left;
   }

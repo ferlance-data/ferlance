@@ -35,7 +35,7 @@
   border: 1px solid transparent;
   border-radius: var(--radius-xl);
   pointer-events: auto;
-  transition: background-color 0.25s, border-color 0.25s, backdrop-filter 0.25s;
+  transition: background-color var(--duration-base), border-color var(--duration-base), backdrop-filter var(--duration-base);
 }
 
 .site-nav.scrolled .site-nav-inner,
@@ -58,7 +58,7 @@
   color: var(--fog-300);
   font-size: var(--text-sm);
   text-decoration: none;
-  transition: color 0.15s, background-color 0.15s;
+  transition: color var(--duration-fast), background-color var(--duration-fast);
 }
 
 .site-links a:hover {
@@ -811,7 +811,7 @@
 }
 
 .facts-curve-path.drawn {
-  transition: stroke-dashoffset 2.4s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: stroke-dashoffset 2.4s var(--ease-out);
   stroke-dashoffset: 0;
 }
 

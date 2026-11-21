@@ -814,7 +814,7 @@ svg.icon {
   display: block;
   height: 100%;
   background: var(--accent);
-  transition: width 0.3s;
+  transition: width var(--duration-slow);
 }
 
 .setup-steps {
@@ -1256,7 +1256,7 @@ svg.icon {
   border-radius: 16px;
   background: var(--surface);
   box-shadow: var(--shadow-sm);
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: border-color var(--duration-fast), box-shadow var(--duration-fast);
 }
 
 .composer:focus-within {
@@ -1331,7 +1331,7 @@ svg.icon {
   text-align: center;
   font-size: var(--text-sm);
   cursor: pointer;
-  transition: border-color 0.15s, background-color 0.15s;
+  transition: border-color var(--duration-fast), background-color var(--duration-fast);
 }
 
 .dropzone:hover,
