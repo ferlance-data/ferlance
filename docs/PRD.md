@@ -104,7 +104,7 @@ Credentials (AWS, OCR provider, Expo/EAS) are requested only at the step that ne
 
 ### 5.3 #4/#5: Onboarding, team access and admin console (v1.3.0)
 
-**Current state:** `backend/routers/admin.py` already provides `GET /admin/capabilities`, `GET /admin/users` and `PATCH /admin/users/{id}/role`, gated by `FERLANCE_ADMIN_EMAILS`. Settings already has an admin card. This feature *extends* what exists. It does not build a second console.
+**Current state:** `backend/routers/admin.py` already provides `GET /api/admin/capabilities`, `GET /api/admin/users` and `PATCH /api/admin/users/{id}/role`, gated by `FERLANCE_ADMIN_EMAILS`. Settings already has an admin card. This feature *extends* what exists. It does not build a second console.
 
 | ID | Requirement | Acceptance |
 | --- | --- | --- |

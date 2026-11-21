@@ -9,3 +9,4 @@ for (const f of fs.readdirSync(a).filter((x) => x.endsWith('.png'))) {
   if (n) fs.writeFileSync(`${outDir}/${f}`, PNG.sync.write(d));
   console.log(f, n ? `${n} px (${(100 * n / (A.width * A.height)).toFixed(3)}%)` : 'identical');
 }
+for (const f of fs.readdirSync(b).filter((x) => x.endsWith('.png'))) if (!fs.existsSync(`${a}/${f}`)) console.log(f, 'NEW');
