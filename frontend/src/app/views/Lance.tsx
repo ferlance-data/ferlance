@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState, useSyncExternalStore, type FormEvent, type KeyboardEvent, type ReactNode } from 'react';
 import { request } from '../../lib/api';
 import { formatDateTime, money, number, plainPercent, plural } from '../../lib/format';
 import { Icon, IconSlot } from '../../lib/icons';
@@ -141,6 +141,51 @@ function Assistant({ meta, body }: { meta: ReactNode; body: ReactNode }) {
   );
 }
 
+/*
+ * The thread lives outside the component so it survives navigation: leaving Ask Lance
+ * mid-answer and coming back shows the same conversation, and an in-flight answer still
+ * lands (only the 60 s timeout aborts it). It resets on a full page load, which is also
+ * the only way to switch account or business (sign-out reloads the page).
+ */
+interface Session {
+  conversationId: string | null;
+  entries: Entry[];
+  draft: string;
+  sending: boolean;
+  /** Bumped whenever the thread is replaced, so a late answer can't hijack a newer thread. */
+  epoch: number;
+}
+
+let session: Session = { conversationId: null, entries: [], draft: '', sending: false, epoch: 0 };
+let nextEntryId = 0;
+const sessionListeners = new Set<() => void>();
+
+function setSession(patch: Partial<Session> | ((current: Session) => Partial<Session>)) {
+  session = { ...session, ...(typeof patch === 'function' ? patch(session) : patch) };
+  sessionListeners.forEach((listener) => listener());
+}
+
+function subscribeSession(listener: () => void) {
+  sessionListeners.add(listener);
+  return () => {
+    sessionListeners.delete(listener);
+  };
+}
+
+function pushEntry(entry: NewEntry): number {
+  const id = nextEntryId++;
+  setSession((current) => ({ entries: [...current.entries, { ...entry, id } as Entry] }));
+  return id;
+}
+
+function replaceEntry(id: number, entry: Omit<Extract<Entry, { kind: 'assistant' }>, 'id'>) {
+  setSession((current) => ({ entries: current.entries.map((item) => (item.id === id ? { ...entry, id } : item)) }));
+}
+
+function resetThread(patch: Partial<Session> = {}) {
+  setSession((current) => ({ conversationId: null, entries: [], epoch: current.epoch + 1, ...patch }));
+}
+
 export default function Lance() {
   const { business, businessPath, datasets, markSetup } = useWorkspace();
   const { label, params } = useScope();
@@ -150,27 +195,12 @@ export default function Lance() {
   const questions = useBusinessQuery<Question[]>('/questions', { silent: true });
   const conversations = useBusinessQuery<ConversationItem[]>('/ask-lance/conversations', { silent: true });
 
-  const [conversationId, setConversationId] = useState<string | null>(null);
-  const [entries, setEntries] = useState<Entry[]>([]);
-  const [draft, setDraft] = useState('');
-  const [sending, setSending] = useState(false);
+  const { conversationId, entries, draft, sending } = useSyncExternalStore(subscribeSession, () => session);
+  const setDraft = (value: string) => setSession({ draft: value });
   const [status, setStatus] = useState<{ message: string; error: boolean }>({ message: '', error: false });
 
-  const nextId = useRef(0);
-  const sendingRef = useRef(false);
-  const lifetime = useRef<AbortController | null>(null);
-  const askController = useRef<AbortController | null>(null);
   const threadRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    lifetime.current = controller;
-    return () => {
-      controller.abort();
-      askController.current?.abort();
-    };
-  }, []);
 
   useLayoutEffect(() => {
     const thread = threadRef.current;
@@ -189,22 +219,12 @@ export default function Lance() {
     [queryClient, business.id],
   );
 
-  const push = (entry: NewEntry): number => {
-    const id = nextId.current++;
-    setEntries((current) => [...current, { ...entry, id } as Entry]);
-    return id;
-  };
-  const replace = (id: number, entry: Omit<Extract<Entry, { kind: 'assistant' }>, 'id'>) =>
-    setEntries((current) => current.map((item) => (item.id === id ? { ...entry, id } : item)));
-
   const quickAnswer = async (question: Question) => {
-    const signal = lifetime.current?.signal;
-    push({ kind: 'user', text: question.label });
-    const pending = push({ kind: 'thinking', text: 'Calculating from your records…' });
+    pushEntry({ kind: 'user', text: question.label });
+    const pending = pushEntry({ kind: 'thinking', text: 'Calculating from your records…' });
     try {
-      const result = await request<QuickResult>(businessPath(`/questions/${question.id}?${params().toString()}`), { signal });
-      if (signal?.aborted) return;
-      replace(pending, {
+      const result = await request<QuickResult>(businessPath(`/questions/${question.id}?${params().toString()}`));
+      replaceEntry(pending, {
         kind: 'assistant',
         meta: (
           <>
@@ -215,37 +235,33 @@ export default function Lance() {
         body: <QuickBody question={question.id} answer={result.answer} />,
       });
     } catch (error) {
-      if (signal?.aborted) return;
-      replace(pending, { kind: 'assistant', meta: null, body: <p className="negative">{(error as Error).message}</p> });
+      replaceEntry(pending, { kind: 'assistant', meta: null, body: <p className="negative">{(error as Error).message}</p> });
     }
   };
 
   const ask = async (raw: string) => {
     const question = raw.trim();
-    if (!question || sendingRef.current) return;
+    if (!question || session.sending) return;
     if (!hasFiles) {
       setStatus({ message: 'Import at least one file before asking Lance.', error: true });
       return;
     }
-    sendingRef.current = true;
-    setSending(true);
-    setDraft('');
+    setSession({ sending: true, draft: '' });
     setStatus({ message: '', error: false });
-    push({ kind: 'user', text: question });
-    const pending = push({ kind: 'thinking', text: 'Reading your records…' });
+    const epoch = session.epoch;
+    pushEntry({ kind: 'user', text: question });
+    const pending = pushEntry({ kind: 'thinking', text: 'Reading your records…' });
     const controller = new AbortController();
-    askController.current = controller;
     const timer = window.setTimeout(() => controller.abort(), 60000);
     try {
       const result = await request<AskResult>(businessPath(`/ask-lance?${params().toString()}`), {
         method: 'POST',
-        json: { question, conversation_id: conversationId },
+        json: { question, conversation_id: session.conversationId },
         signal: controller.signal,
       });
-      if (lifetime.current?.signal.aborted) return;
-      setConversationId(result.conversation_id);
       markSetup({ conversations: true });
-      replace(pending, {
+      if (session.epoch === epoch) setSession({ conversationId: result.conversation_id });
+      replaceEntry(pending, {
         kind: 'assistant',
         meta: (
           <>
@@ -257,43 +273,35 @@ export default function Lance() {
       });
       void refreshConversations();
     } catch (error) {
-      if (lifetime.current?.signal.aborted) return;
       const message = (error as Error).name === 'AbortError' ? 'Lance took too long to respond. Try again in a moment.' : (error as Error).message;
-      replace(pending, { kind: 'assistant', meta: null, body: <p className="negative">{message}</p> });
-      setDraft(question);
+      replaceEntry(pending, { kind: 'assistant', meta: null, body: <p className="negative">{message}</p> });
+      if (session.epoch === epoch && !session.draft) setSession({ draft: question });
     } finally {
       window.clearTimeout(timer);
-      if (!lifetime.current?.signal.aborted) {
-        sendingRef.current = false;
-        setSending(false);
-      }
+      setSession({ sending: false });
     }
   };
 
   const openConversation = async (id: string) => {
-    const signal = lifetime.current?.signal;
     try {
-      const conversation = await request<ConversationDetail>(businessPath(`/ask-lance/conversations/${id}`), { signal });
-      if (signal?.aborted) return;
-      setConversationId(conversation.id);
-      setEntries(
-        conversation.messages.map((message): Entry => {
-          const entryId = nextId.current++;
+      const conversation = await request<ConversationDetail>(businessPath(`/ask-lance/conversations/${id}`));
+      resetThread({
+        conversationId: conversation.id,
+        entries: conversation.messages.map((message): Entry => {
+          const entryId = nextEntryId++;
           return message.role === 'user'
             ? { id: entryId, kind: 'user', text: message.content }
             : { id: entryId, kind: 'assistant', meta: <span>{formatDateTime(message.created_at)}</span>, body: <Markdown source={message.content} /> };
         }),
-      );
+      });
       void refreshConversations();
     } catch (error) {
-      if (signal?.aborted) return;
       toast((error as Error).message, { error: true });
     }
   };
 
   const startConversation = () => {
-    setConversationId(null);
-    setEntries([]);
+    resetThread();
     void refreshConversations();
     inputRef.current?.focus();
   };

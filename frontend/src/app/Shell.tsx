@@ -7,6 +7,7 @@ import { signOut } from '../lib/api';
 import { Icon, IconSlot } from '../lib/icons';
 import { toast } from '../lib/toast';
 import { RANGE_OPTIONS, analysableDatasets, type RangePreset } from '../lib/scope';
+import { PageErrorBoundary } from './components/PageErrorBoundary';
 import { SkeletonRows } from './components/ui';
 import { ActionsSlotContext } from './page';
 import { PAGES, pagePath, resolvePageName, type PageDef } from './routes';
@@ -22,9 +23,10 @@ function BrandMark() {
   );
 }
 
-function NavItem({ page, pendingCount }: { page: PageDef; pendingCount?: number }) {
+function NavItem({ page, pendingCount, onNavigate }: { page: PageDef; pendingCount?: number; onNavigate: () => void }) {
   return (
-    <NavLink className="nav-item" to={pagePath(page.name)} data-page={page.name}>
+    // Close the phone drawer on click: navigation to a not-yet-loaded page commits only after its chunk arrives.
+    <NavLink className="nav-item" to={pagePath(page.name)} data-page={page.name} onClick={onNavigate}>
       <IconSlot name={page.nav.icon} />
       {page.nav.label}
       {page.name === 'data' ? (
@@ -65,16 +67,16 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
         <nav className="nav" id="nav">
           <p className="nav-label">Analyse</p>
           {group('analyse').map((page) => (
-            <NavItem key={page.name} page={page} />
+            <NavItem key={page.name} page={page} onNavigate={onClose} />
           ))}
           <p className="nav-label">Operate</p>
           {group('operate').map((page) => (
-            <NavItem key={page.name} page={page} pendingCount={pending} />
+            <NavItem key={page.name} page={page} pendingCount={pending} onNavigate={onClose} />
           ))}
         </nav>
         <div className="sidebar-bottom">
           {group('bottom').map((page) => (
-            <NavItem key={page.name} page={page} />
+            <NavItem key={page.name} page={page} onNavigate={onClose} />
           ))}
           <button className="nav-item" id="logout" type="button" onClick={() => void signOut()}>
             <IconSlot name="logout" />
@@ -166,9 +168,11 @@ function Page({ page, onNavigate }: { page: PageDef; onNavigate: () => void }) {
   const { Component } = page;
   return (
     <section className={`view${page.sectionClass ? ` ${page.sectionClass}` : ''}`} data-view={page.name}>
-      <Suspense fallback={<SkeletonRows count={6} height={24} />}>
-        <Component />
-      </Suspense>
+      <PageErrorBoundary>
+        <Suspense fallback={<SkeletonRows count={6} height={24} />}>
+          <Component />
+        </Suspense>
+      </PageErrorBoundary>
     </section>
   );
 }
