@@ -177,7 +177,9 @@ def backfill_periods() -> None:
     for dataset in pending:
         try:
             period = available_period(read_records(dataset))
-        except (RecordsUnavailableError, ValueError, KeyError):
+        except RecordsUnavailableError:
+            continue  # Leave it NULL so a later startup retries once the file is readable again.
+        except ValueError:
             period = {"from": None, "to": None}
         db.insert(
             config.DB_PATH,

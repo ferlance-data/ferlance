@@ -612,3 +612,29 @@ def test_responses_are_gzipped_except_auth():
     assert client.get("/api/businesses/b/analytics", headers=headers).headers["content-encoding"] == "gzip"
     # The real app is wrapped too.
     assert any(item.cls is main._Compression for item in main.app.user_middleware)
+
+
+def test_backfill_retries_files_that_are_unreadable(tmp_path, monkeypatch):
+    from backend import dataset_store
+
+    monkeypatch.setattr(config, "DB_PATH", tmp_path / "test.sqlite3")
+    monkeypatch.setattr(config, "RAW_DIR", tmp_path / "raw")
+    monkeypatch.setattr(config, "PROCESSED_DIR", tmp_path / "processed")
+    config.RAW_DIR.mkdir()
+    config.PROCESSED_DIR.mkdir()
+    db.initialize(config.DB_PATH)
+    client = TestClient(main.app)
+    signup = client.post("/api/auth/signup", json={"email": "retry@example.com", "password": "password123", "business_name": "Retry Shop"})
+    headers = {"Authorization": f"Bearer {signup.json()['access_token']}"}
+    base = f"/api/businesses/{signup.json()['business']['id']}"
+    client.post(f"{base}/datasets", headers=headers, files={"file": ("s.csv", b"transaction_date,product,amount\n2026-02-03,Rice,10\n", "text/csv")})
+    db.insert(config.DB_PATH, "UPDATE datasets SET period_from = NULL, period_to = NULL", ())
+    processed = next(config.PROCESSED_DIR.iterdir())
+    hidden = processed.with_suffix(".hidden")
+    processed.rename(hidden)
+    monkeypatch.setattr(dataset_store, "_resolve", lambda stored, directory: processed)  # file temporarily missing
+    dataset_store.backfill_periods()
+    assert db.one(config.DB_PATH, "SELECT period_from FROM datasets", ())["period_from"] is None
+    hidden.rename(processed)
+    dataset_store.backfill_periods()
+    assert client.get(f"{base}/datasets", headers=headers).json()[0]["period"] == {"from": "2026-02-03", "to": "2026-02-03"}
