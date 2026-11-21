@@ -65,6 +65,22 @@ export function scopeLabel(scope: Scope, datasets: Dataset[]): string {
   return datasets.find((item) => item.id === scope.datasetId)?.filename ?? 'All business data';
 }
 
+/**
+ * Earliest/latest record dates in scope, from each file's stored span: the chosen file,
+ * or every included file. Known before any analytics request, so presets resolve on the first read.
+ */
+export function scopeBounds(scope: Scope, datasets: Dataset[]): Period {
+  const files =
+    scope.datasetId !== 'all' ? analysableDatasets(datasets).filter((item) => item.id === scope.datasetId) : includedDatasets(datasets);
+  let from: string | null = null;
+  let to: string | null = null;
+  for (const { period } of files) {
+    if (period?.from && (!from || period.from < from)) from = period.from;
+    if (period?.to && (!to || period.to > to)) to = period.to;
+  }
+  return { from, to };
+}
+
 /** True when the scope has records to analyse (a chosen file, or at least one included file). */
 export function scopeHasData(scope: Scope, datasets: Dataset[]): boolean {
   return scope.datasetId !== 'all'

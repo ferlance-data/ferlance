@@ -570,3 +570,45 @@ def test_insights_and_predefined_questions_are_tenant_scoped(tmp_path, monkeypat
     assert question.status_code == 200
     assert question.json()["answer"][0]["product"] == "Rice"
     assert unknown.status_code == 404
+
+
+def test_datasets_report_their_record_date_span_and_old_rows_are_backfilled(tmp_path, monkeypatch):
+    from backend import dataset_store
+
+    monkeypatch.setattr(config, "DB_PATH", tmp_path / "test.sqlite3")
+    monkeypatch.setattr(config, "RAW_DIR", tmp_path / "raw")
+    monkeypatch.setattr(config, "PROCESSED_DIR", tmp_path / "processed")
+    config.RAW_DIR.mkdir()
+    config.PROCESSED_DIR.mkdir()
+    db.initialize(config.DB_PATH)
+    client = TestClient(main.app)
+    signup = client.post("/api/auth/signup", json={"email": "period@example.com", "password": "password123", "business_name": "Period Shop"})
+    headers = {"Authorization": f"Bearer {signup.json()['access_token']}"}
+    base = f"/api/businesses/{signup.json()['business']['id']}"
+    csv = b"transaction_date,product,amount\n2026-03-04,Rice,10\n2026-01-15,Beans,5\n2026-02-01,Oil,7\n"
+
+    upload = client.post(f"{base}/datasets", headers=headers, files={"file": ("sales.csv", csv, "text/csv")})
+    assert upload.json()["period"] == {"from": "2026-01-15", "to": "2026-03-04"}
+
+    # A file imported before the span was stored is filled in once, from its records.
+    db.insert(config.DB_PATH, "UPDATE datasets SET period_from = NULL, period_to = NULL", ())
+    assert client.get(f"{base}/datasets", headers=headers).json()[0]["period"] == {"from": None, "to": None}
+    dataset_store.backfill_periods()
+    assert client.get(f"{base}/datasets", headers=headers).json()[0]["period"] == {"from": "2026-01-15", "to": "2026-03-04"}
+    analytics = client.get(f"{base}/analytics", headers=headers).json()
+    assert analytics["available_period"] == {"from": "2026-01-15", "to": "2026-03-04"}
+
+
+def test_responses_are_gzipped_except_auth():
+    from starlette.applications import Starlette
+    from starlette.responses import PlainTextResponse
+    from starlette.routing import Route
+
+    body = PlainTextResponse("x" * 5000)
+    inner = Starlette(routes=[Route("/api/auth/refresh", lambda request: body), Route("/api/businesses/b/analytics", lambda request: body)])
+    client = TestClient(main._Compression(inner))
+    headers = {"Accept-Encoding": "gzip"}
+    assert "content-encoding" not in client.get("/api/auth/refresh", headers=headers).headers
+    assert client.get("/api/businesses/b/analytics", headers=headers).headers["content-encoding"] == "gzip"
+    # The real app is wrapped too.
+    assert any(item.cls is main._Compression for item in main.app.user_middleware)

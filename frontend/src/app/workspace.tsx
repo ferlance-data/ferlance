@@ -11,6 +11,7 @@ import {
   resolveRange,
   scopeHasData,
   scopeLabel,
+  scopeBounds,
   scopeParams,
   type Scope,
 } from '../lib/scope';
@@ -131,8 +132,6 @@ interface ScopeValue {
   setScope: (patch: Partial<Scope>) => void;
   /** Earliest/latest record dates in scope; presets anchor to `bounds.to`. */
   bounds: Period;
-  /** Call with `analytics.available_period` after each scoped load. */
-  setBounds: (bounds: Period | null | undefined) => void;
   /** Resolved dates for the current preset. */
   range: Period;
   /** Query string for scoped endpoints (dataset_id, from, to). */
@@ -151,7 +150,6 @@ export function useScope(): ScopeValue {
 
 function ScopeProvider({ datasets, children }: { datasets: Dataset[]; children: ReactNode }) {
   const [rawScope, setRawScope] = useState<Scope>(DEFAULT_SCOPE);
-  const [bounds, setBoundsState] = useState<Period>({ from: null, to: null });
 
   // A file that disappears (deleted or failed) drops the scope back to all data.
   const scope = useMemo<Scope>(
@@ -163,23 +161,19 @@ function ScopeProvider({ datasets, children }: { datasets: Dataset[]; children: 
   );
 
   const setScope = useCallback((patch: Partial<Scope>) => setRawScope((current) => ({ ...current, ...patch })), []);
-  const setBounds = useCallback((next: Period | null | undefined) => {
-    if (!next) return;
-    setBoundsState((current) => (current.from === next.from && current.to === next.to ? current : { from: next.from, to: next.to }));
-  }, []);
+  const bounds = useMemo(() => scopeBounds(scope, datasets), [scope, datasets]);
 
   const value = useMemo<ScopeValue>(
     () => ({
       scope,
       setScope,
       bounds,
-      setBounds,
       range: resolveRange(scope, bounds),
       params: (options) => scopeParams(scope, bounds, options),
       label: scopeLabel(scope, datasets),
       hasData: scopeHasData(scope, datasets),
     }),
-    [scope, setScope, bounds, setBounds, datasets],
+    [scope, setScope, bounds, datasets],
   );
   return <ScopeContext.Provider value={value}>{children}</ScopeContext.Provider>;
 }

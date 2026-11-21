@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_SCOPE, resolveRange, scopeHasData, scopeLabel, scopeParams, type Scope } from './scope';
+import { DEFAULT_SCOPE, resolveRange, scopeBounds, scopeHasData, scopeLabel, scopeParams, type Scope } from './scope';
 import type { Dataset } from './types';
 
 const bounds = { from: '2026-01-05', to: '2026-05-20' };
@@ -60,5 +60,34 @@ describe('scope labels and data checks', () => {
     expect(scopeHasData(scope({}), [datasets[1] as Dataset])).toBe(false);
     expect(scopeHasData(scope({ datasetId: 'b' }), datasets)).toBe(true);
     expect(scopeHasData(scope({ datasetId: 'c' }), datasets)).toBe(false);
+  });
+});
+
+describe('scopeBounds', () => {
+  const files = [
+    dataset({ id: 'a', period: { from: '2026-01-05', to: '2026-03-31' } }),
+    dataset({ id: 'b', period: { from: '2025-11-01', to: '2026-02-10' } }),
+    dataset({ id: 'x', included: false, period: { from: '2024-01-01', to: '2026-12-31' } }),
+    dataset({ id: 'f', status: 'failed', period: { from: null, to: null } }),
+  ];
+
+  it('spans every included file for all data', () => {
+    expect(scopeBounds(scope({}), files)).toEqual({ from: '2025-11-01', to: '2026-03-31' });
+  });
+
+  it('uses only the chosen file, even when it is excluded from business-wide views', () => {
+    expect(scopeBounds(scope({ datasetId: 'b' }), files)).toEqual({ from: '2025-11-01', to: '2026-02-10' });
+    expect(scopeBounds(scope({ datasetId: 'x' }), files)).toEqual({ from: '2024-01-01', to: '2026-12-31' });
+  });
+
+  it('is open when files have no dated records or no stored span', () => {
+    expect(scopeBounds(scope({ datasetId: 'f' }), files)).toEqual({ from: null, to: null });
+    expect(scopeBounds(scope({}), [dataset({})])).toEqual({ from: null, to: null });
+  });
+
+  it('switching file re-anchors presets without waiting for a response', () => {
+    const last30 = (id: string) => scopeParams(scope({ datasetId: id, range: '30' }), scopeBounds(scope({ datasetId: id }), files)).toString();
+    expect(last30('a')).toBe('dataset_id=a&from=2026-03-02&to=2026-03-31');
+    expect(last30('b')).toBe('dataset_id=b&from=2026-01-12&to=2026-02-10');
   });
 });

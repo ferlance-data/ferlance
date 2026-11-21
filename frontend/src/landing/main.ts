@@ -4,6 +4,7 @@
 
 import '../styles/base.css';
 import '../styles/landing.css';
+import { prefetchWorkspace } from './prefetch';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -228,6 +229,7 @@ const asMode = (value: string | undefined): Mode => (value === 'signup' ? 'signu
 function openAuth(mode: Mode): void {
   setMode(mode);
   if (!dialog.open) dialog.showModal();
+  prefetchWorkspace();
   $<HTMLInputElement>('input', forms[mode]).focus();
 }
 

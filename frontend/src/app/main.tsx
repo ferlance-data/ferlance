@@ -3,11 +3,11 @@
 import { QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter } from 'react-router';
 import '../styles/base.css';
 import '../styles/app.css';
 import { ApiError, navigation, refreshSession, request } from '../lib/api';
 import { setCurrency } from '../lib/format';
+import { Router } from '../lib/router';
 import { followSystemTheme } from '../lib/theme';
 import { toast, Toasts } from '../lib/toast';
 import type { Business, BalanceHistoryRow, ConversationSummary, Dataset, Identity, InventoryResponse, User } from '../lib/types';
@@ -115,9 +115,9 @@ if (!root) throw new Error('Missing #root');
 createRoot(root).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
+      <Router>
         <App />
-      </BrowserRouter>
+      </Router>
     </QueryClientProvider>
   </StrictMode>,
 );

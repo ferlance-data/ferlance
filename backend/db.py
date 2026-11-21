@@ -124,6 +124,12 @@ def initialize(path: Path) -> None:
             db.execute("ALTER TABLE datasets ADD COLUMN review_status TEXT NOT NULL DEFAULT 'accepted'")
         if "overlap_details" not in dataset_columns:
             db.execute("ALTER TABLE datasets ADD COLUMN overlap_details TEXT NOT NULL DEFAULT '[]'")
+        # Record date span per file, so the UI can resolve date presets before any analytics request.
+        # NULL means "not computed yet" (backfilled by dataset_store.backfill_periods); '' means "no dated records".
+        if "period_from" not in dataset_columns:
+            db.execute("ALTER TABLE datasets ADD COLUMN period_from TEXT")
+        if "period_to" not in dataset_columns:
+            db.execute("ALTER TABLE datasets ADD COLUMN period_to TEXT")
         movement_columns = {row[1] for row in db.execute("PRAGMA table_info(inventory_movements)").fetchall()}
         if "unit_cost" not in movement_columns:
             db.execute("ALTER TABLE inventory_movements ADD COLUMN unit_cost REAL")

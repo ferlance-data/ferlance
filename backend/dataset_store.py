@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from . import config, db
+from .analytics import available_period
 from .processor import ProcessingResult
 
 DATASET_FIELDS = (
@@ -39,6 +40,7 @@ def serialize(row: dict[str, Any]) -> dict[str, Any]:
         if isinstance(item[field], str):
             item[field] = json.loads(item[field])
     item["included"] = row.get("review_status") != EXCLUDED
+    item["period"] = {"from": row.get("period_from") or None, "to": row.get("period_to") or None}
     return item
 
 
@@ -135,6 +137,7 @@ def save(
     checksum: str | None,
 ) -> dict[str, Any]:
     processed_path: Path | None = None
+    period = available_period(result.rows)
     status = "failed" if not result.rows else "partial" if result.rejected_rows or result.errors else "processed"
     if result.rows:
         processed_path = config.PROCESSED_DIR / f"{dataset_id}.jsonl"
@@ -144,8 +147,8 @@ def save(
     db.insert(
         config.DB_PATH,
         "INSERT INTO datasets (id, business_id, filename, extension, raw_path, processed_path, status, "
-        "source_rows, accepted_rows, rejected_rows, warnings, errors, created_at, checksum) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "source_rows, accepted_rows, rejected_rows, warnings, errors, created_at, checksum, period_from, period_to) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             dataset_id,
             business_id,
@@ -161,9 +164,26 @@ def save(
             json.dumps(result.errors),
             db.now(),
             checksum,
+            period["from"] or "",
+            period["to"] or "",
         ),
     )
     return serialize(get(business_id, dataset_id) or {})
+
+
+def backfill_periods() -> None:
+    """Compute the record date span for files imported before it was stored. Runs once per file."""
+    pending = db.many(config.DB_PATH, "SELECT * FROM datasets WHERE period_from IS NULL OR period_to IS NULL")
+    for dataset in pending:
+        try:
+            period = available_period(read_records(dataset))
+        except (RecordsUnavailableError, ValueError, KeyError):
+            period = {"from": None, "to": None}
+        db.insert(
+            config.DB_PATH,
+            "UPDATE datasets SET period_from = ?, period_to = ? WHERE id = ?",
+            (period["from"] or "", period["to"] or "", dataset["id"]),
+        )
 
 
 def new_id() -> str:

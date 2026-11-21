@@ -1,6 +1,6 @@
 import { useMutation } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Link } from 'react-router';
+import { Link } from '../../lib/router';
 import { request } from '../../lib/api';
 import { formatDate, money, number } from '../../lib/format';
 import { IconSlot } from '../../lib/icons';
@@ -93,7 +93,7 @@ export default function Insights() {
   const { hasData, params } = useScope();
   const qs = params().toString();
   const insights = useScopedQuery<InsightsResponse & { available_period?: Period }>('/insights', { enabled: hasData });
-  const analytics = useScopedQuery<AnalyticsWithPeriod>('/analytics', { updatesBounds: true, enabled: hasData });
+  const analytics = useScopedQuery<AnalyticsWithPeriod>('/analytics', { enabled: hasData });
   const brave = useBusinessQuery<{ configured: boolean }>('/integrations/brave-search');
   const configured = Boolean(brave.data?.configured);
   const canRun = configured && analysableDatasets(datasets).length > 0;

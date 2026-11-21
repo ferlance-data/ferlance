@@ -1,6 +1,6 @@
 // Rendering shared across views: insight cards, ranked lists, dataset status, attention items.
 
-import { Link } from 'react-router';
+import { Link } from '../../lib/router';
 import { money, number, plainPercent } from '../../lib/format';
 import { Icon, type IconName } from '../../lib/icons';
 import type { Dataset, Insight } from '../../lib/types';

@@ -29,10 +29,15 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
-    rollupOptions: {
+    rolldownOptions: {
       input: {
         landing: fileURLToPath(new URL('./index.html', import.meta.url)),
         app: fileURLToPath(new URL('./app/index.html', import.meta.url)),
+      },
+      output: {
+        // Third-party code changes far less often than ours. In its own chunk it keeps its
+        // hash across app releases, so returning users re-download only the app code.
+        codeSplitting: { groups: [{ name: 'vendor', test: /[\\/]node_modules[\\/]/ }] },
       },
     },
   },

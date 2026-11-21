@@ -2,8 +2,8 @@
 // and the routed page content.
 
 import { Suspense, useCallback, useEffect, useState } from 'react';
-import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router';
 import { signOut } from '../lib/api';
+import { Link, NavLink, Redirect, useLocation, useNavigate } from '../lib/router';
 import { Icon, IconSlot } from '../lib/icons';
 import { toast } from '../lib/toast';
 import { RANGE_OPTIONS, analysableDatasets, type RangePreset } from '../lib/scope';
@@ -191,10 +191,18 @@ function useHashRedirect() {
   }, [navigate, location.key]);
 }
 
-function PageRoute({ onNavigate }: { onNavigate: () => void }) {
-  const { name } = useParams();
+/** `/app/<name>` (optionally with a trailing slash) renders that page; legacy names redirect, anything else goes to Overview. */
+function PageRoute({ pathname, onNavigate }: { pathname: string; onNavigate: () => void }) {
+  const match = /^\/app\/([^/]+)\/?$/.exec(pathname);
+  if (!match) return <Redirect to={pagePath('overview')} />;
+  let name: string;
+  try {
+    name = decodeURIComponent(match[1] ?? '');
+  } catch {
+    name = '';
+  }
   const resolved = resolvePageName(name);
-  if (name !== resolved) return <Navigate to={pagePath(resolved)} replace />;
+  if (name !== resolved) return <Redirect to={pagePath(resolved)} />;
   const page = PAGES.find((item) => item.name === resolved) as PageDef;
   return <Page key={page.name} page={page} onNavigate={onNavigate} />;
 }
@@ -247,10 +255,7 @@ export function Shell() {
             {current?.description ?? ''}
           </p>
           <ActionsSlotContext.Provider value={actionsSlot}>
-            <Routes>
-              <Route path="/app/:name" element={<PageRoute onNavigate={closeNav} />} />
-              <Route path="*" element={<Navigate to={pagePath('overview')} replace />} />
-            </Routes>
+            <PageRoute pathname={location.pathname} onNavigate={closeNav} />
           </ActionsSlotContext.Provider>
         </main>
       </div>

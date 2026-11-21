@@ -8,8 +8,8 @@ Goal: **exact visual and behavioural parity** with the legacy vanilla-JS view. N
 - Legacy static markup for the view: `frontend/legacy/index.html` — the `<section class="view" data-view="<name>">` block
   (overview :93, products :139, insights :156, lance :178, inventory :205, position :261, data :298, settings :349).
 - Foundation you build on (read, don't edit):
-  - `src/app/workspace.tsx` — `useWorkspace()` → `{ user, business, businessPath, datasets, refreshDatasets, inventory, refreshInventory, setup, markSetup, updateIdentity }`; `useScope()` → `{ scope, setScope, bounds, setBounds, range, params, label, hasData }`; `keys` (query keys).
-  - `src/app/hooks.ts` — `useScopedQuery<T>('/analytics', { updatesBounds: true })` for scoped reads; `useBusinessQuery<T>('/inventory/movements?limit=100')` for unscoped reads.
+  - `src/app/workspace.tsx` — `useWorkspace()` → `{ user, business, businessPath, datasets, refreshDatasets, inventory, refreshInventory, setup, markSetup, updateIdentity }`; `useScope()` → `{ scope, setScope, bounds, range, params, label, hasData }` (bounds come from each dataset's `period`); `keys` (query keys).
+  - `src/app/hooks.ts` — `useScopedQuery<T>('/analytics')` for scoped reads; `useBusinessQuery<T>('/inventory/movements?limit=100')` for unscoped reads.
   - `src/app/components/ui.tsx` — `Pill, Delta, Kpi, EmptyState, SkeletonRows, Notice, StatusText, Segmented, DataTable` (+ `Column`, `SortState`).
   - `src/app/views/shared.tsx` — `InsightCard, RankItems, StatusPill, AttentionItem`.
   - `src/app/page.tsx` — `<PageActions>` portals the view's top-bar buttons (legacy `view.actions()`).
@@ -20,13 +20,13 @@ Goal: **exact visual and behavioural parity** with the legacy vanilla-JS view. N
 1. File: `src/app/views/<Name>.tsx`, `export default function <Name>()`. The Shell already renders the `<section class="view" data-view=...>` wrapper and the page title/description — render only the section's *inner* content.
 2. **Markup parity**: same elements, class names, ids, `aria-*`, `role`, `data-*` attributes and text as the legacy static HTML **plus** what the legacy JS generated. CSS (`src/styles/*.css`, unchanged) targets these. Where legacy HTML had `<span data-icon="x"></span>` use `<IconSlot name="x" />`; where an element itself carried `data-icon` (icon buttons) keep `data-icon` on it and put `<Icon>` inside.
 3. **Data**:
-   - Scoped endpoints (`/analytics`, `/insights`, `/questions/{id}`, `/performance-research`, `/ask-lance`) use the current scope. For GETs use `useScopedQuery`. Pass `updatesBounds: true` wherever the legacy code assigned `state.bounds = ...available_period`.
+   - Scoped endpoints (`/analytics`, `/insights`, `/questions/{id}`, `/performance-research`, `/ask-lance`) use the current scope. For GETs use `useScopedQuery`.
    - Unscoped reads: `useBusinessQuery`. Datasets and inventory already live in `useWorkspace()` — don't refetch them separately.
    - Writes: `request()` (or TanStack `useMutation`), then refresh caches: `refreshDatasets()`, `refreshInventory()`, or `queryClient.invalidateQueries({ queryKey: keys.business(business.id) })` (prefix match) as appropriate.
    - Load errors are already toasted globally by the query client (except 401). Action errors: `toast(error.message, { error: true })` or the view's `StatusText`, matching legacy.
    - `legacy state.setup.x = true` → `markSetup({ x: true })`. `state.user/business` updates → `updateIdentity()`.
    - Use `AbortSignal` from the query fn (handled by hooks) — never `setState` after unmount.
-4. **Links**: legacy `href="#page"` → `<Link to={pagePath('page')}>` from `react-router`. External URLs from API data → `href={safeHref(url)}` with `target="_blank" rel="noopener noreferrer"`.
+4. **Links**: legacy `href="#page"` → `<Link to={pagePath('page')}>` from `src/lib/router.tsx`. External URLs from API data → `href={safeHref(url)}` with `target="_blank" rel="noopener noreferrer"`.
 5. **Security**: never `dangerouslySetInnerHTML`/`innerHTML` (lint enforces). Render user/upload data as text.
 6. **Types**: declare view-specific response types at the top of your view file. Use `src/lib/types.ts` types where they fit. Strict TS — no `any`; `unknown` + narrowing if needed.
 7. **Do not edit shared files** (`src/lib/**`, `src/app/*.tsx|ts`, `src/app/components/**`, `src/app/views/shared.tsx`, styles, configs). Other agents are working in parallel. If you need a missing shared helper, write a local one in your view file and **list it in your final report** so the lead can promote it.

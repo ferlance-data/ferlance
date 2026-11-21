@@ -39,6 +39,8 @@ export interface Dataset {
   errors: string[];
   created_at: string;
   included: boolean;
+  /** Earliest and latest record dates in the file. */
+  period?: Period;
   /** Present on the merged "all business data" pseudo-dataset in analytics responses. */
   files?: number;
 }

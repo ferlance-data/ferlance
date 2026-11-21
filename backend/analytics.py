@@ -126,6 +126,17 @@ def _data_profile(records: list[dict[str, Any]]) -> dict[str, Any]:
     return {"domain": "records", "label": "Records", "value_key": "amount", "value_label": "Recorded value"}
 
 
+def available_period(records: list[dict[str, Any]]) -> dict[str, str | None]:
+    """Earliest and latest transaction dates in the records (ISO strings, or None when undated)."""
+    # Freshly processed rows may still hold date objects; stored JSONL rows hold ISO strings.
+    dates = [
+        value if isinstance(value, date) else date.fromisoformat(value)
+        for value in (record.get("transaction_date") for record in records)
+        if value
+    ]
+    return {"from": min(dates).isoformat() if dates else None, "to": max(dates).isoformat() if dates else None}
+
+
 def analyze(records: list[dict[str, Any]], from_date: date | None = None, to_date: date | None = None) -> dict[str, Any]:
     if from_date and to_date and from_date > to_date:
         raise ValueError("The from date must be on or before the to date.")
@@ -179,7 +190,7 @@ def analyze(records: list[dict[str, Any]], from_date: date | None = None, to_dat
         "summary": (f"Revenue was {currency} {total:,.2f} across {transactions} transaction{'s' if transactions != 1 else ''}." if profile["domain"] == "sales" else f"{profile['label']} recorded {currency} {costs if profile['domain'] == 'cost' else total:,.2f} across {transactions} records.") if transactions else f"No accepted {profile['label'].lower()} records fall within this period.",
         "profile": profile,
         "currency": currency,
-        "available_period": {"from": min(available_dates).isoformat() if available_dates else None, "to": max(available_dates).isoformat() if available_dates else None},
+        "available_period": available_period(records),
         "revenue": {"total": round(total, 2), "currency": currency, "transactions": transactions, "average_sale": round(total / transactions, 2) if transactions else 0.0},
         "trend": trend_dict,
         "products": products,
@@ -229,7 +240,12 @@ def compare(records: list[dict[str, Any]], from_date: date | None = None, to_dat
     but only reports a change when the earlier window actually contains records.
     """
     records = _present(records)
-    dates = [date.fromisoformat(record["transaction_date"]) for record in records if record.get("transaction_date")]
+    # Freshly processed rows may still hold date objects; stored JSONL rows hold ISO strings.
+    dates = [
+        value if isinstance(value, date) else date.fromisoformat(value)
+        for value in (record.get("transaction_date") for record in records)
+        if value
+    ]
     if not dates:
         return {"available": False, "reason": "No dated records to compare."}
     start, end = from_date or min(dates), to_date or max(dates)

@@ -15,7 +15,7 @@ Ferlance turns the records small businesses already keep — spreadsheet exports
 ```text
 Browser (React + TypeScript, built by Vite into frontend/dist)
   /            index.html + src/landing/main.ts     public marketing page (static markup) and auth dialog
-  /app/*       app/index.html + src/app/main.tsx    workspace shell, React Router pages, views
+  /app/*       app/index.html + src/app/main.tsx    workspace shell, client-side routed pages, views
         │  JSON over HTTPS — Bearer access token (memory) + HttpOnly refresh cookie
         ▼
 FastAPI (backend/main.py) — wiring, lifespan, built frontend + SPA fallback, cache headers
@@ -81,6 +81,7 @@ React 19 + TypeScript (strict) built by Vite. Two entries: the landing page keep
 - `src/styles/base.css` holds design tokens and primitives; `landing.css` and `app.css` build on them. Light and dark workspace themes share one token set; an inline script in `app/index.html` applies the saved theme before first paint.
 - `src/lib/api.ts` keeps the access token in memory only. Concurrent 401s share one refresh, because refresh tokens are single-use. A failed refresh sends the user to `/?signin`.
 - `src/app/workspace.tsx` provides identity, datasets, inventory and the **scope** (files + dates) to every view. Server data is cached with TanStack Query. Scoped reads (`useScopedQuery` in `src/app/hooks.ts`) put the resolved scope in their cache key, so changing the scope refetches and stale responses are discarded.
+- `src/lib/router.tsx` is a small history router (links, active nav links, redirects). Navigations run in `startTransition`, so a lazy page keeps the current one on screen until its chunk loads. Date presets anchor to each dataset's stored `period` (its record date span), so the first scoped request already has the right window.
 - `src/app/routes.tsx` lists the pages (`/app/<page>`); `Shell.tsx` renders the sidebar, top bar, scope bar and the routed view. Old `#page` links are redirected.
 - Rendering safety: everything is rendered as text by React. `dangerouslySetInnerHTML`/`innerHTML` are banned by lint. `src/lib/markdown.tsx` turns Lance answers into elements, and links from API data pass through `safeHref` (http/https only).
 - `src/lib/chart/BarChart.tsx` is a dependency-free SVG chart; `src/lib/reports.tsx` renders printable reports into `#print-report`.
