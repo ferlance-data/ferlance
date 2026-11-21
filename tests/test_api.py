@@ -1,6 +1,7 @@
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from io import BytesIO
+import re
 import threading
 
 from fastapi import HTTPException, Response
@@ -69,29 +70,66 @@ def test_folder_import_status_is_scoped_to_business(tmp_path, monkeypatch):
     assert forbidden.status_code == 404
 
 
-def test_public_and_app_pages_serve_structured_frontend(tmp_path, monkeypatch):
+def _frontend_client(tmp_path, monkeypatch) -> TestClient:
     monkeypatch.setattr(config, "DB_PATH", tmp_path / "test.sqlite3")
     monkeypatch.setattr(config, "RAW_DIR", tmp_path / "raw")
     monkeypatch.setattr(config, "PROCESSED_DIR", tmp_path / "processed")
     config.RAW_DIR.mkdir()
     config.PROCESSED_DIR.mkdir()
     db.initialize(config.DB_PATH)
-    client = TestClient(main.app)
+    return TestClient(main.app)
+
+
+def test_pages_route_to_the_built_entries_and_fall_back_for_client_routes(tmp_path, monkeypatch):
+    client = _frontend_client(tmp_path, monkeypatch)
+    dist = tmp_path / "dist"
+    (dist / "app").mkdir(parents=True)
+    (dist / "index.html").write_text("<title>landing entry</title>")
+    (dist / "app" / "index.html").write_text("<title>workspace entry</title>")
+    monkeypatch.setattr(config, "FRONTEND_DIST", dist)
 
     landing = client.get("/")
-    app_shell = client.get("/app")
-    base_styles = client.get("/assets/css/base.css")
-    app_script = client.get("/assets/js/app/main.js")
+    workspace = client.get("/app")
+    deep_link = client.get("/app/products")
+
+    assert "landing entry" in landing.text
+    assert "workspace entry" in workspace.text
+    assert "workspace entry" in deep_link.text
+    assert landing.headers["cache-control"] == "no-cache"
+    assert deep_link.headers["cache-control"] == "no-cache"
+
+
+def test_pages_explain_how_to_build_when_the_frontend_is_missing(tmp_path, monkeypatch):
+    client = _frontend_client(tmp_path, monkeypatch)
+    monkeypatch.setattr(config, "FRONTEND_DIST", tmp_path / "missing")
+
+    response = client.get("/app")
+
+    assert response.status_code == 503
+    assert "npm --prefix frontend run build" in response.text
+    assert client.get("/health").status_code == 200
+
+
+def test_built_frontend_serves_landing_workspace_and_immutable_assets(tmp_path, monkeypatch):
+    built = config.FRONTEND_DIST / "app" / "index.html"
+    assert built.is_file(), "Frontend not built: run `npm --prefix frontend ci && npm --prefix frontend run build` before pytest."
+    client = _frontend_client(tmp_path, monkeypatch)
+
+    landing = client.get("/")
+    workspace = client.get("/app")
+    script = re.search(r'src="(/assets/[^"]+\.js)"', workspace.text)
+    styles = re.findall(r'href="(/assets/[^"]+\.css)"', workspace.text)
 
     assert landing.status_code == 200
     assert "Business intelligence for growing businesses" in landing.text
-    assert "/assets/js/landing.js" in landing.text
-    assert "Ferlance | Workspace" in app_shell.text
-    assert 'data-view="overview"' in app_shell.text
-    assert base_styles.status_code == 200
-    assert "--mint-glow" in base_styles.text
-    assert app_script.status_code == 200
-    assert app_script.headers["cache-control"] == "no-cache"
+    assert "Ferlance | Workspace" in workspace.text
+    assert 'id="root"' in workspace.text
+    assert script, "workspace HTML should reference a bundled script"
+    bundle = client.get(script.group(1))
+    assert bundle.status_code == 200
+    assert bundle.headers["cache-control"] == "public, max-age=31536000, immutable"
+    assert any("--mint-glow" in client.get(href).text for href in styles)
+    assert client.get("/assets/missing-file.js").status_code == 404
 
 
 def test_upload_rejects_unsupported_type(tmp_path, monkeypatch):

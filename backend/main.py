@@ -10,11 +10,11 @@ Layout
 - ``llm`` / ``rag`` / ``market_research``  optional AI and web context.
 """
 
+import re
 from contextlib import asynccontextmanager
-from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from . import config, db
@@ -29,29 +29,53 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title="Ferlance", version="0.2.0", lifespan=lifespan)
-app.mount("/assets", StaticFiles(directory=config.FRONTEND_DIR / "assets"), name="assets")
+app = FastAPI(title="Ferlance", version="1.0.0", lifespan=lifespan)
+# The React frontend is a Vite build (frontend/dist). check_dir=False keeps the API
+# importable before the first build; pages then explain how to build instead.
+app.mount("/assets", StaticFiles(directory=config.FRONTEND_DIST / "assets", check_dir=False), name="assets")
 for module in (auth, admin, datasets, analytics, inventory, financial_position, integrations, lance):
     app.include_router(module.router)
 
+# Vite names bundles like app-CTxM_byd.js: the hash changes whenever the content does.
+_HASHED_ASSET = re.compile(r"-[A-Za-z0-9_-]{8}\.(?:js|css|woff2?|svg|png|jpg|webp)$")
+
 
 @app.middleware("http")
-async def revalidate_frontend(request: Request, call_next):
-    """Unbundled ES modules have no content hashes, so make browsers revalidate (cheap 304s) after deploys."""
+async def cache_policy(request: Request, call_next):
+    """Hashed bundles never change, so cache them for a year; everything else (HTML) revalidates."""
     response = await call_next(request)
-    if not request.url.path.startswith("/api/"):
+    path = request.url.path
+    if path.startswith("/api/"):
+        return response
+    if path.startswith("/assets/") and response.status_code == 200 and _HASHED_ASSET.search(path):
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    else:
         response.headers.setdefault("Cache-Control", "no-cache")
     return response
 
 
-@app.get("/", response_class=FileResponse, include_in_schema=False)
-def landing_page() -> Path:
-    return config.FRONTEND_DIR / "landing.html"
+_BUILD_MISSING = """<!doctype html><title>Ferlance frontend not built</title>
+<p>The Ferlance frontend has not been built yet. Run <code>npm --prefix frontend ci &amp;&amp; npm --prefix frontend run build</code>,
+then reload this page.</p>"""
 
 
-@app.get("/app", response_class=FileResponse, include_in_schema=False)
-def application() -> Path:
-    return config.FRONTEND_DIR / "index.html"
+def _page(relative: str) -> Response:
+    page = config.FRONTEND_DIST / relative
+    if not page.is_file():
+        return HTMLResponse(_BUILD_MISSING, status_code=503)
+    return FileResponse(page)
+
+
+@app.get("/", include_in_schema=False)
+def landing_page() -> Response:
+    return _page("index.html")
+
+
+@app.get("/app", include_in_schema=False)
+@app.get("/app/{_path:path}", include_in_schema=False)
+def application(_path: str = "") -> Response:
+    """Every workspace route (/app/overview, /app/products, …) loads the same single-page app."""
+    return _page("app/index.html")
 
 
 @app.get("/health")

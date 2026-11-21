@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ferlance | Workspace</title>
+  <meta name="theme-color" content="#fbfaf6">
+  <link rel="icon" href="/assets/img/mark.svg" type="image/svg+xml">
+  <script>
+    // Apply the saved theme before first paint to avoid a flash.
+    try {
+      const theme = localStorage.getItem('ferlance-theme') || 'system';
+      const dark = theme === 'dark' || (theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+      document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+    } catch { document.documentElement.dataset.theme = 'light'; }
+  </script>
+</head>
+<body class="app-body">
+  <div id="root">
+    <div class="boot" role="status"><svg class="brand-mark" viewBox="0 0 20 20" aria-hidden="true"><rect x="1" y="12" width="5" height="5" rx="1"/><rect x="7.5" y="7.5" width="5" height="5" rx="1"/><rect x="14" y="3" width="5" height="5" rx="1"/></svg><span>Opening your workspace…</span></div>
+  </div>
+  <article class="print-report" id="print-report" hidden aria-label="Printable report"></article>
+  <script type="module" src="/src/app/main.tsx"></script>
+</body>
+</html>
