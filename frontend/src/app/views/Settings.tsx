@@ -1,4 +1,4 @@
-// Settings: profile, appearance, the web-research integration, and administration.
+// Settings: profile, appearance and administration.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
@@ -6,14 +6,9 @@ import { request } from '../../lib/api';
 import { formatDate } from '../../lib/format';
 import { toast } from '../../lib/toast';
 import { DataTable, StatusText, type Column } from '../components/ui';
-import { useBusinessQuery } from '../hooks';
-import { keys, useWorkspace } from '../workspace';
+import { useWorkspace } from '../workspace';
 import { applyTheme, savedTheme, THEME_KEY, type ThemeChoice } from '../../lib/theme';
 
-interface BraveStatus {
-  configured: boolean;
-  updated_at?: string | null;
-}
 interface AdminUser {
   id: string;
   email: string;
@@ -42,7 +37,6 @@ export default function Settings() {
     <div className="settings">
       <ProfileCard />
       <AppearanceCard />
-      <BraveCard />
       <AdminCard />
     </div>
   );
@@ -138,87 +132,6 @@ function AppearanceCard() {
         </div>
       </div>
     </div>
-  );
-}
-
-function BraveCard() {
-  const { business, businessPath } = useWorkspace();
-  const queryClient = useQueryClient();
-  const brave = useBusinessQuery<BraveStatus>('/integrations/brave-search');
-  const [key, setKey] = useState('');
-  const [status, setStatus] = useState<Status | null>(null);
-  const refresh = () => queryClient.invalidateQueries({ queryKey: keys.business(business.id, '/integrations/brave-search') });
-
-  async function save(event: FormEvent) {
-    event.preventDefault();
-    const value = key.trim();
-    if (!value) {
-      setStatus({ message: 'Paste an API key first.', error: true });
-      return;
-    }
-    try {
-      await request(businessPath('/integrations/brave-search'), { method: 'PUT', json: { api_key: value } });
-      setKey('');
-      await refresh();
-      setStatus({ message: 'Connected. The key is encrypted and will not be shown again.', error: false });
-    } catch (error) {
-      setStatus({ message: (error as Error).message, error: true });
-    }
-  }
-
-  async function remove() {
-    try {
-      await request(businessPath('/integrations/brave-search'), { method: 'DELETE' });
-      await refresh();
-      setStatus({ message: 'Disconnected.', error: false });
-    } catch (error) {
-      setStatus({ message: (error as Error).message, error: true });
-    }
-  }
-
-  const configured = Boolean(brave.data?.configured);
-  return (
-    <form className="card" id="brave-form" onSubmit={(event) => void save(event)}>
-      <div className="card-header">
-        <div>
-          <h2 className="card-title">Web research</h2>
-          <p className="card-subtitle">Brave Search API key for market context on declines and losses</p>
-        </div>
-        {configured ? (
-          <span className="pill pill-success" id="brave-pill">
-            {`Connected ${brave.data?.updated_at ? formatDate(brave.data.updated_at) : ''}`.trim()}
-          </span>
-        ) : (
-          <span className="pill" id="brave-pill">
-            Not connected
-          </span>
-        )}
-      </div>
-      <div className="card-body form-grid">
-        <label className="field">
-          API key
-          <input
-            className="input"
-            id="brave-key"
-            type="password"
-            autoComplete="off"
-            placeholder="Paste a key to connect or replace"
-            value={key}
-            onChange={(event) => setKey(event.target.value)}
-          />
-          <span className="field-hint">Stored encrypted and never shown again. Provider usage may be billed by Brave.</span>
-        </label>
-        <div className="button-row">
-          <button className="btn btn-primary" type="submit">
-            Save key
-          </button>
-          <button className="btn btn-danger" id="brave-remove" type="button" disabled={!configured} onClick={() => void remove()}>
-            Disconnect
-          </button>
-          <StatusText id="brave-status" message={status?.message} error={status?.error} />
-        </div>
-      </div>
-    </form>
   );
 }
 

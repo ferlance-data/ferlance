@@ -62,6 +62,14 @@ CREATE INDEX IF NOT EXISTS inventory_movements_business_date
     ON inventory_movements(business_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS inventory_movements_product_date
     ON inventory_movements(product_id, created_at DESC);
+CREATE TABLE IF NOT EXISTS insight_explanations (
+    business_id TEXT NOT NULL,
+    cache_key TEXT NOT NULL,
+    text TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY(business_id, cache_key),
+    FOREIGN KEY(business_id) REFERENCES businesses(id)
+);
 CREATE TABLE IF NOT EXISTS business_integrations (
     id TEXT PRIMARY KEY,
     business_id TEXT NOT NULL,
@@ -130,6 +138,8 @@ def initialize(path: Path) -> None:
             db.execute("ALTER TABLE datasets ADD COLUMN period_from TEXT")
         if "period_to" not in dataset_columns:
             db.execute("ALTER TABLE datasets ADD COLUMN period_to TEXT")
+        # Brave web research was removed in favour of free sources; drop any stored Brave keys.
+        db.execute("DELETE FROM business_integrations WHERE provider = 'brave_search'")
         movement_columns = {row[1] for row in db.execute("PRAGMA table_info(inventory_movements)").fetchall()}
         if "unit_cost" not in movement_columns:
             db.execute("ALTER TABLE inventory_movements ADD COLUMN unit_cost REAL")

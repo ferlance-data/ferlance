@@ -119,13 +119,11 @@ The Inventory workspace is a separate business-scoped product master and movemen
 
 On-hand stock is calculated from the movement ledger, and sales/issue movements that would make a product's stock negative are rejected. Archived products leave the active list and reorder alerts but remain in total on-hand units and stock valuation until their balance is reconciled. Displayed stock value multiplies on-hand units by the product's currently recorded unit cost; it is withheld when any product with stock has no unit cost. This is an operational estimate, not FIFO/weighted-average accounting valuation, a general ledger, or a multi-location stock balance. Physical counts, costs, and movements still need reconciliation; batches, expiry tracking, reservations, and multiple warehouses are not modeled.
 
-## External performance research
+## Advice and outside context
 
-The Insights workspace can connect a business's Brave Search API key. Once configured, Ferlance automatically evaluates the selected report period and searches when it detects a period-over-period business revenue decline or a product loss. It refreshes research when the selected dataset or date filter changes; users can also request a fresh search. Queries include the product label, market (Ghana), report dates, and terms relating to seasonality, weather, environmental conditions, festivals, holidays, and market conditions. They do not include transaction rows, amounts, or customer information.
+The Insights page ranks plain-language suggestions calculated from the business's own records (see ARCHITECTURE, *Advice*). Reasons are labelled *likely* when the records show them directly (for example, fewer units sold) and *possible* when they are context (a Ghanaian holiday or season, the same pattern last year, an item now out of stock). Inventory is matched to sales by exact product name only, and the item says so.
 
-Configure a persistent `FERLANCE_SECRET_KEY` of at least 32 characters before saving a provider credential. Ferlance encrypts the key in its business-scoped integration table and does not return it to the browser. Rotating the application secret invalidates saved encrypted credentials, which must then be entered again. Brave Search requires a valid API key and internet access; provider usage may incur charges.
-
-Retrieved pages are shown as linked sources. If an LLM provider is available, Ask Lance gives a contextual assessment with source citations; if it is unavailable, the sources are still shown with an explicit analysis error. External information is a research lead only: the search does not prove why a business result changed, may be outdated or irrelevant, and should be checked against internal records. The report can include the findings and source links that are currently loaded for its selected dataset and date filter.
+When an AI provider is configured, tapping a suggestion asks for an explanation. Only that suggestion's figures, reasons and actions are sent, with product names; never customer names or raw rows. Free news headlines from the GDELT index may be added for declines and losses; they are unverified leads, not causes. Brave Search and SerpAPI are no longer used, and any stored Brave keys are deleted on upgrade.
 
 ## Dated financial-position balances
 

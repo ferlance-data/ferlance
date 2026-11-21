@@ -1,0 +1,266 @@
+/* Advice cards and the detail sheet. Semantic tokens only (see base.css). */
+
+.advice-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.advice-card {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 12px;
+  align-items: start;
+  width: 100%;
+  min-height: 44px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+
+.advice-card:hover {
+  background: var(--surface-muted);
+}
+
+.advice-card:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.advice-risk {
+  border-left-color: var(--error-foreground);
+}
+
+.advice-attention {
+  border-left-color: var(--warning-foreground);
+}
+
+.advice-opportunity {
+  border-left-color: var(--success-foreground);
+}
+
+.advice-info {
+  border-left-color: var(--info-foreground);
+}
+
+.advice-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-pill);
+  background: var(--muted);
+  color: var(--subtle-foreground);
+}
+
+.advice-risk .advice-icon {
+  background: var(--error-background);
+  color: var(--error-foreground);
+}
+
+.advice-attention .advice-icon {
+  background: var(--warning-background);
+  color: var(--warning-foreground);
+}
+
+.advice-opportunity .advice-icon {
+  background: var(--success-background);
+  color: var(--success-foreground);
+}
+
+.advice-info .advice-icon {
+  background: var(--info-background);
+  color: var(--info-foreground);
+}
+
+.advice-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.advice-text {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.advice-title {
+  font-size: var(--text-base);
+  font-weight: 500;
+}
+
+.advice-summary {
+  font-size: var(--text-sm);
+}
+
+.advice-next {
+  font-size: var(--text-sm);
+  color: var(--subtle-foreground);
+}
+
+.advice-chevron {
+  align-self: center;
+  color: var(--muted-foreground);
+}
+
+.advice-chevron svg {
+  width: 16px;
+  height: 16px;
+}
+
+.advice-missing {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 34px;
+  font-size: var(--text-sm);
+}
+
+/* Detail sheet: a bottom sheet on phones, a side panel on wider screens. */
+.advice-sheet {
+  width: 100%;
+  max-width: 560px;
+  max-height: 88vh;
+  margin: auto auto 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  background: var(--surface);
+  color: var(--foreground);
+  box-shadow: var(--shadow-lg);
+}
+
+.advice-sheet::backdrop {
+  background: #0000007a;
+}
+
+@media (min-width: 768px) {
+  .advice-sheet {
+    height: 100vh;
+    max-height: 100vh;
+    margin: 0 0 0 auto;
+    border-radius: var(--radius-xl) 0 0 var(--radius-xl);
+  }
+}
+
+.advice-sheet-body {
+  display: grid;
+  gap: 20px;
+  padding: 20px 20px 28px;
+}
+
+.advice-sheet-head {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.advice-sheet-head > div {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+}
+
+.advice-sheet-head h2 {
+  font-size: var(--text-xl);
+}
+
+.advice-sheet h3 {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 10px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--subtle-foreground);
+}
+
+.advice-evidence {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+  margin: 0 0 8px;
+}
+
+.advice-evidence > div {
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--surface-muted);
+}
+
+.advice-evidence dt {
+  font-size: var(--text-xs);
+  color: var(--muted-foreground);
+}
+
+.advice-evidence dd {
+  margin: 2px 0 0;
+  font-size: var(--text-base);
+  font-weight: 500;
+}
+
+.advice-reasons {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+}
+
+.advice-reasons li {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.advice-people {
+  color: var(--subtle-foreground);
+}
+
+.advice-actions {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 20px;
+  font-size: var(--text-sm);
+}
+
+.advice-ai-section {
+  padding: 16px;
+  border: 1px solid var(--ai-border);
+  border-radius: var(--radius-lg);
+  background: var(--ai-background);
+}
+
+.advice-ai-section h3 {
+  color: var(--ai-foreground);
+}
+
+.advice-ai {
+  display: grid;
+  gap: 12px;
+  font-size: var(--text-sm);
+}
+
+.advice-news h4 {
+  margin-bottom: 6px;
+  font-size: var(--text-sm);
+}
+
+.advice-news ul {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 6px;
+  padding-left: 18px;
+}

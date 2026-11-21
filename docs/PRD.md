@@ -39,13 +39,14 @@ Ferlance follows [Semantic Versioning 2.0.0](https://semver.org/). The version l
 | 1.0.0 | React migration (parity) | done |
 | 1.0.x | Migration follow-ups (§5.0) | F0 |
 | 1.1.0 | Design system and interface refinement | #7 |
-| 1.2.0 | Analytics visuals | #6 |
-| 1.3.0 | Onboarding and team access, admin console | #4, #5 |
-| 1.4.0 | OCR inventory capture | #1 |
-| 1.5.0 | Inventory↔product sync | #2 |
-| 1.6.0 | Retrieval improvements for Ask Lance | #8 |
-| 1.7.0 | Data export to AWS | #3 |
-| 1.8.0 | Expo mobile app (internal testing) and shared API types | #9 |
+| 1.2.0 | Insights that say what to do; free outside context (owner request, 2026-11-22) | A1 |
+| 1.3.0 | Analytics visuals | #6 |
+| 1.4.0 | Onboarding and team access, admin console | #4, #5 |
+| 1.5.0 | OCR inventory capture | #1 |
+| 1.6.0 | Inventory↔product sync | #2 |
+| 1.7.0 | Retrieval improvements for Ask Lance | #8 |
+| 1.8.0 | Data export to AWS | #3 |
+| 1.9.0 | Expo mobile app (internal testing) and shared API types | #9 |
 
 The order follows the agreed handoff plan. #6 builds on the #7 tokens. #2 reuses the #1 review flow. #3 and #9 carry the most external cost and credentials, so they come last.
 
@@ -74,7 +75,20 @@ Credentials (AWS, OCR provider, Expo/EAS) are requested only at the step that ne
 | F0.1 | Shrink the workspace first load, about 100 KB gzip today against 29 KB before the migration | Done in v1.0.1. The measured breakdown of the shell's minified JS was react-dom 65%, react-router 12%, TanStack Query 10% and app code 9%. React alone is about 60 KB gzip, so the original 60 KB target cannot be met on React. The budget is now **first-visit JS+CSS for `/app/overview` at 110 KB gzip or less on the wire**: v1.0.1 measures 108 KB, against about 383 KB before, because the server sent everything uncompressed. App-only releases should re-download 15 KB gzip or less (the vendor chunk is cached separately). Going further needs Preact (an owner decision, §8). |
 | F0.2 | Stop the old date window flashing after a file switch with a preset range (`useScopedQuery`) | Done in v1.0.1. Each dataset stores its record date span, so presets resolve before the first request. |
 | F0.3 | Product name sort can go Z→A (`nextSort`) | Done in v1.0.1 |
-| F0.4 | Exercise a real AI provider and a real Brave research run once | A recorded run with the owner's keys. Credentials are requested at this step. |
+| F0.4 | Exercise a real AI provider once (Brave was removed; outside context is free) | A recorded run with the owner's AI key. Requested at this step. |
+
+### 5.0a A1: Insights that say what to do (v1.2.0)
+
+**Owner request:** go beyond "which product sells best". Tell owners what to sell more of, what to watch, what is doing badly and *why*, with suggestions. The AI answer should appear only when the owner taps for details. Drop Brave, because there is no key, and use free search.
+
+| ID | Requirement | Acceptance |
+| --- | --- | --- |
+| A1.1 | Deterministic suggestions ranked by money at stake: sell more, decline, stopped, loss, margin squeeze, restock, slow stock, product or customer concentration, busiest day | Works with no AI key. A change needs at least 3 earlier sales before it is reported. Each signal degrades cleanly when cost, quantity, customer or a year of history is missing, and names what is missing. |
+| A1.2 | Reasons with evidence and a confidence label; actions that are concrete | *Likely* means shown by the records; *possible* means context (calendar, seasonality, stock now). Every action names a product, quantity or price where one is known. |
+| A1.3 | Tap for details. The AI explanation loads only then. | The server rebuilds the item, with nothing taken from the client. No customer names go into the prompt. Answers are cached per evidence. Rendering is safe (no HTML). |
+| A1.4 | Free outside context only | A Ghana calendar plus keyless GDELT news. Lookups are bounded (wait 1 s or less, timeout 4 s) and never block the answer. Brave and SerpAPI are removed, and stored Brave keys are deleted. |
+
+**Not yet done:** inventory matching uses exact names until #2 adds product mapping. The calendar must be reviewed each year.
 
 ### 5.1 #7: Design system and interface refinement (v1.1.0)
 

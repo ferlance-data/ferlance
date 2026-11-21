@@ -17,8 +17,8 @@ from .config import (
     OPENROUTER_MODELS,
     OPENROUTER_TIMEOUT_SECONDS,
     OPENROUTER_URL,
-    SERPAPI_KEY,
 )
+from . import news_context
 
 logger = logging.getLogger(__name__)
 
@@ -28,30 +28,25 @@ MAX_LIST_ITEMS = 15
 MAX_HISTORY_MESSAGES = 6
 MAX_HISTORY_CHARS = 1500
 
-# Search limits.
-SERPAPI_URL = "https://serpapi.com/search"
-SEARCH_TIMEOUT = httpx.Timeout(connect=20.0, read=40.0, write=20.0, pool=20.0)
-SEARCH_ATTEMPTS = 2
+# Tool limits.
 MAX_TOOL_ROUNDS = 2
-MAX_SEARCH_RESULTS = 3
-MAX_RESULT_CHARS = 400
 MAX_QUERY_CHARS = 200
 
-SEARCH_TOOL = {
+NEWS_TOOL = {
     "type": "function",
     "function": {
-        "name": "web_search",
+        "name": "news_search",
         "description": (
-            "Search the web for market research that supports a business decision: "
-            "product value, competitor pricing, or typical market prices. "
-            "Do not use it for anything else."
+            "Search recent Ghanaian news (free GDELT index) for context on a product, supply, prices or events: "
+            "for example a shortage, a price rise, a festival or the weather. Results are headlines only. "
+            "Use it only when outside context would change the advice."
         ),
         "parameters": {
             "type": "object",
             "properties": {
                 "query": {
                     "type": "string",
-                    "description": "A short, specific search query, for example 'bulk rice 25kg wholesale price Accra'.",
+                    "description": "Two to five keywords, for example 'rice prices' or 'cooking oil shortage'.",
                 }
             },
             "required": ["query"],
@@ -78,21 +73,14 @@ def _snapshot(analytics: dict[str, Any]) -> str:
 
 
 def _messages(question: str, analytics: dict[str, Any], history: list[dict[str, str]] | None) -> list[dict[str, Any]]:
-    search_rule = (
-        "You may call the web_search tool, but only for market research on products, product value, "
-        "and competitor pricing. Use it only when the question requires external market data. "
-        "Treat the business snapshot as the business's own data and web results as external data. "
-        "State the source (site name or URL) for every external figure, and never present an external "
-        "figure as if it came from the business's own metrics.\n\n"
-        if SERPAPI_KEY
-        else ""
-    )
     prompt = (
-        "You are Lance, a careful business analyst for an SME. Answer the user's question using only the supplied metrics"
-        + (" and any web search results you retrieve. " if SERPAPI_KEY else ". ")
-        + "Never invent values, causes, or recommendations unsupported by the data. Explain comparisons and rankings plainly. "
-        "If a metric is unavailable, say so and explain what data is missing. Keep the answer concise and actionable.\n\n"
-        f"{search_rule}"
+        "You are Lance, a careful business analyst for an SME in Ghana. Answer the user's question using only the supplied "
+        "metrics and any news headlines you retrieve. Never invent values, causes, or recommendations unsupported by the data. "
+        "Explain comparisons and rankings plainly. If a metric is unavailable, say so and explain what data is missing. "
+        "Keep the answer concise and actionable.\n\n"
+        "You may call the news_search tool for outside context (shortages, price rises, festivals, weather). Treat the "
+        "business snapshot as the business's own data and news as external leads: name the source of any headline you use, "
+        "and never present it as proof or as the business's own figures.\n\n"
         f"Structured business snapshot (JSON, long lists are shortened):\n{_snapshot(analytics)}"
     )
     trimmed_history = [
@@ -114,53 +102,10 @@ def _failure(response: httpx.Response) -> str:
     return str(message or f"HTTP {response.status_code}")
 
 
-def _search(query: str) -> str:
-    """Run one SerpAPI Google search and return a short plain-text digest for the model."""
-    logger.info("Lance web search: %r", query)
-    if not SERPAPI_KEY:
-        return "Search is unavailable because no search API key is configured."
+def _news(query: str) -> str:
+    logger.info("Lance news search: %r", query)
+    return news_context.digest(news_context.search(query[:MAX_QUERY_CHARS]))
 
-    body: dict[str, Any] = {}
-    for attempt in range(1, SEARCH_ATTEMPTS + 1):
-        try:
-            response = httpx.get(
-                SERPAPI_URL,
-                params={
-                    "engine": "google",
-                    "q": query[:MAX_QUERY_CHARS],
-                    "api_key": SERPAPI_KEY,
-                    "num": MAX_SEARCH_RESULTS,
-                    "gl": "gh",
-                    "hl": "en",
-                },
-                timeout=SEARCH_TIMEOUT,
-            )
-            response.raise_for_status()
-            body = response.json()
-            break
-        except httpx.TimeoutException:
-            logger.warning("Lance web search: %s", f"timeout on attempt {attempt}/{SEARCH_ATTEMPTS}")
-            if attempt == SEARCH_ATTEMPTS:
-                return "Search timed out. Answer without external data and say so."
-        except httpx.HTTPStatusError as error:
-            logger.warning("Lance web search: %s", f"HTTP {error.response.status_code}: {error.response.text[:300]}")
-            return f"Search failed (HTTP {error.response.status_code}). Answer without external data and say so."
-        except (httpx.HTTPError, ValueError) as error:
-            logger.warning("Lance web search: %s", f"{type(error).__name__}")
-            return f"Search failed ({type(error).__name__}). Answer without external data and say so."
-
-    if body.get("error"):
-        logger.warning("Lance web search: %s", f"SerpAPI error: {body['error']}")
-        return f"Search failed: {body['error']}. Answer without external data and say so."
-
-    lines: list[str] = []
-    for item in body.get("shopping_results", [])[:MAX_SEARCH_RESULTS]:
-        lines.append(f"- {item.get('title', '')} | {item.get('price', 'price n/a')} | {item.get('source', '')}")
-    for item in body.get("organic_results", [])[:MAX_SEARCH_RESULTS]:
-        lines.append(
-            f"- {item.get('title', '')} ({item.get('link', '')}): {str(item.get('snippet', ''))[:MAX_RESULT_CHARS]}"
-        )
-    return "\n".join(lines) if lines else "The search returned no results."
 
 def _chat(
     url: str,
@@ -198,14 +143,15 @@ def _complete(
     model: str,
     messages: list[dict[str, Any]],
     timeout: float,
+    use_tools: bool = True,
 ) -> str:
     """Run the model, executing any requested searches, until a final text answer is produced."""
     conversation = list(messages)
-    tools_enabled = bool(SERPAPI_KEY)
+    tools_enabled = use_tools
 
     for round_number in range(MAX_TOOL_ROUNDS + 1):
         # The last round never offers tools, which forces a final text answer.
-        tools = [SEARCH_TOOL] if tools_enabled and round_number < MAX_TOOL_ROUNDS else None
+        tools = [NEWS_TOOL] if tools_enabled and round_number < MAX_TOOL_ROUNDS else None
         try:
             message = _chat(url, headers, model, conversation, timeout, tools)
         except httpx.HTTPStatusError as error:
@@ -227,27 +173,41 @@ def _complete(
         )
         for call in calls:
             function = call.get("function", {})
-            if function.get("name") != "web_search":
+            if function.get("name") != "news_search":
                 result = "Unknown tool."
             else:
                 try:
                     query = str(json.loads(function.get("arguments") or "{}").get("query", "")).strip()
                 except (ValueError, AttributeError):
                     query = ""
-                result = _search(query) if query else "No query was provided."
+                result = _news(query) if query else "No query was provided."
             conversation.append({"role": "tool", "tool_call_id": call.get("id", ""), "content": result})
 
     raise ValueError("The model did not produce a final answer.")
 
 
+def ai_available() -> bool:
+    return bool(OPENROUTER_KEY or GROQ_API_KEY or AGENTROUTER_API_KEY)
+
+
 def ask_lance(question: str, analytics: dict[str, Any], history: list[dict[str, str]] | None = None) -> str:
-    """Try OpenRouter models first, fallback to Groq, then AgentRouter, stopping early on authentication failures."""
-    if not (OPENROUTER_KEY or GROQ_API_KEY or AGENTROUTER_API_KEY):
+    if not ai_available():
         raise RuntimeError(
             "Ask Lance is not set up on this server yet: add an OpenRouter or Groq API key to the environment. "
             "Instant answers still work without one."
         )
-    messages = _messages(question, analytics, history)
+    return _generate(_messages(question, analytics, history), use_tools=True)
+
+
+def explain(system: str, user: str) -> str:
+    """One-shot explanation without tools (the caller supplies any outside context)."""
+    if not ai_available():
+        raise RuntimeError("AI explanations are not set up on this server: add an OpenRouter or Groq API key.")
+    return _generate([{"role": "system", "content": system}, {"role": "user", "content": user}], use_tools=False)
+
+
+def _generate(messages: list[dict[str, Any]], use_tools: bool) -> str:
+    """Try OpenRouter models first, fallback to Groq, then AgentRouter, stopping early on authentication failures."""
     errors: list[str] = []
 
     if OPENROUTER_KEY:
@@ -257,7 +217,7 @@ def ask_lance(question: str, analytics: dict[str, Any], history: list[dict[str, 
         }
         for model in OPENROUTER_MODELS:
             try:
-                return _complete(OPENROUTER_URL, headers, model, messages, OPENROUTER_TIMEOUT_SECONDS)
+                return _complete(OPENROUTER_URL, headers, model, messages, OPENROUTER_TIMEOUT_SECONDS, use_tools)
             except httpx.HTTPStatusError as error:
                 errors.append(f"OpenRouter {model}: {_failure(error.response)}")
                 if error.response.status_code in (401, 403):
@@ -278,6 +238,7 @@ def ask_lance(question: str, analytics: dict[str, Any], history: list[dict[str, 
                 GROQ_MODEL,
                 messages,
                 GROQ_TIMEOUT_SECONDS,
+                use_tools,
             )
         except httpx.HTTPStatusError as error:
             errors.append(f"Groq {GROQ_MODEL}: {_failure(error.response)}")
@@ -293,7 +254,7 @@ def ask_lance(question: str, analytics: dict[str, Any], history: list[dict[str, 
         }
         for model in AGENTROUTER_MODELS:
             try:
-                return _complete(AGENTROUTER_URL, headers, model, messages, OPENROUTER_TIMEOUT_SECONDS)
+                return _complete(AGENTROUTER_URL, headers, model, messages, OPENROUTER_TIMEOUT_SECONDS, use_tools)
             except httpx.HTTPStatusError as error:
                 errors.append(f"AgentRouter {model}: {_failure(error.response)}")
                 if error.response.status_code in (401, 403):
@@ -304,4 +265,4 @@ def ask_lance(question: str, analytics: dict[str, Any], history: list[dict[str, 
                 logger.exception("Unexpected Lance provider failure")
                 errors.append(f"AgentRouter {model}: unexpected error")
 
-    raise RuntimeError("Lance could not get a response from any provider. " + " | ".join(errors))
+    raise RuntimeError("Could not get a response from any AI provider. " + " | ".join(errors))

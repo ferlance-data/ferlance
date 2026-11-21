@@ -13,7 +13,7 @@ For how the system fits together, the product benchmarks behind the redesign, an
 - **Overview** — revenue, profit after recorded costs, sales and average sale, each compared with the previous period of the same length; revenue-and-cost trend by day, week, month, quarter or year; a "Needs attention" list (losses, declines, low stock, duplicate files, rejected rows); top products and customers; a setup guide driven by real workspace state.
 - **One scope everywhere** — every analytical page reads the same scope bar: all included files or a single file, plus a date range (presets anchor to the latest record, so historical uploads still work).
 - **Products** — every product or service ranked by revenue, cost, profit, margin, ROI, units and records, with search and profitable/loss-making filters.
-- **Insights** — deterministic findings with their supporting numbers, a period comparison, and optional Brave web research on declines and losses (product names and dates only are sent; results are cited leads, not proof).
+- **Insights** — "What to do now": ranked, plain-language suggestions from your own records (what to sell more of, what is declining or losing money, what to restock, money tied up in slow stock), each with its evidence, likely reasons and actions; tap one for an AI explanation with free Ghanaian news context when AI is configured. Plus deterministic findings and a period comparison.
 - **Ask Lance** — saved, grounded conversations over every included file (SQLite FTS5 retrieval + OpenRouter/Groq), plus six instant answers calculated without any AI.
 - **Inventory** — catalogue with SKU, unit cost and reorder levels; an auditable stock ledger (purchases, sales, adjustments) that cannot go negative; stocktake CSV imports. Sales files never change stock.
 - **Financial position** — dated balances rolled into a point-in-time statement with completeness and stale-balance checks.
@@ -46,9 +46,9 @@ Open http://127.0.0.1:5173/app. Set `FERLANCE_API` to proxy to a different backe
 
 Copy `.env.example` to `.env` to configure secrets and the optional AI and search providers. Set a strong `FERLANCE_SECRET_KEY` (32+ characters) for anything beyond local development. Data is stored under `data/` (SQLite, raw uploads, processed JSONL) — set `FERLANCE_DATA_DIR` to move it. That directory is local runtime state and is not tracked in git.
 
-## Market research
+## Advice and AI explanations
 
-Settings → Web research accepts a business-owned Brave Search API key, encrypted with a key derived from `FERLANCE_SECRET_KEY` (rotating the secret makes stored keys unreadable; reconnect afterwards). On the Insights page, "Research this period" looks for period-over-period declines and recorded item losses and searches for Ghanaian seasonal, weather, festive and market context. Only product labels, dates and the market are sent — never amounts or customers. When an AI provider is configured, Lance assesses the snippets with citations; results remain contextual leads, not causes.
+Suggestions on the Insights page are calculated without AI. With an AI key configured (`OPENROUTER_KEY`, `GROQ_API_KEY` or `AGENTROUTER_API_KEY`), tapping a suggestion adds Lance's explanation, cached per suggestion. Outside context comes from free sources only: a built-in Ghana holiday and season calendar, and keyless GDELT news headlines (best effort). No search API key is needed.
 
 ## Project layout
 
@@ -57,11 +57,12 @@ backend/
   main.py               app wiring: routers, built frontend, lifespan, cache headers
   deps.py               auth, tenancy, date range and data-scope dependencies
   dataset_store.py      import persistence and scope rules
-  routers/              auth, admin, datasets, analytics, inventory, financial_position, integrations, lance
+  routers/              auth, admin, datasets, analytics, inventory, financial_position, lance
   processor.py, universal_ingestion.py, sms_parser.py   ingestion
   analytics.py, insights.py                             deterministic metrics
   inventory.py, financial_position.py                   operational ledgers
-  llm.py, rag.py, market_research.py                    optional AI and web context
+  advisor.py, ghana_calendar.py                         plain-language advice
+  llm.py, rag.py, news_context.py                       optional AI and free news context
 frontend/                React 19 + TypeScript + Vite
   index.html            landing page (static markup) + src/landing/main.ts
   app/index.html        workspace entry -> src/app/main.tsx

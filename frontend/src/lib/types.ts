@@ -144,6 +144,63 @@ export interface Insight {
   limitations?: string[];
 }
 
+export type AdviceSeverity = 'risk' | 'attention' | 'opportunity' | 'info';
+
+export interface AdviceEvidence {
+  label: string;
+  value: number | string;
+  format: 'money' | 'percent' | 'number' | 'text';
+}
+
+export interface AdviceReason {
+  text: string;
+  confidence: 'likely' | 'possible';
+  basis: string;
+  /** Customer names behind a "regular buyers stopped" reason. Shown to the owner only. */
+  people?: string[];
+}
+
+export interface AdviceItem {
+  id: string;
+  kind: string;
+  severity: AdviceSeverity;
+  title: string;
+  summary: string;
+  product: string | null;
+  impact: number;
+  evidence: AdviceEvidence[];
+  reasons: AdviceReason[];
+  actions: string[];
+}
+
+export interface Advice {
+  items: AdviceItem[];
+  /** Ids of the most important items, in order. */
+  top: string[];
+  /** What data would unlock more suggestions. */
+  missing: string[];
+  currency?: string;
+  period: Period | null;
+  comparison_period: Period | null;
+  calendar?: { window: 'previous' | 'current'; name: string; note: string }[];
+  ai_available: boolean;
+}
+
+export interface NewsItem {
+  title: string;
+  url: string;
+  source: string;
+  date: string;
+}
+
+export interface AdviceExplanation {
+  id: string;
+  explanation: string;
+  news: NewsItem[];
+  cached: boolean;
+  created_at: string;
+}
+
 export interface InsightsResponse {
   period: Period;
   comparison_period?: Period;
@@ -152,6 +209,7 @@ export interface InsightsResponse {
   insights: Insight[];
   warnings: string[];
   dataset: Dataset | null;
+  advice?: Advice;
 }
 
 export interface InventoryItem {

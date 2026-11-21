@@ -57,7 +57,7 @@ Each feature gets its own `feat/*` branch off `main`. Planned order:
 ## Known follow-ups from the migration (all listed in PR #12)
 - ~~First-load size, the stale date window after a file switch, and the Product name Z→A sort~~ were fixed in v1.0.1 (PRD F0.1–F0.3). Going below about 108 KB on the wire needs Preact, which is the owner's decision (PRD §8).
 - ~~Open PRs #10 and #11 need rebasing.~~ That note was stale: both were merged before #12, and the folder-import feature from #11 survived the migration (`backend/routers/datasets.py`, `frontend/src/app/views/Data.tsx`).
-- A real AI provider and a real Brave research run were never exercised. Only a mock LLM was used.
+- A real AI provider was never exercised; only a mock LLM was used. Brave was removed (owner has no key): outside context is now the Ghana calendar plus free GDELT news.
 
 ## Verification tooling (`tools/verify/`)
 These are dev-only scripts. They need Playwright: `npm i playwright pngjs pixelmatch` in a scratch dir, then `npx playwright install chromium`.

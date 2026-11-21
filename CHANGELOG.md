@@ -6,6 +6,33 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-22
+
+Insights that say what to do. Free outside context replaces paid search.
+
+### Added
+- **What to do now:** ranked, plain-language suggestions on Insights (all of them) and Overview (top 3), calculated from the business's own records without AI:
+  - which product to sell more of
+  - products selling less, or no longer selling
+  - products losing money, with the price that would break even
+  - margins being squeezed, with the price that restores the old margin
+  - stock about to run out, with how much to order (matched to inventory by exact name)
+  - money tied up in slow stock
+  - dependence on one product or one customer
+  - the busiest day of the week
+- Each suggestion explains **why it may be happening**, labelled *likely* or *possible*: price vs volume, fewer vs smaller sales, regular buyers who stopped (named for the owner only), out of stock, the same pattern last year, or Ghanaian holidays and seasons. It also lists **what to do**.
+- **Tap for details:** a sheet shows the numbers, reasons and actions. When an AI key is configured, it also shows Lance's short explanation, cached so repeat taps are free.
+- A Ghana calendar (`ghana_calendar.py`) of statutory holidays, Easter, Eid and Ramadan (approximate), the festive season, back-to-school periods and weather seasons.
+- Free, keyless news context from the GDELT index (`news_context.py`). It is used for explanations and by Ask Lance, rate-limited and best effort.
+- "Get sharper suggestions" lists the missing columns (cost, quantity, customer, history) that would unlock more advice.
+
+### Changed
+- Ask Lance's search tool is now `news_search` (free GDELT headlines). It replaces the paid SerpAPI web search.
+
+### Removed
+- Brave Search web research: the Settings card, `/integrations/brave-search`, `/performance-research`, and stored Brave keys, which are deleted on upgrade.
+- The `SERPAPI_KEY` setting.
+
 ## [1.0.1] - 2026-11-22
 
 Migration follow-ups (PRD F0.1–F0.3). A first visit to the workspace now downloads about 108 KB instead of about 383 KB.
@@ -51,6 +78,7 @@ The first versioned release. The frontend was migrated to React 19, TypeScript (
 - The old date window briefly renders after a file switch with a preset range.
 - The Product name column never sorts Z→A. This was kept for parity.
 
-[Unreleased]: https://github.com/ferlance-data/ferlance/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/ferlance-data/ferlance/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/ferlance-data/ferlance/compare/v1.0.1...v1.2.0
 [1.0.1]: https://github.com/ferlance-data/ferlance/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/ferlance-data/ferlance/releases/tag/v1.0.0

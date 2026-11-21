@@ -53,8 +53,6 @@ AGENTROUTER_API_KEY = os.getenv("AGENTROUTER_API_KEY", "")
 AGENTROUTER_URL = os.getenv("AGENTROUTER_URL", "https://agentrouter.org/v1/chat/completions")
 AGENTROUTER_MODELS = _csv(os.getenv("AGENTROUTER_MODELS", ""))
 
-# Optional web search tool that Lance may call for market prices.
-SERPAPI_KEY = os.getenv("SERPAPI_KEY", "")
 
 
 def ensure_storage() -> None:
