@@ -42,6 +42,58 @@
   --levender-600: #594b7f;
   --levender-800: #3d3260;
 
+  /* Extended palette: tints, alpha steps and print greys (values unchanged from the literals they replaced). */
+  --white: #fff;
+  --black: #000;
+  --white-a06: #ffffff0f;
+  --white-a08: #ffffff14;
+  --white-a09: #ffffff17;
+  --white-a10: #ffffff1a;
+  --white-a12: #ffffff1f;
+  --white-a18: #ffffff2e;
+  --white-a55: #ffffff8c;
+  --black-a20: #0003;
+  --ink-950-a40: #0a151466;
+  --ink-950-a50: #0a151480;
+  --ink-950-a60: #0a151499;
+  --ink-950-a70: #0a1514b3;
+  --ink-950-a80: #0a1514cc;
+  --ink-950-a90: #0a1514e6;
+  --ink-950-a95: #0a1514f2;
+  --ink-830: #1b2420;
+  --ink-825: #1c2724;
+  --fog-50: #f2f4f3;
+  --fog-100: #e6ebe9;
+  --fog-150: #dfe5e3;
+  --fog-200: #d9dfdd;
+  --fog-300: #c9d1cf;
+  --fog-400: #b9c3c1;
+  --fog-500: #95a19f;
+  --fog-550: #8b9795;
+  --fog-600: #7f8b89;
+  --fog-700: #6d7a78;
+  --fog-900: #3d4a46;
+  --mint-150: #a4f5d6;
+  --mint-glow-a08: #7af0c214;
+  --mint-glow-a10: #7af0c21a;
+  --mint-glow-a40: #7af0c266;
+  --mint-875: #1d4a3a;
+  --mint-900: #1f4a3f;
+  --mint-950: #12302a;
+  --amber-300: #f3c77a;
+  --amber-300-a25: #f3c77a40;
+  --amber-600-a12: #c98a4a1f;
+  --amber-850: #4a3d18;
+  --amber-900: #4a3818;
+  --amber-950: #2b2112;
+  --red-300: #ff9c9f;
+  --red-900: #4f2427;
+  --red-950: #2d1517;
+  --stone-800: #33302a;
+  --print-ink: #111;
+  --print-muted: #555;
+  --print-rule: #ddd;
+
   /* Semantic (light workspace) */
   --background: #ffffff;
   --foreground: var(--neutral-900);
@@ -101,12 +153,71 @@
   --radius-xl: 18px;
   --radius-pill: 9999px;
   --gutter: clamp(16px, 3vw, 28px);
+
+  /* Spacing scale (4 px base, with the half steps the layout already uses). */
+  --space-0-5: 2px;
+  --space-1: 4px;
+  --space-1-5: 6px;
+  --space-2: 8px;
+  --space-2-5: 10px;
+  --space-3: 12px;
+  --space-3-5: 14px;
+  --space-4: 16px;
+  --space-4-5: 18px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-9: 36px;
+
+  /* Motion. Everything collapses to ~0 under prefers-reduced-motion (see the end of this file). */
+  --duration-fast: 0.15s;
+  --duration-base: 0.25s;
+  --duration-slow: 0.3s;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Elevation: shadows (above) plus stacking order. */
+  --z-nav: 50;
+  --z-toast: 80;
+
+  /* Component tier: the only place component dimensions and states are tuned.
+     Values reference the semantic tier, so both themes follow automatically. */
+  --button-height: 34px;
+  --button-height-sm: 28px;
+  --button-height-lg: 44px;
+  --button-padding-x: var(--space-3-5);
+  --button-padding-x-sm: var(--space-2-5);
+  --button-padding-x-lg: 26px;
+  --button-gap: var(--space-1-5);
+  --button-radius: var(--radius-pill);
+  --button-transition: background-color var(--duration-fast), border-color var(--duration-fast), color var(--duration-fast), opacity var(--duration-fast);
+  --input-height: 36px;
+  --input-padding: 7px 11px;
+  --input-radius: 8px;
+  --input-focus-ring: 0 0 0 3px color-mix(in srgb, var(--ring) 22%, transparent);
+  --pill-height: 22px;
+  --pill-padding-x: 9px;
+  --card-radius: var(--radius-lg);
+  --card-shadow: var(--shadow-xs);
+  --card-padding-x: var(--space-4-5);
+  --card-padding-y: var(--space-4);
+  --table-head-padding: 9px var(--space-3);
+  --table-cell-padding: var(--space-2-5) var(--space-3);
+  --table-row-hover: color-mix(in srgb, var(--muted) 55%, transparent);
+  --dialog-width: 440px;
+  --dialog-radius: var(--radius-xl);
+  --dialog-backdrop: var(--ink-950-a70);
+  --toast-radius: var(--radius-lg);
+  --toast-padding: var(--space-3) var(--space-3-5);
+  --nav-item-height: 34px;
+  --nav-item-radius: 8px;
+  --nav-item-padding-x: var(--space-2-5);
+  --nav-item-hover: color-mix(in srgb, var(--foreground) 5%, transparent);
   color-scheme: light;
 }
 
 :root[data-theme="dark"] {
   --background: var(--ink-950);
-  --foreground: #f2f4f3;
+  --foreground: var(--fog-50);
   --surface: var(--ink-850);
   --surface-muted: var(--ink-900);
   --sidebar: var(--ink-900);
@@ -114,24 +225,24 @@
   --border-strong: var(--ink-500);
   --input: var(--ink-500);
   --muted: var(--ink-800);
-  --muted-foreground: #95a19f;
-  --subtle-foreground: #b9c3c1;
+  --muted-foreground: var(--fog-500);
+  --subtle-foreground: var(--fog-400);
   --primary: var(--mint-glow);
   --primary-foreground: var(--ink-950);
   --cta: var(--mint-glow);
   --cta-hover: var(--mint-300);
   --ai-foreground: var(--mint-300);
-  --ai-background: #12302a;
-  --ai-border: #1f4a3f;
+  --ai-background: var(--mint-950);
+  --ai-border: var(--mint-900);
   --success-foreground: #7ee2a8;
   --success-background: #10291d;
   --success-border: #1d4630;
-  --warning-foreground: #f3c77a;
-  --warning-background: #2b2112;
-  --warning-border: #4a3818;
-  --error-foreground: #ff9c9f;
-  --error-background: #2d1517;
-  --error-border: #4f2427;
+  --warning-foreground: var(--amber-300);
+  --warning-background: var(--amber-950);
+  --warning-border: var(--amber-900);
+  --error-foreground: var(--red-300);
+  --error-background: var(--red-950);
+  --error-border: var(--red-900);
   --info-foreground: #c9bdf0;
   --info-background: #1e1a2e;
   --info-border: #362e52;
@@ -245,11 +356,11 @@ textarea {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  height: 34px;
-  padding: 0 14px;
+  gap: var(--button-gap);
+  height: var(--button-height);
+  padding: 0 var(--button-padding-x);
   border: 1px solid transparent;
-  border-radius: var(--radius-pill);
+  border-radius: var(--button-radius);
   background: transparent;
   font-size: var(--text-sm);
   font-weight: 500;
@@ -257,7 +368,7 @@ textarea {
   white-space: nowrap;
   text-decoration: none;
   cursor: pointer;
-  transition: background-color 0.15s, border-color 0.15s, color 0.15s, opacity 0.15s;
+  transition: var(--button-transition);
 }
 
 .btn svg {
@@ -312,39 +423,39 @@ textarea {
 }
 
 .btn-mint:not(:disabled):hover {
-  background: #a4f5d6;
+  background: var(--mint-150);
 }
 
 .btn-outline-dark {
-  border-color: #ffffff2e;
-  background: #0a151480;
-  color: #fff;
+  border-color: var(--white-a18);
+  background: var(--ink-950-a50);
+  color: var(--white);
   backdrop-filter: blur(8px);
 }
 
 .btn-outline-dark:hover {
-  background: #ffffff14;
+  background: var(--white-a08);
 }
 
 .btn-sm {
-  height: 28px;
-  padding: 0 10px;
+  height: var(--button-height-sm);
+  padding: 0 var(--button-padding-x-sm);
   font-size: var(--text-xs);
 }
 
 .btn-lg {
-  height: 44px;
-  padding: 0 26px;
+  height: var(--button-height-lg);
+  padding: 0 var(--button-padding-x-lg);
   font-size: 0.875rem;
 }
 
 .btn-icon {
-  width: 34px;
+  width: var(--button-height);
   padding: 0;
 }
 
 .btn-sm.btn-icon {
-  width: 28px;
+  width: var(--button-height-sm);
 }
 
 /* ---------- Forms ---------- */
@@ -365,14 +476,14 @@ textarea {
 .select,
 .textarea {
   width: 100%;
-  min-height: 36px;
-  padding: 7px 11px;
+  min-height: var(--input-height);
+  padding: var(--input-padding);
   border: 1px solid var(--input);
-  border-radius: 8px;
+  border-radius: var(--input-radius);
   background: var(--surface);
   font-size: var(--text-sm);
   font-weight: 400;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: border-color var(--duration-fast), box-shadow var(--duration-fast);
 }
 
 .textarea {
@@ -393,7 +504,7 @@ textarea {
 .textarea:focus {
   outline: none;
   border-color: var(--ring);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 22%, transparent);
+  box-shadow: var(--input-focus-ring);
 }
 
 .input:disabled {
@@ -448,7 +559,7 @@ textarea {
   inset: 0;
   border-radius: var(--radius-pill);
   background: var(--neutral-300);
-  transition: background-color 0.15s;
+  transition: background-color var(--duration-fast);
   pointer-events: none;
 }
 
@@ -460,9 +571,9 @@ textarea {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 1px 2px #0003;
-  transition: transform 0.15s;
+  background: var(--white);
+  box-shadow: 0 1px 2px var(--black-a20);
+  transition: transform var(--duration-fast);
 }
 
 .switch input:checked + span {
@@ -483,8 +594,8 @@ textarea {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  height: 22px;
-  padding: 0 9px;
+  height: var(--pill-height);
+  padding: 0 var(--pill-padding-x);
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
   background: var(--surface);
@@ -541,9 +652,9 @@ textarea {
 .card {
   min-width: 0;
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--card-radius);
   background: var(--surface);
-  box-shadow: var(--shadow-xs);
+  box-shadow: var(--card-shadow);
 }
 
 .card-header {
@@ -552,7 +663,7 @@ textarea {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  padding: 16px 18px 0;
+  padding: var(--card-padding-y) var(--card-padding-x) 0;
 }
 
 .card-title {
@@ -567,11 +678,11 @@ textarea {
 }
 
 .card-body {
-  padding: 16px 18px 18px;
+  padding: var(--card-padding-y) var(--card-padding-x) var(--card-padding-x);
 }
 
 .card-footer {
-  padding: 12px 18px;
+  padding: var(--space-3) var(--card-padding-x);
   border-top: 1px solid var(--border);
   font-size: var(--text-xs);
   color: var(--muted-foreground);
@@ -592,7 +703,7 @@ textarea {
 .table th {
   position: sticky;
   top: 0;
-  padding: 9px 12px;
+  padding: var(--table-head-padding);
   border-bottom: 1px solid var(--border);
   background: var(--surface);
   color: var(--muted-foreground);
@@ -603,7 +714,7 @@ textarea {
 }
 
 .table td {
-  padding: 10px 12px;
+  padding: var(--table-cell-padding);
   border-bottom: 1px solid var(--border);
   vertical-align: middle;
 }
@@ -613,7 +724,7 @@ textarea {
 }
 
 .table tbody tr:hover td {
-  background: color-mix(in srgb, var(--muted) 55%, transparent);
+  background: var(--table-row-hover);
 }
 
 .table .num,
@@ -759,18 +870,18 @@ textarea {
 
 /* ---------- Dialog ---------- */
 .dialog {
-  width: min(440px, calc(100vw - 32px));
+  width: min(var(--dialog-width), calc(100vw - 32px));
   max-height: calc(100vh - 32px);
   padding: 0;
   border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
+  border-radius: var(--dialog-radius);
   background: var(--surface);
   color: var(--foreground);
   box-shadow: var(--shadow-lg);
 }
 
 .dialog::backdrop {
-  background: #0a1514b3;
+  background: var(--dialog-backdrop);
   backdrop-filter: blur(4px);
 }
 
