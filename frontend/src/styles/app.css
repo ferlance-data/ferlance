@@ -121,7 +121,7 @@ svg.icon {
   margin: 12px 8px 4px;
   color: var(--muted-foreground);
   font-family: var(--font-mono);
-  font-size: 0.625rem;
+  font-size: var(--text-2xs);
   font-weight: 500;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -538,7 +538,7 @@ svg.icon {
 .chart .axis {
   fill: var(--muted-foreground);
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: var(--text-2xs);
 }
 
 .chart-tooltip {
@@ -1243,7 +1243,7 @@ svg.icon {
 .suggestion small {
   color: var(--ai-foreground);
   font-family: var(--font-mono);
-  font-size: 0.625rem;
+  font-size: var(--text-2xs);
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -1650,8 +1650,14 @@ svg.icon {
     max-width: 90%;
   }
 
+  /* Icon-only on phones, but the label stays in the accessibility tree as the button's name. */
   .topbar-actions .btn-label {
-    display: none;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
   }
 
   .scope-custom {
