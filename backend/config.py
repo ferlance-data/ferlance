@@ -19,6 +19,8 @@ def _csv(value: str) -> tuple[str, ...]:
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 FRONTEND_DIR = BASE_DIR / "frontend"
+# Vite build output (npm --prefix frontend run build). Served as-is by backend.main.
+FRONTEND_DIST = Path(os.getenv("FERLANCE_FRONTEND_DIST", FRONTEND_DIR / "dist"))
 DATA_DIR = Path(os.getenv("FERLANCE_DATA_DIR", BASE_DIR / "data"))
 DB_PATH = DATA_DIR / "ferlance.sqlite3"
 RAW_DIR = DATA_DIR / "raw"
