@@ -87,7 +87,7 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   );
 }
 
-function ScopeBar() {
+function ScopeBar({ hidden }: { hidden: boolean }) {
   const { datasets } = useWorkspace();
   const { scope, setScope, bounds } = useScope();
   const files = analysableDatasets(datasets);
@@ -117,7 +117,7 @@ function ScopeBar() {
   };
 
   return (
-    <div className="scope-bar" id="scope-bar">
+    <div className="scope-bar" id="scope-bar" hidden={hidden}>
       <label className="scope-control">
         <span className="visually-hidden">Data scope</span>
         <IconSlot name="database" />
@@ -232,7 +232,8 @@ export function Shell() {
           <div className="topbar-title">
             <h1 id="page-title">{current?.title ?? 'Overview'}</h1>
           </div>
-          {current?.scoped ? <ScopeBar /> : null}
+          {/* Stays mounted (hidden) on unscoped pages: CSS right-aligns the actions via `.scope-bar[hidden] + .topbar-actions`. */}
+          <ScopeBar hidden={!current?.scoped} />
           <div className="topbar-actions" id="topbar-actions" ref={setActionsSlot} />
         </header>
         <main className="content" id="content">

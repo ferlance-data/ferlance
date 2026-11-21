@@ -13,10 +13,18 @@ import { keys, useScope, useWorkspace } from './workspace';
  *
  * With `updatesBounds`, the response's `available_period` becomes the scope's
  * bounds, so date presets anchor to the latest record (legacy `state.bounds`).
+ *
+ * Load failures are toasted globally; pass `silent` for optional reads whose
+ * failure the view already handles quietly (legacy `.catch(() => null)`).
  */
 export function useScopedQuery<T extends { available_period?: Period }>(
   suffix: string,
-  { includeDataset = true, updatesBounds = false, enabled = true }: { includeDataset?: boolean; updatesBounds?: boolean; enabled?: boolean } = {},
+  {
+    includeDataset = true,
+    updatesBounds = false,
+    enabled = true,
+    silent = false,
+  }: { includeDataset?: boolean; updatesBounds?: boolean; enabled?: boolean; silent?: boolean } = {},
 ) {
   const { business, businessPath } = useWorkspace();
   const { params, setBounds } = useScope();
@@ -26,6 +34,7 @@ export function useScopedQuery<T extends { available_period?: Period }>(
     queryFn: ({ signal }) => request<T>(businessPath(`${suffix}${qs ? `?${qs}` : ''}`), { signal }),
     placeholderData: keepPreviousData,
     enabled,
+    meta: { silent },
   });
   const period = query.data?.available_period;
   useEffect(() => {
@@ -35,11 +44,12 @@ export function useScopedQuery<T extends { available_period?: Period }>(
 }
 
 /** Read an unscoped business endpoint, e.g. `useBusinessQuery<Movement[]>('/inventory/movements?limit=100')`. */
-export function useBusinessQuery<T>(suffix: string, { enabled = true }: { enabled?: boolean } = {}) {
+export function useBusinessQuery<T>(suffix: string, { enabled = true, silent = false }: { enabled?: boolean; silent?: boolean } = {}) {
   const { business, businessPath } = useWorkspace();
   return useQuery({
     queryKey: keys.business(business.id, suffix),
     queryFn: ({ signal }) => request<T>(businessPath(suffix), { signal }),
     enabled,
+    meta: { silent },
   });
 }

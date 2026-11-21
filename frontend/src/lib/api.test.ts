@@ -5,13 +5,13 @@ const json = (status: number, body: unknown) => new Response(JSON.stringify(body
 
 describe('api client', () => {
   let fetchMock: ReturnType<typeof vi.fn>;
-  let replace: ReturnType<typeof vi.fn>;
+  let replace: ReturnType<typeof vi.fn<(url: string) => void>>;
 
   beforeEach(() => {
     resetSessionForTests();
     fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
-    replace = vi.fn();
+    replace = vi.fn<(url: string) => void>();
     vi.spyOn(navigation, 'replace').mockImplementation(replace);
   });
 

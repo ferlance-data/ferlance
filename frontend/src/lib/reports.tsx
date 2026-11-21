@@ -70,13 +70,15 @@ function Header({ kind, title, lines }: { kind: string; title: string; lines: st
   );
 }
 
-let reportRoot: Root | null = null;
+// The React root lives on the element so module reloads (dev HMR) reuse it instead of
+// calling createRoot twice on the same container.
+type ReportElement = HTMLElement & { __reportRoot?: Root };
 
 function print(content: ReactNode) {
-  const report = document.getElementById('print-report');
+  const report = document.getElementById('print-report') as ReportElement | null;
   if (!report) return;
-  reportRoot ??= createRoot(report);
-  const root = reportRoot;
+  report.__reportRoot ??= createRoot(report);
+  const root = report.__reportRoot;
   flushSync(() => root.render(content));
   report.hidden = false;
   document.body.classList.add('printing');

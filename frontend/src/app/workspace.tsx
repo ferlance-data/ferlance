@@ -72,6 +72,17 @@ export function WorkspaceProvider({
   const [setup, setSetup] = useState(initialSetup);
   setCurrency(business.currency);
 
+  const updateIdentity = useCallback(({ user: userPatch, business: businessPatch }: { user?: Partial<User>; business?: Partial<Business> }) => {
+    if (userPatch) setUser((current) => ({ ...current, ...userPatch }));
+    if (businessPatch) setBusiness((current) => ({ ...current, ...businessPatch }));
+  }, []);
+  // Stable, and a no-op when nothing changes, so views may call it from effects.
+  const markSetup = useCallback((patch: Partial<SetupFlags>) => {
+    setSetup((current) =>
+      (Object.keys(patch) as (keyof SetupFlags)[]).every((key) => current[key] === patch[key]) ? current : { ...current, ...patch },
+    );
+  }, []);
+
   const businessPath = useCallback((suffix = '') => `/api/businesses/${business.id}${suffix}`, [business.id]);
 
   const datasetsQuery = useQuery({
@@ -87,10 +98,7 @@ export function WorkspaceProvider({
     () => ({
       user,
       business,
-      updateIdentity: ({ user: userPatch, business: businessPatch }) => {
-        if (userPatch) setUser((current) => ({ ...current, ...userPatch }));
-        if (businessPatch) setBusiness((current) => ({ ...current, ...businessPatch }));
-      },
+      updateIdentity,
       businessPath,
       datasets: datasetsQuery.data ?? [],
       refreshDatasets: async () => {
@@ -103,9 +111,9 @@ export function WorkspaceProvider({
       inventory: inventoryQuery.data ?? null,
       refreshInventory: () => queryClient.invalidateQueries({ queryKey: keys.inventory(business.id) }),
       setup,
-      markSetup: (patch) => setSetup((current) => ({ ...current, ...patch })),
+      markSetup,
     }),
-    [user, business, businessPath, datasetsQuery.data, inventoryQuery.data, setup, queryClient],
+    [user, business, updateIdentity, businessPath, datasetsQuery.data, inventoryQuery.data, setup, markSetup, queryClient],
   );
 
   return (
