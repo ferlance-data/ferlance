@@ -6,6 +6,33 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-22
+
+The design system and interface refinement (PRD §5.1, #7). It keeps the existing identity and makes it accessible, touch-friendly and lighter. See `docs/DESIGN_SYSTEM.md`.
+
+### Added
+- A component token tier for button, input, pill, card, table, dialog, toast and nav item, plus spacing, motion and z-index scales.
+- A colour lint in `npm run check`. Colour literals are allowed only in token declarations.
+- `docs/DESIGN_SYSTEM.md`: tiers, rules, the measured contrast table, the component inventory and fonts.
+- A phone layout for data tables: each row becomes a labelled card, so no column is hidden off-screen.
+- 44 px touch targets on touch screens. Compact controls get an invisible hit area, so desktop density is unchanged.
+
+### Changed
+- Fonts are self-hosted and preloaded, subset to Latin-1, the cedi sign and Ghanaian letters (ɛ ɔ ŋ ɖ ƒ ɣ ʋ). That is 92.6 KB from our own origin, against about 152 KB from two Google origins.
+- Contrast was measured in both themes and fixed:
+  - muted text is 4.5:1 on muted surfaces
+  - AI-labelled text is 4.5:1
+  - input borders and the focus ring are 3:1
+  - landing grey text is 5.3:1
+- Chart revenue and cost colours were re-picked per theme with a palette validator (colour-blind separation, and 3:1 against the surface).
+- The smallest text is now 12 px. The 10, 10.5 and 11 px sizes are gone.
+
+### Fixed
+- On phones, the icon-only Print and New chat buttons had no accessible name.
+- The setup progress bar had no accessible name.
+- The Ask Lance conversation could be scrolled but not reached by keyboard.
+
+
 ## [1.0.1] - 2026-11-22
 
 Migration follow-ups (PRD F0.1–F0.3). A first visit to the workspace now downloads about 108 KB instead of about 383 KB.
@@ -51,6 +78,7 @@ The first versioned release. The frontend was migrated to React 19, TypeScript (
 - The old date window briefly renders after a file switch with a preset range.
 - The Product name column never sorts Z→A. This was kept for parity.
 
-[Unreleased]: https://github.com/ferlance-data/ferlance/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/ferlance-data/ferlance/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/ferlance-data/ferlance/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/ferlance-data/ferlance/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/ferlance-data/ferlance/releases/tag/v1.0.0
