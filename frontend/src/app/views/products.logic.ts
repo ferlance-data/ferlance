@@ -12,9 +12,13 @@ export function sortValue(item: ProductRow, key: string): string | number {
   return typeof raw === 'number' ? raw : Number.NEGATIVE_INFINITY;
 }
 
-/** Next sort state when a header is clicked: toggles direction on the active column. */
+/**
+ * Next sort state when a header is clicked. A new column starts A→Z for names and
+ * highest-first for numbers; clicking the active column again flips its direction.
+ */
 export function nextSort(current: SortState, key: string): SortState {
-  return { key, dir: current.key === key && current.dir === 'desc' ? 'asc' : key === 'product' ? 'asc' : 'desc' };
+  if (current.key === key) return { key, dir: current.dir === 'asc' ? 'desc' : 'asc' };
+  return { key, dir: key === 'product' ? 'asc' : 'desc' };
 }
 
 export function filterProducts(items: ProductRow[], query: string, filter: ProductFilter): ProductRow[] {

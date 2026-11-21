@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router';
+import { Link } from '../../lib/router';
 import { money, number, plainPercent, setCurrency } from '../../lib/format';
 import { IconSlot } from '../../lib/icons';
 import type { Analytics, ProductRow } from '../../lib/types';
@@ -17,7 +17,7 @@ const FILTERS: { value: ProductFilter; label: string }[] = [
 
 export default function Products() {
   const { hasData } = useScope();
-  const query = useScopedQuery<Analytics>('/analytics', { updatesBounds: true, enabled: hasData });
+  const query = useScopedQuery<Analytics>('/analytics', { enabled: hasData });
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<ProductFilter>('all');
   const [sort, setSort] = useState<SortState>({ key: 'metric_value', dir: 'desc' });

@@ -34,8 +34,9 @@ describe('products logic', () => {
     expect(nextSort({ key: 'revenue', dir: 'desc' }, 'revenue')).toEqual({ key: 'revenue', dir: 'asc' });
     expect(nextSort({ key: 'revenue', dir: 'asc' }, 'revenue')).toEqual({ key: 'revenue', dir: 'desc' });
     expect(nextSort({ key: 'revenue', dir: 'desc' }, 'product')).toEqual({ key: 'product', dir: 'asc' });
-    // Pre-migration behaviour kept for parity: the name column never flips back to descending.
-    expect(nextSort({ key: 'product', dir: 'asc' }, 'product')).toEqual({ key: 'product', dir: 'asc' });
+    expect(nextSort({ key: 'product', dir: 'asc' }, 'product')).toEqual({ key: 'product', dir: 'desc' });
+    expect(nextSort({ key: 'product', dir: 'desc' }, 'product')).toEqual({ key: 'product', dir: 'asc' });
+    expect(sortProducts(items, { key: 'product', dir: 'desc' }).map((i) => i.product)).toEqual(['Corn', 'Beans', 'apple']);
   });
   it('computes share with a floor of 1% bar width and guards zero totals', () => {
     expect(metricTotal([row('a', 10), row('b', -4)])).toBe(10);

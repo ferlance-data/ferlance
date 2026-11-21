@@ -71,9 +71,9 @@ Credentials (AWS, OCR provider, Expo/EAS) are requested only at the step that ne
 
 | ID | Requirement | Acceptance |
 | --- | --- | --- |
-| F0.1 | Shrink the workspace first load, about 100 KB gzip today against 29 KB before the migration | Route-level code splitting, with the router and data layer reviewed. The size target is set and agreed in the PR with before/after numbers. Initial target: 60 KB gzip or less for the shell. |
-| F0.2 | Stop the old date window flashing after a file switch with a preset range (`useScopedQuery`) | A test or browser check shows no stale window frame |
-| F0.3 | Product name sort can go Z→A (`nextSort`) | Unit test. The behaviour change is noted in the CHANGELOG. |
+| F0.1 | Shrink the workspace first load, about 100 KB gzip today against 29 KB before the migration | Done in v1.0.1. The measured breakdown of the shell's minified JS was react-dom 65%, react-router 12%, TanStack Query 10% and app code 9%. React alone is about 60 KB gzip, so the original 60 KB target cannot be met on React. The budget is now **first-visit JS+CSS for `/app/overview` at 110 KB gzip or less on the wire**: v1.0.1 measures 108 KB, against about 383 KB before, because the server sent everything uncompressed. App-only releases should re-download 15 KB gzip or less (the vendor chunk is cached separately). Going further needs Preact (an owner decision, §8). |
+| F0.2 | Stop the old date window flashing after a file switch with a preset range (`useScopedQuery`) | Done in v1.0.1. Each dataset stores its record date span, so presets resolve before the first request. |
+| F0.3 | Product name sort can go Z→A (`nextSort`) | Done in v1.0.1 |
 | F0.4 | Exercise a real AI provider and a real Brave research run once | A recorded run with the owner's keys. Credentials are requested at this step. |
 
 ### 5.1 #7: Design system and interface refinement (v1.1.0)
@@ -207,6 +207,7 @@ Today, sales files never change stock (by design), and inventory products and sa
 3. AWS account, region and the residency stance (#3).
 4. Expo/EAS account (#9).
 5. Disabling the unused account-level skills and connectors (`docs/SKILLS_AUDIT.md`).
+6. Whether to swap React for Preact (`preact/compat`) to cut about 55 KB gzip from the first visit. The cost: it reverses the React 19 choice, and React 19 APIs, Testing Library and TanStack Query would need re-verifying.
 
 ## Appendix: the owner's original brief (verbatim, from `docs/UPDATE_PLAN.md`)
 

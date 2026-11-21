@@ -55,9 +55,7 @@ Each feature gets its own `feat/*` branch off `main`. Planned order:
 5. Add a CHANGELOG entry and bump the version.
 
 ## Known follow-ups from the migration (all listed in PR #12)
-- The workspace shell is about 100 KB gzip on first load, up from 29 KB. That matters on mobile data, so consider a lighter router or other ways to shrink it.
-- After switching file with a preset range, the old date window renders for a moment. The cause is in `useScopedQuery`, `frontend/src/app/hooks.ts`.
-- The Product name column never sorts Z→A (`frontend/src/app/views/products.logic.ts`, `nextSort`). This was kept for parity.
+- ~~First-load size, the stale date window after a file switch, and the Product name Z→A sort~~ were fixed in v1.0.1 (PRD F0.1–F0.3). Going below about 108 KB on the wire needs Preact, which is the owner's decision (PRD §8).
 - ~~Open PRs #10 and #11 need rebasing.~~ That note was stale: both were merged before #12, and the folder-import feature from #11 survived the migration (`backend/routers/datasets.py`, `frontend/src/app/views/Data.tsx`).
 - A real AI provider and a real Brave research run were never exercised. Only a mock LLM was used.
 

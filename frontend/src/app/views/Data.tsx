@@ -3,7 +3,7 @@
 
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState, type DragEvent, type FormEvent, type ReactNode } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useNavigate } from '../../lib/router';
 import { request } from '../../lib/api';
 import { formatDateTime, money, number, plural } from '../../lib/format';
 import { Icon } from '../../lib/icons';
@@ -98,7 +98,7 @@ function ImportResult({ result }: { result: Result }) {
             type="button"
             onClick={() => {
               setScope({ datasetId: dataset.id });
-              void navigate(pagePath('overview'));
+              navigate(pagePath('overview'));
             }}
           >
             View only this file

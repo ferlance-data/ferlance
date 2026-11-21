@@ -15,10 +15,12 @@ import re
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from starlette.middleware.gzip import GZipMiddleware
+from starlette.types import ASGIApp, Receive, Scope, Send
 from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from . import config, db
+from . import config, dataset_store, db
 from .routers import admin, analytics, auth, datasets, financial_position, integrations, inventory, lance
 
 
@@ -27,6 +29,7 @@ async def lifespan(_: FastAPI):
     config.ensure_storage()
     db.initialize(config.DB_PATH)
     db.repair_dataset_paths(config.DB_PATH, config.RAW_DIR, config.PROCESSED_DIR)
+    dataset_store.backfill_periods()
     yield
 
 
@@ -40,7 +43,7 @@ class _BuildAssets(StaticFiles):
         await super().__call__(scope, receive, send)
 
 
-app = FastAPI(title="Ferlance", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="Ferlance", version="1.0.1", lifespan=lifespan)
 # The React frontend is a Vite build (frontend/dist). check_dir=False keeps the API
 # importable before the first build; pages then explain how to build instead.
 app.mount("/assets", _BuildAssets(directory=config.FRONTEND_DIST / "assets", check_dir=False), name="assets")
@@ -63,6 +66,27 @@ async def cache_policy(request: Request, call_next):
     else:
         response.headers.setdefault("Cache-Control", "no-cache")
     return response
+
+
+class _Compression:
+    """Gzip bundles, HTML and API JSON (about a third of the bytes on mobile data).
+
+    Auth responses carry tokens and are left uncompressed, so their size can never be used
+    to guess a secret (BREACH-style attacks).
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.plain = app
+        self.gzip = GZipMiddleware(app, minimum_size=1024)
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] == "http" and scope["path"].startswith("/api/auth/"):
+            await self.plain(scope, receive, send)
+        else:
+            await self.gzip(scope, receive, send)
+
+
+app.add_middleware(_Compression)
 
 
 _BUILD_MISSING = """<!doctype html><title>Ferlance frontend not built</title>

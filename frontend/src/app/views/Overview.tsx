@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { Link } from 'react-router';
+import { Link } from '../../lib/router';
 import { BarChart, type Bar } from '../../lib/chart/BarChart';
 import { money, number, plainPercent, plural, setCurrency } from '../../lib/format';
 import { Icon, IconSlot } from '../../lib/icons';
@@ -28,7 +28,7 @@ const PERIODS: { value: TrendPeriod; label: string }[] = [
 export default function Overview() {
   const { user, business, datasets, inventory } = useWorkspace();
   const { hasData } = useScope();
-  const analyticsQuery = useScopedQuery<Analytics>('/analytics', { updatesBounds: true, enabled: hasData });
+  const analyticsQuery = useScopedQuery<Analytics>('/analytics', { enabled: hasData });
   const insightsQuery = useScopedQuery<InsightsResponse & { available_period?: Period }>('/insights', { enabled: hasData, silent: true });
   const [trendPeriod, setTrendPeriod] = useState<TrendPeriod>('weekly');
 
