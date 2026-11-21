@@ -84,7 +84,7 @@ export function Notice({ tone = 'warning', icon = 'alert', children }: { tone?: 
   );
 }
 
-/** Inline status line under a form (legacy `setStatus`). */
+/** Inline status line under a form. */
 export function StatusText({ message, error = false, id }: { message?: string | null; error?: boolean; id?: string }) {
   return (
     <p className={`status-text${error ? ' error' : ''}`} id={id} role="status" aria-live="polite">

@@ -16,7 +16,7 @@ import { WorkspaceProvider, type SetupFlags } from './workspace';
 
 const queryClient = new QueryClient({
   queryCache: new QueryCache({
-    // Legacy runLoad: surface load failures as toasts, except auth (handled by redirect).
+    // Surface load failures as toasts, except auth (handled by redirect) and reads marked silent.
     onError: (error, query) => {
       if (query.meta?.silent) return;
       if (error instanceof ApiError && error.status === 401) return;

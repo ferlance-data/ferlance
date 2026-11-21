@@ -29,7 +29,7 @@ export function shortLabel(period: string): string {
   return period.replace(/^\d{2}(\d{2})-/, "'$1 ");
 }
 
-/** Track an element's width, ignoring sub-8px jitter (legacy redraw threshold). */
+/** Track an element's width, ignoring sub-8px jitter so tiny layout shifts don't redraw. */
 function useWidth<T extends HTMLElement>() {
   const ref = useRef<T>(null);
   const [width, setWidth] = useState(0);

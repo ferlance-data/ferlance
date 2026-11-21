@@ -33,7 +33,7 @@ export default function Overview() {
   const [trendPeriod, setTrendPeriod] = useState<TrendPeriod>('weekly');
 
   const analytics = hasData ? analyticsQuery.data : undefined;
-  // Legacy treated a failed insights request as "no insights".
+  // A failed insights request is treated as "no insights" (the read is silent).
   const insights = hasData && !insightsQuery.isError ? (insightsQuery.data ?? null) : null;
   const insightsPending = hasData && insightsQuery.isPending;
   if (analytics) setCurrency(analytics.currency);

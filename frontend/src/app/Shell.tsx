@@ -173,8 +173,8 @@ function Page({ page, onNavigate }: { page: PageDef; onNavigate: () => void }) {
   );
 }
 
-/** In-content `#page` anchors (legacy hash links) map onto the new paths. Initial /app#page URLs are rewritten in main.tsx. */
-function useLegacyHashRedirect() {
+/** Old-style `#page` anchors map onto the new paths. Initial /app#page URLs are rewritten in main.tsx. */
+function useHashRedirect() {
   const navigate = useNavigate();
   const location = useLocation();
   useEffect(() => {
@@ -199,7 +199,7 @@ export function Shell() {
   const [navOpen, setNavOpen] = useState(false);
   const [actionsSlot, setActionsSlot] = useState<HTMLDivElement | null>(null);
   const location = useLocation();
-  useLegacyHashRedirect();
+  useHashRedirect();
 
   const current = PAGES.find((page) => location.pathname === pagePath(page.name));
   const closeNav = useCallback(() => setNavOpen(false), []);

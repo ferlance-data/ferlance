@@ -34,7 +34,7 @@ describe('products logic', () => {
     expect(nextSort({ key: 'revenue', dir: 'desc' }, 'revenue')).toEqual({ key: 'revenue', dir: 'asc' });
     expect(nextSort({ key: 'revenue', dir: 'asc' }, 'revenue')).toEqual({ key: 'revenue', dir: 'desc' });
     expect(nextSort({ key: 'revenue', dir: 'desc' }, 'product')).toEqual({ key: 'product', dir: 'asc' });
-    // Legacy quirk preserved: the name column never flips back to descending.
+    // Pre-migration behaviour kept for parity: the name column never flips back to descending.
     expect(nextSort({ key: 'product', dir: 'asc' }, 'product')).toEqual({ key: 'product', dir: 'asc' });
   });
   it('computes share with a floor of 1% bar width and guards zero totals', () => {

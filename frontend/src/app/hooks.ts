@@ -12,10 +12,10 @@ import { keys, useScope, useWorkspace } from './workspace';
  * responses from an earlier scope are discarded by the query cache.
  *
  * With `updatesBounds`, the response's `available_period` becomes the scope's
- * bounds, so date presets anchor to the latest record (legacy `state.bounds`).
+ * bounds, so date presets anchor to the latest record.
  *
  * Load failures are toasted globally; pass `silent` for optional reads whose
- * failure the view already handles quietly (legacy `.catch(() => null)`).
+ * failure the view already handles quietly.
  */
 export function useScopedQuery<T extends { available_period?: Period }>(
   suffix: string,

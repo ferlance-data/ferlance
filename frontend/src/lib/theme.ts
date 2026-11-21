@@ -1,4 +1,4 @@
-// Theme handling for Settings (legacy views/settings.js).
+// Workspace theme: saved choice (system/light/dark) and how it is applied.
 
 export const THEME_KEY = 'ferlance-theme';
 export type ThemeChoice = 'system' | 'light' | 'dark';
@@ -22,9 +22,9 @@ export function savedTheme(): string {
 let following = false;
 
 /**
- * Follow the OS colour scheme while the saved choice is "system". Legacy registered
- * this once for the page's lifetime (so it kept working after leaving Settings); this
- * does the same, guarded so repeated calls register a single listener.
+ * Follow the OS colour scheme while the saved choice is "system". Registered once
+ * for the page's lifetime (so it keeps working after leaving Settings),
+ * guarded so repeated calls register a single listener.
  */
 export function followSystemTheme(): void {
   if (following || typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;

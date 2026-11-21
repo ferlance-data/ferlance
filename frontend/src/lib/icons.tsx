@@ -74,8 +74,8 @@ export function Icon({ name }: { name: IconName }) {
 }
 
 /**
- * Legacy markup used `<span data-icon="name"></span>` placeholders and the CSS
- * targets `[data-icon]`. Use this wherever the old HTML had such a placeholder;
+ * The CSS styles icons through `[data-icon]` wrappers (e.g. nav items, scope
+ * controls). Use this for an icon inside such a wrapper;
  * for elements that carried `data-icon` themselves (e.g. icon buttons), set
  * `data-icon` on the element and render <Icon> inside it.
  */
