@@ -1,7 +1,8 @@
 // Data imports: file uploads, Mobile Money SMS, and the import history with
 // per-file inclusion switches.
 
-import { useRef, useState, type DragEvent, type FormEvent, type ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useEffect, useRef, useState, type DragEvent, type FormEvent, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { request } from '../../lib/api';
 import { formatDateTime, money, number, plural } from '../../lib/format';
@@ -10,7 +11,7 @@ import { toast } from '../../lib/toast';
 import type { Dataset } from '../../lib/types';
 import { DataTable, Segmented, StatusText, type Column } from '../components/ui';
 import { pagePath } from '../routes';
-import { useScope, useWorkspace } from '../workspace';
+import { keys, useScope, useWorkspace } from '../workspace';
 import { StatusPill } from './shared';
 
 interface MomoRecord {
@@ -109,8 +110,14 @@ function ImportResult({ result }: { result: Result }) {
 }
 
 export default function Data() {
-  const { datasets, refreshDatasets, businessPath } = useWorkspace();
+  const { business, datasets, refreshDatasets, businessPath } = useWorkspace();
+  const queryClient = useQueryClient();
   const [tab, setTab] = useState<Tab>('file');
+
+  // The background folder importer can add files at any time: re-read the list on every visit.
+  useEffect(() => {
+    void queryClient.invalidateQueries({ queryKey: keys.datasets(business.id) });
+  }, [queryClient, business.id]);
   const [result, setResult] = useState<Result | null>(null);
   const resultRef = useRef<HTMLDivElement>(null);
 

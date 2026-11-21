@@ -57,7 +57,6 @@ function GroupCard({ title, items, total, asOf }: { title: string; items: Positi
 
 export default function Position() {
   const { user, business, businessPath, markSetup, setup } = useWorkspace();
-  // markSetup is not referentially stable and always replaces state, so only call it on change.
   const queryClient = useQueryClient();
   const today = isoDate(new Date());
   const [asOf, setAsOf] = useState(today);

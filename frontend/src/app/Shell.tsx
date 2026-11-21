@@ -205,7 +205,9 @@ export function Shell() {
   const location = useLocation();
   useHashRedirect();
 
-  const current = PAGES.find((page) => location.pathname === pagePath(page.name));
+  // Ignore a trailing slash: /app/products/ renders the same page as /app/products.
+  const pathname = location.pathname.replace(/\/+$/, '');
+  const current = PAGES.find((page) => pathname === pagePath(page.name));
   const closeNav = useCallback(() => setNavOpen(false), []);
 
   useEffect(() => {

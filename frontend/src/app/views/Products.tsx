@@ -20,7 +20,7 @@ export default function Products() {
   const query = useScopedQuery<Analytics>('/analytics', { updatesBounds: true, enabled: hasData });
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<ProductFilter>('all');
-  const [sort, setSort] = useState<SortState>({ key: 'revenue', dir: 'desc' });
+  const [sort, setSort] = useState<SortState>({ key: 'metric_value', dir: 'desc' });
   const analytics = hasData ? query.data : undefined;
   if (analytics) setCurrency(analytics.currency);
   const products = analytics?.products;

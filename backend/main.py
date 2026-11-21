@@ -10,6 +10,7 @@ Layout
 - ``llm`` / ``rag`` / ``market_research``  optional AI and web context.
 """
 
+import os
 import re
 from contextlib import asynccontextmanager
 
@@ -29,10 +30,20 @@ async def lifespan(_: FastAPI):
     yield
 
 
+class _BuildAssets(StaticFiles):
+    """Static files that answer 404 (not a 500 from Starlette's directory check) until the first build."""
+
+    async def __call__(self, scope, receive, send):
+        if not os.path.isdir(self.directory):
+            await Response(status_code=404)(scope, receive, send)
+            return
+        await super().__call__(scope, receive, send)
+
+
 app = FastAPI(title="Ferlance", version="1.0.0", lifespan=lifespan)
 # The React frontend is a Vite build (frontend/dist). check_dir=False keeps the API
 # importable before the first build; pages then explain how to build instead.
-app.mount("/assets", StaticFiles(directory=config.FRONTEND_DIST / "assets", check_dir=False), name="assets")
+app.mount("/assets", _BuildAssets(directory=config.FRONTEND_DIST / "assets", check_dir=False), name="assets")
 for module in (auth, admin, datasets, analytics, inventory, financial_position, integrations, lance):
     app.include_router(module.router)
 

@@ -70,11 +70,13 @@ export function WorkspaceProvider({
   const [user, setUser] = useState(initialUser);
   const [business, setBusiness] = useState(initialBusiness);
   const [setup, setSetup] = useState(initialSetup);
-  setCurrency(business.currency);
+  // The business currency is applied once at boot (main.tsx); analytics responses may
+  // override it per scope, so it is not re-applied on every render here.
 
   const updateIdentity = useCallback(({ user: userPatch, business: businessPatch }: { user?: Partial<User>; business?: Partial<Business> }) => {
     if (userPatch) setUser((current) => ({ ...current, ...userPatch }));
     if (businessPatch) setBusiness((current) => ({ ...current, ...businessPatch }));
+    if (businessPatch?.currency) setCurrency(businessPatch.currency);
   }, []);
   // Stable, and a no-op when nothing changes, so views may call it from effects.
   const markSetup = useCallback((patch: Partial<SetupFlags>) => {

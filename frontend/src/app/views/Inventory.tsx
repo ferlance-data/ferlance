@@ -1,7 +1,7 @@
 // Inventory: catalogue, auditable stock ledger, and stocktake imports.
 
 import { useQueryClient } from '@tanstack/react-query';
-import { useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { request } from '../../lib/api';
 import { formatDateTime, money, number } from '../../lib/format';
 import { Icon, IconSlot } from '../../lib/icons';
@@ -52,6 +52,10 @@ export default function Inventory() {
   const { user, business, businessPath, inventory, refreshInventory } = useWorkspace();
   const queryClient = useQueryClient();
   const movementsQuery = useBusinessQuery<Movement[]>('/inventory/movements?limit=100');
+  // The summary lives in the workspace (it outlives this page): re-read it on every visit.
+  useEffect(() => {
+    void queryClient.invalidateQueries({ queryKey: keys.inventory(business.id) });
+  }, [queryClient, business.id]);
   const movements = movementsQuery.data ?? [];
 
   const [search, setSearch] = useState('');

@@ -7,12 +7,13 @@ import { BrowserRouter } from 'react-router';
 import '../styles/base.css';
 import '../styles/app.css';
 import { ApiError, navigation, refreshSession, request } from '../lib/api';
+import { setCurrency } from '../lib/format';
 import { followSystemTheme } from '../lib/theme';
 import { toast, Toasts } from '../lib/toast';
-import type { Business, BalanceHistoryRow, ConversationSummary, Identity, User } from '../lib/types';
+import type { Business, BalanceHistoryRow, ConversationSummary, Dataset, Identity, InventoryResponse, User } from '../lib/types';
 import { pagePath, resolvePageName } from './routes';
 import { Shell } from './Shell';
-import { WorkspaceProvider, type SetupFlags } from './workspace';
+import { keys, WorkspaceProvider, type SetupFlags } from './workspace';
 
 const queryClient = new QueryClient({
   queryCache: new QueryCache({
@@ -67,10 +68,18 @@ function App() {
         toast('This account has no business workspace.', { error: true });
         return;
       }
+      setCurrency(business.currency);
       const path = (suffix: string) => `/api/businesses/${business.id}${suffix}`;
+      // Load datasets and inventory before showing the shell, so pages never mistake
+      // "not loaded yet" for "no data" (empty states, setup guide, Ask Lance's file check).
       const [history, conversations] = await Promise.all([
         request<BalanceHistoryRow[]>(path('/financial-position/history?limit=1')).catch(() => []),
         request<ConversationSummary[]>(path('/ask-lance/conversations')).catch(() => []),
+        queryClient.prefetchQuery({ queryKey: keys.datasets(business.id), queryFn: ({ signal }) => request<Dataset[]>(path('/datasets'), { signal }) }),
+        queryClient.prefetchQuery({
+          queryKey: keys.inventory(business.id),
+          queryFn: ({ signal }) => request<InventoryResponse>(path('/inventory?include_archived=true'), { signal }),
+        }),
       ]);
       if (!cancelled) setBoot({ user, business, setup: { balances: history.length > 0, conversations: conversations.length > 0 } });
     })();
