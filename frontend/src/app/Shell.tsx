@@ -165,7 +165,7 @@ function Page({ page, onNavigate }: { page: PageDef; onNavigate: () => void }) {
   }, [page, onNavigate]);
   const { Component } = page;
   return (
-    <section className="view" data-view={page.name}>
+    <section className={`view${page.sectionClass ? ` ${page.sectionClass}` : ''}`} data-view={page.name}>
       <Suspense fallback={<SkeletonRows count={6} height={24} />}>
         <Component />
       </Suspense>

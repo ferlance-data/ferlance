@@ -11,6 +11,8 @@ export interface PageDef {
   description: string;
   /** Scoped pages show the scope bar and read the current dataset/date scope. */
   scoped: boolean;
+  /** Extra class on the page's <section class="view"> wrapper. */
+  sectionClass?: string;
   nav: { label: string; icon: IconName; group: 'analyse' | 'operate' | 'bottom' };
   Component: LazyExoticComponent<ComponentType>;
 }
@@ -45,6 +47,7 @@ export const PAGES: PageDef[] = [
     title: 'Ask Lance',
     description: 'Ask about your business in plain language. Lance answers from your own records and says when data is missing.',
     scoped: true,
+    sectionClass: 'view-lance',
     nav: { label: 'Ask Lance', icon: 'sparkles', group: 'analyse' },
     Component: lazy(() => import('./views/Lance')),
   },
