@@ -6,7 +6,7 @@ Ferlance is business intelligence for small and growing businesses, starting wit
 import records -> validate every row -> scoped metrics + period comparison -> insights -> ask Lance
 ```
 
-For how the system fits together, the product benchmarks behind the redesign, and what was removed and why, read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Implementation status lives in [MVP_PROGRESS.md](MVP_PROGRESS.md) and the import rules in [docs/DATA_CONTRACT.md](docs/DATA_CONTRACT.md).
+For how the system fits together, the product benchmarks behind the redesign, and what was removed and why, read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Implementation status lives in [MVP_PROGRESS.md](MVP_PROGRESS.md) and the import rules in [docs/DATA_CONTRACT.md](docs/DATA_CONTRACT.md). The update-phase requirements and release plan are in [docs/PRD.md](docs/PRD.md), the target users in [docs/PERSONAS.md](docs/PERSONAS.md), and release history in [CHANGELOG.md](CHANGELOG.md).
 
 ## What it does
 
@@ -70,7 +70,7 @@ frontend/                React 19 + TypeScript + Vite
   src/styles/           base.css (design tokens + primitives), landing.css, app.css
   dist/                 build output served by FastAPI (not committed)
 tests/                  API, ingestion, analytics, ledger and LLM tests
-docs/                   architecture, data contract, stress-test notes
+docs/                   architecture, data contract, PRD, personas, stress-test notes
 ```
 
 The frontend is built with Vite (`npm --prefix frontend run build`). Hashed bundles are cached for a year; HTML always revalidates.
