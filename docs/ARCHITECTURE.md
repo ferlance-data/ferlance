@@ -13,12 +13,12 @@ Ferlance turns the records small businesses already keep — spreadsheet exports
 ## System overview
 
 ```text
-Browser (no build step, ES modules)
-  /            landing.html + js/landing.js         public marketing page and auth dialog
-  /app         index.html + js/app/main.js          workspace shell, hash router, views
+Browser (React + TypeScript, built by Vite into frontend/dist)
+  /            index.html + src/landing/main.ts     public marketing page (static markup) and auth dialog
+  /app/*       app/index.html + src/app/main.tsx    workspace shell, React Router pages, views
         │  JSON over HTTPS — Bearer access token (memory) + HttpOnly refresh cookie
         ▼
-FastAPI (backend/main.py) — wiring, lifespan, static files, cache headers
+FastAPI (backend/main.py) — wiring, lifespan, built frontend + SPA fallback, cache headers
   routers/auth.py            signup, login, refresh (single-use rotation), logout, profile
   routers/datasets.py        file uploads, Mobile Money SMS import, history, include/exclude
   routers/analytics.py       metrics + period comparison, insights, instant questions, web research
@@ -76,9 +76,15 @@ Six **instant questions** (`/questions/*`) are calculated without any model, so 
 
 ### Frontend
 
-- `assets/css/base.css` holds design tokens and primitives; `landing.css` and `app.css` build on them. Light and dark workspace themes share one token set.
-- `assets/js/app/` is split into `api.js` (token handling; concurrent 401s share one refresh because refresh tokens are single-use), `state.js` (session and scope), `dom.js` (safe element builder — values from uploads are always text nodes), `chart.js` (dependency-free SVG), `markdown.js` (safe renderer for Lance), `reports.js` (printing) and one module per view.
-- The server sends `Cache-Control: no-cache` for frontend files so unhashed modules revalidate after deploys.
+React 19 + TypeScript (strict) built by Vite. Two entries: the landing page keeps static markup for first paint and search engines, with a small TypeScript module for its interactions. The workspace is a single-page app.
+
+- `src/styles/base.css` holds design tokens and primitives; `landing.css` and `app.css` build on them. Light and dark workspace themes share one token set; an inline script in `app/index.html` applies the saved theme before first paint.
+- `src/lib/api.ts` keeps the access token in memory only. Concurrent 401s share one refresh, because refresh tokens are single-use. A failed refresh sends the user to `/?signin`.
+- `src/app/workspace.tsx` provides identity, datasets, inventory and the **scope** (files + dates) to every view. Server data is cached with TanStack Query. Scoped reads (`useScopedQuery` in `src/app/hooks.ts`) put the resolved scope in their cache key, so changing the scope refetches and stale responses are discarded.
+- `src/app/routes.tsx` lists the pages (`/app/<page>`); `Shell.tsx` renders the sidebar, top bar, scope bar and the routed view. Old `#page` links are redirected.
+- Rendering safety: everything is rendered as text by React. `dangerouslySetInnerHTML`/`innerHTML` are banned by lint. `src/lib/markdown.tsx` turns Lance answers into elements, and links from API data pass through `safeHref` (http/https only).
+- `src/lib/chart/BarChart.tsx` is a dependency-free SVG chart; `src/lib/reports.tsx` renders printable reports into `#print-report`.
+- FastAPI serves `frontend/dist`: `/` and `/app/*` return the entry HTML (`no-cache`), and hashed files under `/assets` get `Cache-Control: public, max-age=31536000, immutable`. If the build is missing, pages return 503 with the build command.
 
 ## Data model (SQLite)
 

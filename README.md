@@ -23,13 +23,26 @@ For how the system fits together, the product benchmarks behind the redesign, an
 
 ## Run locally
 
+The frontend build needs Node.js 20.19 or newer.
+
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
+npm --prefix frontend ci
+npm --prefix frontend run build          # writes frontend/dist, which FastAPI serves
 .venv/bin/uvicorn backend.main:app --reload
 ```
 
-Open http://127.0.0.1:8000. The landing page is `/`; the workspace is `/app`.
+Open http://127.0.0.1:8000. The landing page is `/`; the workspace is `/app` (pages live at `/app/overview`, `/app/products`, …; old `/app#page` links still work).
+
+### Frontend development
+
+```bash
+.venv/bin/uvicorn backend.main:app --reload    # API on :8000
+npm --prefix frontend run dev                  # Vite on :5173 with hot reload; /api is proxied to :8000
+```
+
+Open http://127.0.0.1:5173/app. Set `FERLANCE_API` to proxy to a different backend. Before pushing, run `npm --prefix frontend run check` (type-check, lint and unit tests).
 
 Copy `.env.example` to `.env` to configure secrets and the optional AI and search providers. Set a strong `FERLANCE_SECRET_KEY` (32+ characters) for anything beyond local development. Data is stored under `data/` (SQLite, raw uploads, processed JSONL) — set `FERLANCE_DATA_DIR` to move it. That directory is local runtime state and is not tracked in git.
 
@@ -41,7 +54,7 @@ Settings → Web research accepts a business-owned Brave Search API key, encrypt
 
 ```text
 backend/
-  main.py               app wiring: routers, static files, lifespan, cache headers
+  main.py               app wiring: routers, built frontend, lifespan, cache headers
   deps.py               auth, tenancy, date range and data-scope dependencies
   dataset_store.py      import persistence and scope rules
   routers/              auth, admin, datasets, analytics, inventory, financial_position, integrations, lance
@@ -49,16 +62,18 @@ backend/
   analytics.py, insights.py                             deterministic metrics
   inventory.py, financial_position.py                   operational ledgers
   llm.py, rag.py, market_research.py                    optional AI and web context
-frontend/
-  landing.html, index.html
-  assets/css/           base.css (design tokens + primitives), landing.css, app.css
-  assets/js/landing.js  public page
-  assets/js/app/        api, state, dom, chart, markdown, reports, views/*
+frontend/                React 19 + TypeScript + Vite
+  index.html            landing page (static markup) + src/landing/main.ts
+  app/index.html        workspace entry -> src/app/main.tsx
+  src/lib/              api client, types, formatting, scope, icons, chart, markdown, reports, toasts
+  src/app/              shell, routes, workspace/scope context, data hooks, components, views/*
+  src/styles/           base.css (design tokens + primitives), landing.css, app.css
+  dist/                 build output served by FastAPI (not committed)
 tests/                  API, ingestion, analytics, ledger and LLM tests
 docs/                   architecture, data contract, stress-test notes
 ```
 
-The frontend has no build step: plain ES modules and CSS served by FastAPI.
+The frontend is built with Vite (`npm --prefix frontend run build`). Hashed bundles are cached for a year; HTML always revalidates.
 
 ## API walkthrough
 
@@ -97,7 +112,9 @@ The health endpoint is available at `GET /health`.
 ## Test
 
 ```bash
+npm --prefix frontend run build     # the serving tests check the real build
 .venv/bin/pytest -q
+npm --prefix frontend run check     # type-check, lint, unit tests
 ```
 
 The existing MVP upload path requires a recognized date and at least one recognized revenue, total-cost, or unit-cost column. The standalone universal engine also supports date-less records such as BOM lines, while preserving the limitation that time-based analytics need dates. Optional columns include transaction ID, product or service, customer or supplier, and quantity. Cost-only files are retained as costs with zero revenue and do not inflate sales; they cannot produce profit until revenue and costs are available together. Invalid rows are rejected with warnings; the normalized JSONL output preserves accepted records without silently hiding the rejection counts. Duplicate transaction IDs are rejected, but identical rows without IDs are preserved because they may represent separate legitimate sales. Uploads return `processed` when all rows are accepted, `partial` when some rows are rejected, and `failed` when no rows can be accepted. See [docs/DATA_CONTRACT.md](docs/DATA_CONTRACT.md) for the complete category-by-category contract and examples.
