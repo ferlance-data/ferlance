@@ -20,7 +20,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from . import config, dataset_store, db
+from . import config, dataset_store, db, exports
 from .routers import admin, analytics, auth, datasets, financial_position, inventory, lance, team
 
 
@@ -30,7 +30,10 @@ async def lifespan(_: FastAPI):
     db.initialize(config.DB_PATH)
     db.repair_dataset_paths(config.DB_PATH, config.RAW_DIR, config.PROCESSED_DIR)
     dataset_store.backfill_periods()
+    scheduler = exports.start()
     yield
+    if scheduler:
+        scheduler[1].set()
 
 
 class _BuildAssets(StaticFiles):
@@ -43,7 +46,7 @@ class _BuildAssets(StaticFiles):
         await super().__call__(scope, receive, send)
 
 
-app = FastAPI(title="Ferlance", version="1.8.0", lifespan=lifespan)
+app = FastAPI(title="Ferlance", version="1.9.0", lifespan=lifespan)
 # The React frontend is a Vite build (frontend/dist). check_dir=False keeps the API
 # importable before the first build; pages then explain how to build instead.
 app.mount("/assets", _BuildAssets(directory=config.FRONTEND_DIST / "assets", check_dir=False), name="assets")

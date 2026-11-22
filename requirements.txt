@@ -9,3 +9,5 @@ python-dotenv==1.0.1
 pandas==2.2.3
 charset-normalizer==3.4.1
 cryptography==46.0.3
+pyarrow==26.0.1
+boto3==1.44.9
