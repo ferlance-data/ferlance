@@ -153,3 +153,13 @@ def scope(
     dataset_id: str | None = Query(default=None, description="A dataset id, or 'all' (default) for every included file."),
 ) -> Scope:
     return resolve_scope(business["id"], dataset_id)
+
+
+def refund_ai_call(business_id: str) -> None:
+    """Give back a call that the provider failed to answer, so outages do not use up the day's cap."""
+    day = datetime.now(timezone.utc).date().isoformat()
+    db.insert(
+        config.DB_PATH,
+        "UPDATE ai_usage SET calls = MAX(calls - 1, 0) WHERE business_id = ? AND day = ?",
+        (business_id, day),
+    )

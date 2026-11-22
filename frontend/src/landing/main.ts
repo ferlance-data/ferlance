@@ -285,9 +285,10 @@ async function acceptInvite(accessToken: string): Promise<string | undefined> {
     credentials: 'same-origin',
     headers: { Authorization: `Bearer ${accessToken}` },
   });
-  const payload = (await response.json().catch(() => ({}))) as ErrorPayload & { business?: { id: string } };
-  // Already a member is fine: open that business.
-  if (!response.ok && response.status !== 409) throw new Error(typeof payload.detail === 'string' ? payload.detail : 'The invite could not be accepted.');
+  const payload = (await response.json().catch(() => ({}))) as { business?: { id: string }; detail?: string | { business_id?: string } };
+  // Already a member is fine: the server says which business, so open it.
+  if (response.status === 409 && typeof payload.detail === 'object') return payload.detail.business_id;
+  if (!response.ok) throw new Error(typeof payload.detail === 'string' ? payload.detail : 'The invite could not be accepted.');
   return payload.business?.id;
 }
 
@@ -327,7 +328,8 @@ const inviteToken = params.get('invite');
 if (inviteToken) {
   // Keep the token out of history, bookmarks and Referer headers once it has been read.
   params.delete('invite');
-  window.history.replaceState(null, '', `${window.location.pathname}${params.size ? `?${params}` : ''}`);
+  const rest = params.toString();
+  window.history.replaceState(null, '', `${window.location.pathname}${rest ? `?${rest}` : ''}`);
   void openInvite(inviteToken);
 } else if (params.has('signin') || params.has('signup')) {
   openAuth(params.has('signup') ? 'signup' : 'login');

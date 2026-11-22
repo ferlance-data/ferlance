@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from .. import config, db
-from ..deps import business_manager, current_user, team_manager
+from ..deps import ROLE_ORDER, business_manager, current_user, team_manager
 from ..security import token_hash
 
 router = APIRouter(prefix="/api/businesses/{business_id}", tags=["team"])
@@ -52,8 +52,7 @@ def team(business: dict = Depends(team_manager)) -> dict:
     members = db.many(
         config.DB_PATH,
         "SELECT u.id AS user_id, u.email, u.full_name, m.role, m.created_at FROM business_members m "
-        "JOIN users u ON u.id = m.user_id WHERE m.business_id = ? "
-        "ORDER BY CASE m.role WHEN 'owner' THEN 0 WHEN 'manager' THEN 1 ELSE 2 END, m.created_at",
+        f"JOIN users u ON u.id = m.user_id WHERE m.business_id = ? ORDER BY {ROLE_ORDER}, m.created_at",
         (business["id"],),
     )
     invites = db.many(
@@ -139,7 +138,8 @@ def accept_invite(token: str, user_id: str) -> dict:
             "SELECT role FROM business_members WHERE business_id = ? AND user_id = ?", (invite["business_id"], user_id)
         ).fetchone()
         if existing:
-            raise HTTPException(409, "You are already a member of this business.")
+            # Tell the client which business, so it can open it; the invite stays unused.
+            raise HTTPException(409, {"message": "You are already a member of this business.", "business_id": invite["business_id"]})
         conn.execute(
             "INSERT INTO business_members (business_id, user_id, role, created_at) VALUES (?, ?, ?, ?)",
             (invite["business_id"], user_id, invite["role"], db.now()),

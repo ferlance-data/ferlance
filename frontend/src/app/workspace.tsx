@@ -96,7 +96,7 @@ export function useWorkspace(): WorkspaceValue {
 export function WorkspaceProvider({
   initialUser,
   initialBusiness,
-  initialBusinesses = [initialBusiness],
+  initialBusinesses,
   initialSetup,
   children,
 }: {
@@ -140,7 +140,7 @@ export function WorkspaceProvider({
     () => ({
       user,
       business,
-      businesses: initialBusinesses.map((item) => (item.id === business.id ? { ...item, ...business } : item)),
+      businesses: (initialBusinesses ?? [business]).map((item) => (item.id === business.id ? { ...item, ...business } : item)),
       role: business.role ?? 'owner',
       can: (permission: Permission) => ROLE_PERMISSIONS[business.role ?? 'owner'].includes(permission),
       switchBusiness: (id: string) => {

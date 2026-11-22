@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 from .. import config, dataset_store, db
 from ..analytics import analyze
-from ..deps import ai_user, current_user, spend_ai_call, date_range, DateRange, read_business
+from ..deps import ai_user, current_user, spend_ai_call, refund_ai_call, date_range, DateRange, read_business
 from ..llm import ask_lance, ai_available
 from ..rag import context as rag_context
 
@@ -91,6 +91,7 @@ def ask(
     try:
         answer = ask_lance(question, snapshot, history)
     except RuntimeError as error:
+        refund_ai_call(business["id"])
         raise HTTPException(503, str(error))
 
     # Persist only after a successful answer so failures never leave empty conversations.

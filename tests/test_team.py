@@ -202,3 +202,15 @@ def test_frontend_role_map_matches_backend():
     for role, permissions in deps.ROLE_PERMISSIONS.items():
         listed = set(re.findall(r"'([a-z_]+)'", re.search(rf"{role}: \[([^\]]*)\]", block).group(1)))
         assert listed == set(permissions), role
+
+
+def test_ai_refund_and_already_member_invite(client, monkeypatch):
+    owner, business = signup(client, "refund@example.com")
+    deps.spend_ai_call(business["id"])
+    deps.refund_ai_call(business["id"])
+    deps.refund_ai_call(business["id"])  # never below zero
+    assert db.one(config.DB_PATH, "SELECT calls FROM ai_usage", ())["calls"] == 0
+
+    member, _ = signup(client, "already@example.com", invite=invite(client, owner, business["id"], "manager"))
+    again = client.post(f"/api/invites/{invite(client, owner, business['id'], 'accountant')}/accept", headers=member)
+    assert again.status_code == 409 and again.json()["detail"]["business_id"] == business["id"]

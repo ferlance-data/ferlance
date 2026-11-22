@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from .. import advisor, config, db, inventory, llm, news_context
 from ..analytics import analyze, compare
-from ..deps import ai_user, spend_ai_call, date_range, DateRange, read_business, resolve_scope, Scope, scope
+from ..deps import ai_user, refund_ai_call, spend_ai_call, date_range, DateRange, read_business, resolve_scope, Scope, scope
 from ..insights import QUESTION_NAMES, answer_question, generate_insights
 
 router = APIRouter(prefix="/api/businesses/{business_id}", tags=["analytics"])
@@ -79,6 +79,7 @@ def explain_insight(
     try:
         text = llm.explain(advisor.EXPLAIN_SYSTEM, advisor.explain_prompt(item, advice, news))
     except RuntimeError as error:
+        refund_ai_call(business["id"])
         raise HTTPException(503, str(error))
     created = db.now()
     cutoff = (datetime.now(timezone.utc) - timedelta(days=EXPLANATION_RETENTION_DAYS)).isoformat()
