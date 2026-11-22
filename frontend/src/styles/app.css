@@ -1837,3 +1837,95 @@ svg.icon {
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 10px;
 }
+
+/* ---------- Books (ledger statements and the accountant's journal) ---------- */
+.books-group {
+  margin: 14px 16px 4px;
+  font-size: var(--text-sm);
+  color: var(--muted-foreground);
+}
+
+.books-totals {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.books-totals div {
+  display: grid;
+  gap: 2px;
+}
+
+.books-totals dt {
+  font-size: var(--text-sm);
+  color: var(--muted-foreground);
+}
+
+.books-totals dd {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.books-issues {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+.journal-list {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 0 16px 8px;
+  list-style: none;
+}
+
+.journal-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.journal-lines {
+  width: 100%;
+  margin-top: 6px;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.journal-lines th,
+.journal-lines td {
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.journal-lines .num {
+  text-align: right;
+  white-space: nowrap;
+  padding-left: 8px;
+}
+
+.journal-entry-line {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+@media (max-width: 480px) {
+  .journal-entry-line {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .journal-entry-line .field:first-of-type {
+    grid-column: 1 / -1;
+  }
+}

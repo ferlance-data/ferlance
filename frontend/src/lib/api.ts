@@ -57,9 +57,11 @@ export interface RequestOptions {
   /** Raw body, e.g. FormData for uploads. */
   body?: BodyInit;
   signal?: AbortSignal;
+  /** Return the response body as text (e.g. a CSV download) instead of parsing JSON. */
+  asText?: boolean;
 }
 
-export async function request<T>(path: string, { method = 'GET', json, body, signal }: RequestOptions = {}): Promise<T> {
+export async function request<T>(path: string, { method = 'GET', json, body, signal, asText = false }: RequestOptions = {}): Promise<T> {
   const send = () => {
     const headers: Record<string, string> = {};
     if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
@@ -82,6 +84,7 @@ export async function request<T>(path: string, { method = 'GET', json, body, sig
     }
     response = await send();
   }
+  if (asText && response.ok) return (await response.text()) as T;
   const payload = (await response.json().catch(() => ({}))) as unknown;
   if (!response.ok) throw new ApiError(detail(payload as ErrorBody, response.status), response.status, (payload as ErrorBody)?.detail);
   return payload as T;
