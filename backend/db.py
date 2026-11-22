@@ -206,6 +206,57 @@ CREATE TABLE IF NOT EXISTS ledger_settings (
     updated_at TEXT NOT NULL,
     FOREIGN KEY(business_id) REFERENCES businesses(id)
 );
+CREATE TABLE IF NOT EXISTS debt_parties (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK(kind IN ('customer', 'supplier')),
+    name TEXT NOT NULL,
+    phone TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(business_id) REFERENCES businesses(id)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS debt_parties_name ON debt_parties(business_id, kind, name COLLATE NOCASE);
+CREATE TABLE IF NOT EXISTS debts (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    party_id TEXT NOT NULL,
+    direction TEXT NOT NULL CHECK(direction IN ('owed_to_us', 'we_owe')),
+    basis TEXT NOT NULL CHECK(basis IN ('new_sale', 'recorded_sale', 'recorded_purchase', 'expense')),
+    description TEXT NOT NULL DEFAULT '',
+    amount_minor INTEGER NOT NULL CHECK(amount_minor > 0),
+    currency TEXT NOT NULL,
+    issued_on TEXT NOT NULL,
+    due_on TEXT,
+    voided_at TEXT,
+    voided_by TEXT,
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(business_id) REFERENCES businesses(id),
+    FOREIGN KEY(party_id) REFERENCES debt_parties(id)
+);
+CREATE INDEX IF NOT EXISTS debts_business ON debts(business_id, issued_on);
+CREATE TABLE IF NOT EXISTS debt_payments (
+    id TEXT PRIMARY KEY,
+    debt_id TEXT NOT NULL,
+    business_id TEXT NOT NULL,
+    amount_minor INTEGER NOT NULL CHECK(amount_minor > 0),
+    paid_on TEXT NOT NULL,
+    method TEXT NOT NULL CHECK(method IN ('cash', 'momo_mtn', 'momo_telecel', 'momo_at', 'momo_other', 'bank', 'momo_sms')),
+    momo_ref TEXT,
+    voided_at TEXT,
+    voided_by TEXT,
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(debt_id) REFERENCES debts(id)
+);
+CREATE INDEX IF NOT EXISTS debt_payments_debt ON debt_payments(debt_id);
+-- One MoMo message settles at most one debt payment (while that payment stands).
+CREATE UNIQUE INDEX IF NOT EXISTS debt_payments_momo_ref ON debt_payments(business_id, momo_ref) WHERE momo_ref IS NOT NULL AND voided_at IS NULL;
+CREATE TABLE IF NOT EXISTS debt_settings (
+    business_id TEXT PRIMARY KEY,
+    pay_to TEXT NOT NULL DEFAULT '',
+    updated_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS business_members (
     business_id TEXT NOT NULL,
     user_id TEXT NOT NULL,
