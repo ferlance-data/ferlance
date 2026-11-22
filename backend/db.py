@@ -62,6 +62,19 @@ CREATE INDEX IF NOT EXISTS inventory_movements_business_date
     ON inventory_movements(business_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS inventory_movements_product_date
     ON inventory_movements(product_id, created_at DESC);
+CREATE TABLE IF NOT EXISTS stock_captures (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    created_by TEXT NOT NULL,
+    source TEXT NOT NULL,
+    filename TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('draft', 'confirmed', 'discarded')),
+    lines TEXT NOT NULL,
+    outcome TEXT,
+    created_at TEXT NOT NULL,
+    confirmed_at TEXT,
+    FOREIGN KEY(business_id) REFERENCES businesses(id)
+);
 CREATE TABLE IF NOT EXISTS admin_audit (
     id TEXT PRIMARY KEY,
     actor_id TEXT NOT NULL,

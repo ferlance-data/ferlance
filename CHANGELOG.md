@@ -6,6 +6,27 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-11-22
+
+Scan invoices into stock (PRD §5.4, #1).
+
+### Added
+- **Inventory → Scan invoice.** Take or choose a photo (or a PDF) of a supplier invoice, delivery note or stock list. Ferlance reads the product lines into a draft:
+  - name, quantity and unit cost
+  - SKU and expiry, where printed
+- **Type the lines** instead (for example "Rice 5kg, 10, 70"): read on the server without AI, and free.
+- **Review before anything changes.** For each line, add it to an existing product, create a new one, or skip it with a reason.
+  - Exact SKU or name matches are pre-filled. A similar name is only suggested ("Did you mean…?"), never pre-selected.
+  - Lines where quantity × unit price doesn't match the printed total, or with no quantity, are flagged "Check this line".
+- **"Add to stock" applies the whole draft in one transaction.** One bad line changes nothing, and a second tap is refused, so purchases are never doubled. Skipped lines are kept with their reason. Expiry dates go into the movement note.
+- **Photos are shrunk on the phone to about 1600 px before upload.** That saves data and strips location data. The photo is read by the AI provider and not stored.
+
+### Notes
+- **Provider.** The default is `google/gemini-2.5-flash-lite` on the existing OpenRouter key: about $0.0003 a page and about 2.5 s. Change it with `FERLANCE_OCR_MODEL`. Each scan counts against the daily AI cap, and failed scans are refunded.
+- **Measured accuracy** on generated pharmacy invoices (clean, tilted 4°, blurred): 18 of 18 fields read correctly on each, and the delivery fee was correctly left out.
+- **PDFs** need at least $0.50 of OpenRouter credit (a provider rule). Below that, the app asks for a photo instead.
+- **Stock and expiry.** Inventory has no expiry tracking yet, so expiry is kept in the movement note only.
+
 ## [1.5.0] - 2026-11-22
 
 Onboarding and the admin console (PRD §5.3, 4.1 and 4.3–4.4).
@@ -163,7 +184,8 @@ The first versioned release. The frontend was migrated to React 19, TypeScript (
 - The old date window briefly renders after a file switch with a preset range.
 - The Product name column never sorts Z→A. This was kept for parity.
 
-[Unreleased]: https://github.com/ferlance-data/ferlance/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/ferlance-data/ferlance/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/ferlance-data/ferlance/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/ferlance-data/ferlance/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/ferlance-data/ferlance/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/ferlance-data/ferlance/compare/v1.2.0...v1.3.0

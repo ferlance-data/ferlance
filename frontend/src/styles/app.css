@@ -1797,3 +1797,43 @@ svg.icon {
   gap: 8px;
   align-items: center;
 }
+
+/* ---------- Scan invoice (Inventory) ---------- */
+.scan-review {
+  display: grid;
+  gap: 12px;
+}
+
+.scan-lines {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.scan-line {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.scan-line.low {
+  border-color: var(--warning-border);
+  background: var(--warning-background);
+}
+
+.scan-line-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.scan-line-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}

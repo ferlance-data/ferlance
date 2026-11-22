@@ -1,3 +1,4 @@
+import json
 import math
 import sqlite3
 import uuid
@@ -405,3 +406,70 @@ def import_stocktake(
                 "Imported counted stock level", "stocktake_import", movement_cost,
             )
     return {"created": created_count, "updated": updated_count, "rows_imported": len(rows)}
+
+
+def confirm_capture(path: Path, business_id: str, user_id: str, capture_id: str, decisions: list[dict[str, Any]]) -> dict[str, Any]:
+    """Apply a reviewed OCR draft in ONE transaction: every accepted line becomes a purchase
+    (creating products where asked), skipped lines are kept with their reason, and the draft
+    flips to confirmed. Any invalid line rolls everything back; a second confirm gets an error.
+    """
+    with db.connection(path) as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        capture = conn.execute(
+            "SELECT * FROM stock_captures WHERE id = ? AND business_id = ?", (capture_id, business_id)
+        ).fetchone()
+        if capture is None:
+            raise InventoryError("Scan not found.")
+        if capture["status"] != "draft":
+            raise CaptureConflict("This scan was already applied or discarded.")
+        lines = json.loads(capture["lines"])
+        if len(decisions) != len(lines):
+            raise InventoryError("Review every line before confirming.")
+        outcome = []
+        for index, (line, decision) in enumerate(zip(lines, decisions)):
+            label = f"Line {index + 1} ({line['name']})"
+            if decision.get("action") == "skip":
+                outcome.append({"line": index, "action": "skipped", "reason": (decision.get("reason") or "Skipped").strip()[:200]})
+                continue
+            quantity = decision.get("quantity")
+            if not isinstance(quantity, (int, float)) or not math.isfinite(quantity) or quantity <= 0:
+                raise InventoryError(f"{label}: enter a quantity above zero.")
+            unit_cost = decision.get("unit_cost")
+            if unit_cost is not None and (not isinstance(unit_cost, (int, float)) or not math.isfinite(unit_cost) or unit_cost < 0):
+                raise InventoryError(f"{label}: unit cost must be zero or more.")
+            product_id = decision.get("product_id")
+            if decision.get("action") == "create":
+                name = _required_text(decision.get("name") or line["name"], "Product name")
+                if conn.execute(
+                    "SELECT 1 FROM inventory_products WHERE business_id = ? AND name = ? COLLATE NOCASE", (business_id, name)
+                ).fetchone():
+                    raise InventoryError(f"{label}: a product called {name} already exists. Choose it instead.")
+                product_id = str(uuid.uuid4())
+                now = db.now()
+                conn.execute(
+                    "INSERT INTO inventory_products (id, business_id, sku, name, unit, unit_cost, reorder_level, active, created_at, updated_at) "
+                    "VALUES (?, ?, ?, ?, ?, ?, 0, 1, ?, ?)",
+                    (product_id, business_id, (line.get("sku") or None), name, (decision.get("unit") or line.get("unit") or "unit")[:40], unit_cost, now, now),
+                )
+            elif decision.get("action") == "add":
+                if not product_id:
+                    raise InventoryError(f"{label}: choose a product or create one.")
+                _product(conn, product_id, business_id)  # must belong to this business
+                if unit_cost is not None:
+                    conn.execute("UPDATE inventory_products SET unit_cost = ?, updated_at = ? WHERE id = ?", (unit_cost, db.now(), product_id))
+            else:
+                raise InventoryError(f"{label}: choose add, create or skip.")
+            note = f"Scanned {capture['filename']}" + (f" · expiry {line['expiry']}" if line.get("expiry") else "")
+            _record_movement(conn, business_id, product_id, user_id, "purchase", float(quantity), note[:500], "capture", unit_cost)
+            outcome.append({"line": index, "action": "added", "product_id": product_id, "quantity": quantity})
+        updated = conn.execute(
+            "UPDATE stock_captures SET status = 'confirmed', outcome = ?, confirmed_at = ? WHERE id = ? AND status = 'draft'",
+            (json.dumps(outcome), db.now(), capture_id),
+        )
+        if updated.rowcount != 1:
+            raise CaptureConflict("This scan was already applied or discarded.")
+    return {"id": capture_id, "status": "confirmed", "outcome": outcome}
+
+
+class CaptureConflict(InventoryError):
+    """The draft is no longer a draft (double confirm, or discarded)."""
