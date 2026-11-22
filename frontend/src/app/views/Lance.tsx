@@ -356,7 +356,7 @@ export default function Lance() {
           </div>
         </aside>
         <div className="lance-main">
-          <div className="lance-thread" id="lance-thread" aria-live="polite" ref={threadRef}>
+          <div className="lance-thread" id="lance-thread" aria-live="polite" ref={threadRef} tabIndex={0} aria-label="Conversation">
             {entries.length === 0 ? (
               <div className="lance-empty">
                 <span className="lance-orb">

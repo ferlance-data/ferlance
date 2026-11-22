@@ -143,7 +143,11 @@ export interface SortState {
   dir: 'asc' | 'desc';
 }
 
-/** Data table; shows an empty state when there are no rows. Pass sortState + onSort for sortable headers. */
+/**
+ * Data table; shows an empty state when there are no rows. Pass sortState + onSort for sortable headers.
+ * On phones (base.css, `.table-stack`) each row becomes a labelled card and the sort buttons a wrapping row,
+ * so no column is hidden off-screen. Explicit roles keep table semantics when CSS changes the display type.
+ */
 export function DataTable<Row>({
   columns,
   rows,
@@ -161,9 +165,9 @@ export function DataTable<Row>({
 }) {
   if (!rows.length) return <EmptyState title={empty} />;
   return (
-    <table className="table">
-      <thead>
-        <tr>
+    <table className="table table-stack" role="table">
+      <thead role="rowgroup">
+        <tr role="row">
           {columns.map((column) => {
             const sorted = sortState && column.sort && sortState.key === column.sort;
             return (
@@ -171,6 +175,7 @@ export function DataTable<Row>({
                 key={column.label}
                 className={column.num ? 'num' : ''}
                 scope="col"
+                role="columnheader"
                 aria-sort={sorted ? (sortState.dir === 'asc' ? 'ascending' : 'descending') : undefined}
               >
                 {column.sort && onSort ? (
@@ -186,11 +191,11 @@ export function DataTable<Row>({
           })}
         </tr>
       </thead>
-      <tbody>
+      <tbody role="rowgroup">
         {rows.map((row, index) => (
-          <tr key={rowKey(row, index)}>
+          <tr key={rowKey(row, index)} role="row">
             {columns.map((column) => (
-              <td key={column.label} className={column.num ? 'num' : ''}>
+              <td key={column.label} className={column.num ? 'num' : ''} role="cell" data-label={column.label}>
                 {column.value(row)}
               </td>
             ))}

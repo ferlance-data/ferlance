@@ -154,7 +154,7 @@ function SetupGuide() {
         <p className="eyebrow">Setup guide</p>
         <h2>{complete ? 'Keep going — your numbers get sharper with each step.' : `Welcome to Ferlance, ${business.name}.`}</h2>
         <p>Four short steps turn your records into a full picture of the business.</p>
-        <div className="setup-progress" role="progressbar" aria-valuemin={0} aria-valuemax={steps.length} aria-valuenow={complete}>
+        <div className="setup-progress" role="progressbar" aria-label="Setup steps complete" aria-valuemin={0} aria-valuemax={steps.length} aria-valuenow={complete}>
           <i style={{ width: `${(complete / steps.length) * 100}%` }} />
         </div>
         <p className="footnote" style={{ marginTop: '8px' }}>{`${complete} of ${steps.length} complete`}</p>

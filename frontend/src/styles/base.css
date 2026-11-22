@@ -4,7 +4,33 @@
    medium-weight headlines. Marketing pages are dark; the workspace is light
    with an optional dark theme. */
 
-@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap");
+/* Fonts are self-hosted (public/assets/fonts, OFL licence alongside): no third-party
+   connections on first load. Subsets cover Latin-1, the cedi sign and Ghanaian letters
+   (ɛ ɔ ŋ ɖ ƒ ɣ ʋ); anything else falls back per glyph to the system font.
+   File names carry a content hash, so they are served with immutable caching. */
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("/assets/fonts/ibm-plex-sans-var-5509c733.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/assets/fonts/ibm-plex-mono-400-b37f5e1f.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 500 600;
+  font-display: swap;
+  src: url("/assets/fonts/ibm-plex-mono-500-8a02ee7a.woff2") format("woff2");
+}
 
 :root {
   /* Palette */
@@ -42,6 +68,66 @@
   --levender-600: #594b7f;
   --levender-800: #3d3260;
 
+  /* Extended palette: tints, alpha steps and print greys (values unchanged from the literals they replaced). */
+  --white: #fff;
+  --black: #000;
+  --white-a06: #ffffff0f;
+  --white-a08: #ffffff14;
+  --white-a09: #ffffff17;
+  --white-a10: #ffffff1a;
+  --white-a12: #ffffff1f;
+  --white-a18: #ffffff2e;
+  --white-a55: #ffffff8c;
+  --black-a20: #0003;
+  --ink-950-a40: #0a151466;
+  --ink-950-a50: #0a151480;
+  --ink-950-a60: #0a151499;
+  --ink-950-a70: #0a1514b3;
+  --ink-950-a80: #0a1514cc;
+  --ink-950-a90: #0a1514e6;
+  --ink-950-a95: #0a1514f2;
+  --ink-830: #1b2420;
+  --ink-825: #1c2724;
+  --fog-50: #f2f4f3;
+  --fog-100: #e6ebe9;
+  --fog-150: #dfe5e3;
+  --fog-200: #d9dfdd;
+  --fog-300: #c9d1cf;
+  --fog-400: #b9c3c1;
+  --fog-500: #95a19f;
+  --fog-550: #8b9795;
+  --fog-600: #7f8b89;
+  --fog-700: #6d7a78;
+  --fog-900: #3d4a46;
+  --mint-150: #a4f5d6;
+  --mint-glow-a08: #7af0c214;
+  --mint-glow-a10: #7af0c21a;
+  --mint-glow-a40: #7af0c266;
+  --mint-875: #1d4a3a;
+  --mint-900: #1f4a3f;
+  --mint-950: #12302a;
+  --amber-300: #f3c77a;
+  --amber-300-a25: #f3c77a40;
+  --amber-600-a12: #c98a4a1f;
+  --amber-850: #4a3d18;
+  --amber-900: #4a3818;
+  --amber-950: #2b2112;
+  --red-300: #ff9c9f;
+  --red-900: #4f2427;
+  --red-950: #2d1517;
+  --stone-800: #33302a;
+  --print-ink: #111;
+  --print-muted: #555;
+  --print-rule: #ddd;
+  --mint-700: #2c7a5d;
+  --stone-400: #949086;
+  --fog-750: #66726f;
+  /* Chart pairs validated with the dataviz palette checks (lightness band, chroma, CVD, 3:1 vs surface). */
+  --viz-mint-600: #2f8a68;
+  --viz-orange-600: #c45f12;
+  --viz-mint-500: #3fa882;
+  --viz-orange-500: #d9742c;
+
   /* Semantic (light workspace) */
   --background: #ffffff;
   --foreground: var(--neutral-900);
@@ -50,17 +136,17 @@
   --sidebar: var(--mud-50);
   --border: #e9e7e1;
   --border-strong: #d9d6ce;
-  --input: var(--neutral-200);
+  --input: var(--stone-400); /* 3:1 boundary on white (WCAG 1.4.11) */
   --muted: var(--neutral-100);
-  --muted-foreground: var(--neutral-500);
+  --muted-foreground: #6b6b6b; /* 4.5:1 on --muted as well as on surfaces */
   --subtle-foreground: var(--neutral-600);
   --primary: var(--green-900);
   --primary-foreground: #ffffff;
   --cta: var(--green-700);
   --cta-hover: var(--green-800);
-  --ring: var(--mint-400);
-  --accent: var(--mint-500);
-  --ai-foreground: var(--mint-600);
+  --ring: var(--mint-600); /* 3:1 focus indicator */
+  --accent: var(--mint-500); /* graphics only (icons, borders): 3:1, not a text colour */
+  --ai-foreground: var(--mint-700);
   --ai-background: var(--mint-50);
   --ai-border: var(--mint-200);
   --success-foreground: #15803d;
@@ -75,9 +161,9 @@
   --info-foreground: var(--levender-800);
   --info-background: var(--levender-50);
   --info-border: #e2dcf2;
-  --chart-revenue: var(--mint-500);
+  --chart-revenue: var(--viz-mint-600);
   --chart-revenue-strong: var(--green-700);
-  --chart-cost: var(--orange-400);
+  --chart-cost: var(--viz-orange-600);
   --chart-grid: #efede8;
   --shadow-xs: 0 1px 2px 0 #00000008;
   --shadow-sm: 0 1px 3px 0 #0000000f, 0 1px 2px -1px #0000000f;
@@ -86,7 +172,7 @@
   /* Type */
   --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
-  --text-2xs: 0.6875rem;
+  --text-2xs: 0.75rem; /* 12 px floor: nothing on screen is smaller (budget phones, sunlight) */
   --text-xs: 0.75rem;
   --text-sm: 0.8125rem;
   --text-base: 0.9375rem;
@@ -101,42 +187,102 @@
   --radius-xl: 18px;
   --radius-pill: 9999px;
   --gutter: clamp(16px, 3vw, 28px);
+
+  /* Spacing scale (4 px base, with the half steps the layout already uses). */
+  --space-0-5: 2px;
+  --space-1: 4px;
+  --space-1-5: 6px;
+  --space-2: 8px;
+  --space-2-5: 10px;
+  --space-3: 12px;
+  --space-3-5: 14px;
+  --space-4: 16px;
+  --space-4-5: 18px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-9: 36px;
+
+  /* Motion. Everything collapses to ~0 under prefers-reduced-motion (see the end of this file). */
+  --duration-fast: 0.15s;
+  --duration-base: 0.25s;
+  --duration-slow: 0.3s;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Elevation: shadows (above) plus stacking order. */
+  --z-nav: 50;
+  --z-toast: 80;
+
+  /* Component tier: the only place component dimensions and states are tuned.
+     Values reference the semantic tier, so both themes follow automatically. */
+  --button-height: 34px;
+  --button-height-sm: 28px;
+  --button-height-lg: 44px;
+  --button-padding-x: var(--space-3-5);
+  --button-padding-x-sm: var(--space-2-5);
+  --button-padding-x-lg: 26px;
+  --button-gap: var(--space-1-5);
+  --button-radius: var(--radius-pill);
+  --button-transition: background-color var(--duration-fast), border-color var(--duration-fast), color var(--duration-fast), opacity var(--duration-fast);
+  --input-height: 36px;
+  --input-padding: 7px 11px;
+  --input-radius: 8px;
+  --input-focus-ring: 0 0 0 3px color-mix(in srgb, var(--ring) 22%, transparent);
+  --pill-height: 22px;
+  --pill-padding-x: 9px;
+  --card-radius: var(--radius-lg);
+  --card-shadow: var(--shadow-xs);
+  --card-padding-x: var(--space-4-5);
+  --card-padding-y: var(--space-4);
+  --table-head-padding: 9px var(--space-3);
+  --table-cell-padding: var(--space-2-5) var(--space-3);
+  --table-row-hover: color-mix(in srgb, var(--muted) 55%, transparent);
+  --dialog-width: 440px;
+  --dialog-radius: var(--radius-xl);
+  --dialog-backdrop: var(--ink-950-a70);
+  --toast-radius: var(--radius-lg);
+  --toast-padding: var(--space-3) var(--space-3-5);
+  --nav-item-height: 34px;
+  --nav-item-radius: 8px;
+  --nav-item-padding-x: var(--space-2-5);
+  --nav-item-hover: color-mix(in srgb, var(--foreground) 5%, transparent);
   color-scheme: light;
 }
 
 :root[data-theme="dark"] {
   --background: var(--ink-950);
-  --foreground: #f2f4f3;
+  --foreground: var(--fog-50);
   --surface: var(--ink-850);
   --surface-muted: var(--ink-900);
   --sidebar: var(--ink-900);
   --border: var(--ink-600);
   --border-strong: var(--ink-500);
-  --input: var(--ink-500);
+  --input: var(--fog-750);
   --muted: var(--ink-800);
-  --muted-foreground: #95a19f;
-  --subtle-foreground: #b9c3c1;
+  --muted-foreground: var(--fog-500);
+  --subtle-foreground: var(--fog-400);
   --primary: var(--mint-glow);
   --primary-foreground: var(--ink-950);
   --cta: var(--mint-glow);
   --cta-hover: var(--mint-300);
   --ai-foreground: var(--mint-300);
-  --ai-background: #12302a;
-  --ai-border: #1f4a3f;
+  --ai-background: var(--mint-950);
+  --ai-border: var(--mint-900);
   --success-foreground: #7ee2a8;
   --success-background: #10291d;
   --success-border: #1d4630;
-  --warning-foreground: #f3c77a;
-  --warning-background: #2b2112;
-  --warning-border: #4a3818;
-  --error-foreground: #ff9c9f;
-  --error-background: #2d1517;
-  --error-border: #4f2427;
+  --warning-foreground: var(--amber-300);
+  --warning-background: var(--amber-950);
+  --warning-border: var(--amber-900);
+  --error-foreground: var(--red-300);
+  --error-background: var(--red-950);
+  --error-border: var(--red-900);
   --info-foreground: #c9bdf0;
   --info-background: #1e1a2e;
   --info-border: #362e52;
-  --chart-revenue: var(--mint-400);
+  --chart-revenue: var(--viz-mint-500);
   --chart-revenue-strong: var(--mint-glow);
+  --chart-cost: var(--viz-orange-500);
   --chart-grid: #1f2a29;
   --shadow-xs: none;
   --shadow-sm: none;
@@ -245,11 +391,11 @@ textarea {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  height: 34px;
-  padding: 0 14px;
+  gap: var(--button-gap);
+  height: var(--button-height);
+  padding: 0 var(--button-padding-x);
   border: 1px solid transparent;
-  border-radius: var(--radius-pill);
+  border-radius: var(--button-radius);
   background: transparent;
   font-size: var(--text-sm);
   font-weight: 500;
@@ -257,7 +403,7 @@ textarea {
   white-space: nowrap;
   text-decoration: none;
   cursor: pointer;
-  transition: background-color 0.15s, border-color 0.15s, color 0.15s, opacity 0.15s;
+  transition: var(--button-transition);
 }
 
 .btn svg {
@@ -312,39 +458,39 @@ textarea {
 }
 
 .btn-mint:not(:disabled):hover {
-  background: #a4f5d6;
+  background: var(--mint-150);
 }
 
 .btn-outline-dark {
-  border-color: #ffffff2e;
-  background: #0a151480;
-  color: #fff;
+  border-color: var(--white-a18);
+  background: var(--ink-950-a50);
+  color: var(--white);
   backdrop-filter: blur(8px);
 }
 
 .btn-outline-dark:hover {
-  background: #ffffff14;
+  background: var(--white-a08);
 }
 
 .btn-sm {
-  height: 28px;
-  padding: 0 10px;
+  height: var(--button-height-sm);
+  padding: 0 var(--button-padding-x-sm);
   font-size: var(--text-xs);
 }
 
 .btn-lg {
-  height: 44px;
-  padding: 0 26px;
+  height: var(--button-height-lg);
+  padding: 0 var(--button-padding-x-lg);
   font-size: 0.875rem;
 }
 
 .btn-icon {
-  width: 34px;
+  width: var(--button-height);
   padding: 0;
 }
 
 .btn-sm.btn-icon {
-  width: 28px;
+  width: var(--button-height-sm);
 }
 
 /* ---------- Forms ---------- */
@@ -365,14 +511,14 @@ textarea {
 .select,
 .textarea {
   width: 100%;
-  min-height: 36px;
-  padding: 7px 11px;
+  min-height: var(--input-height);
+  padding: var(--input-padding);
   border: 1px solid var(--input);
-  border-radius: 8px;
+  border-radius: var(--input-radius);
   background: var(--surface);
   font-size: var(--text-sm);
   font-weight: 400;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: border-color var(--duration-fast), box-shadow var(--duration-fast);
 }
 
 .textarea {
@@ -393,7 +539,7 @@ textarea {
 .textarea:focus {
   outline: none;
   border-color: var(--ring);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 22%, transparent);
+  box-shadow: var(--input-focus-ring);
 }
 
 .input:disabled {
@@ -448,7 +594,7 @@ textarea {
   inset: 0;
   border-radius: var(--radius-pill);
   background: var(--neutral-300);
-  transition: background-color 0.15s;
+  transition: background-color var(--duration-fast);
   pointer-events: none;
 }
 
@@ -460,9 +606,9 @@ textarea {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 1px 2px #0003;
-  transition: transform 0.15s;
+  background: var(--white);
+  box-shadow: 0 1px 2px var(--black-a20);
+  transition: transform var(--duration-fast);
 }
 
 .switch input:checked + span {
@@ -483,8 +629,8 @@ textarea {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  height: 22px;
-  padding: 0 9px;
+  height: var(--pill-height);
+  padding: 0 var(--pill-padding-x);
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
   background: var(--surface);
@@ -541,9 +687,9 @@ textarea {
 .card {
   min-width: 0;
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--card-radius);
   background: var(--surface);
-  box-shadow: var(--shadow-xs);
+  box-shadow: var(--card-shadow);
 }
 
 .card-header {
@@ -552,7 +698,7 @@ textarea {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  padding: 16px 18px 0;
+  padding: var(--card-padding-y) var(--card-padding-x) 0;
 }
 
 .card-title {
@@ -567,11 +713,11 @@ textarea {
 }
 
 .card-body {
-  padding: 16px 18px 18px;
+  padding: var(--card-padding-y) var(--card-padding-x) var(--card-padding-x);
 }
 
 .card-footer {
-  padding: 12px 18px;
+  padding: var(--space-3) var(--card-padding-x);
   border-top: 1px solid var(--border);
   font-size: var(--text-xs);
   color: var(--muted-foreground);
@@ -592,7 +738,7 @@ textarea {
 .table th {
   position: sticky;
   top: 0;
-  padding: 9px 12px;
+  padding: var(--table-head-padding);
   border-bottom: 1px solid var(--border);
   background: var(--surface);
   color: var(--muted-foreground);
@@ -603,7 +749,7 @@ textarea {
 }
 
 .table td {
-  padding: 10px 12px;
+  padding: var(--table-cell-padding);
   border-bottom: 1px solid var(--border);
   vertical-align: middle;
 }
@@ -613,7 +759,7 @@ textarea {
 }
 
 .table tbody tr:hover td {
-  background: color-mix(in srgb, var(--muted) 55%, transparent);
+  background: var(--table-row-hover);
 }
 
 .table .num,
@@ -636,6 +782,73 @@ textarea {
 
 .table th[aria-sort] button {
   color: var(--foreground);
+}
+
+/* Phone layout for DataTable: rows become labelled cards; sortable headers wrap above them. */
+@media (max-width: 600px) {
+  .table-stack thead tr {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1) var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .table-stack thead tr:not(:has(button)),
+  .table-stack th:not(:has(button)) {
+    display: none;
+  }
+
+  .table-stack th {
+    position: static;
+    display: block;
+    padding: 0;
+    border: 0;
+    background: none;
+  }
+
+  .table-stack tbody tr {
+    display: grid;
+    gap: var(--space-1);
+    padding: var(--space-3);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .table-stack tbody tr:last-child {
+    border-bottom: 0;
+  }
+
+  .table-stack td,
+  .table-stack td.num {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: var(--space-3);
+    padding: 0;
+    border: 0;
+    text-align: right;
+    white-space: normal;
+  }
+
+  .table-stack td::before {
+    content: attr(data-label);
+    flex: none;
+    color: var(--muted-foreground);
+    font-family: var(--font-sans);
+    font-size: var(--text-xs);
+    text-align: left;
+  }
+
+  /* The first column names the row: full width, no label. */
+  .table-stack td:first-child {
+    display: block; /* full width, so share bars and sub-lines inside it keep their size */
+    font-weight: 500;
+    text-align: left;
+  }
+
+  .table-stack td:first-child::before {
+    content: none;
+  }
 }
 
 .positive {
@@ -722,6 +935,38 @@ textarea {
   }
 }
 
+/* Touch screens: 44 px targets (WCAG 2.5.5). Full-size controls grow; compact ones keep
+   their look and get an invisible 44 px hit area instead. */
+@media (pointer: coarse) {
+  :root {
+    --button-height: 44px;
+    --input-height: 44px;
+    --nav-item-height: 44px;
+  }
+
+  .btn-sm,
+  .segmented button,
+  .table th button,
+  .switch,
+  .checkbox {
+    position: relative;
+  }
+
+  .btn-sm::before,
+  .segmented button::before,
+  .table th button::before,
+  .switch::before,
+  .checkbox::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -759,18 +1004,18 @@ textarea {
 
 /* ---------- Dialog ---------- */
 .dialog {
-  width: min(440px, calc(100vw - 32px));
+  width: min(var(--dialog-width), calc(100vw - 32px));
   max-height: calc(100vh - 32px);
   padding: 0;
   border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
+  border-radius: var(--dialog-radius);
   background: var(--surface);
   color: var(--foreground);
   box-shadow: var(--shadow-lg);
 }
 
 .dialog::backdrop {
-  background: #0a1514b3;
+  background: var(--dialog-backdrop);
   backdrop-filter: blur(4px);
 }
 
