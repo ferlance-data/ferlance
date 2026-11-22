@@ -27,6 +27,10 @@ def business_analytics(dates: DateRange = Depends(date_range), data: Scope = Dep
 
 def _advice(business_id: str, dates: DateRange, data: Scope) -> dict:
     stock = inventory.list_products(config.DB_PATH, business_id)["items"]
+    # Sales names linked to a stock product (Inventory → Link sales) count as that product.
+    by_id = {item["id"]: item for item in stock}
+    rows = db.many(config.DB_PATH, "SELECT sales_name, product_id FROM product_links WHERE business_id = ? AND product_id IS NOT NULL", (business_id,))
+    stock += [{**by_id[row["product_id"]], "name": row["sales_name"], "linked": True} for row in rows if row["product_id"] in by_id]
     return advisor.build(data.records, dates.start, dates.end, stock)
 
 

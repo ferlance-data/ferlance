@@ -6,8 +6,8 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
-from .. import config, dataset_store, db
-from ..deps import data_writer, read_business, read_scope_records
+from .. import config, dataset_store, db, sync
+from ..deps import data_writer, read_business, read_scope_records, current_user
 from ..processor import ProcessingResult, process_file
 from ..sms_parser import MoMoSMSParser
 
@@ -93,11 +93,16 @@ def dataset_history(business: dict = Depends(read_business)) -> list[dict]:
 
 
 @router.patch("/datasets/{dataset_id}")
-def update_dataset(dataset_id: str, payload: DatasetUpdate, business: dict = Depends(data_writer)) -> dict:
-    """Include or exclude a file from business-wide analytics without deleting its audit trail."""
+def update_dataset(dataset_id: str, payload: DatasetUpdate, business: dict = Depends(data_writer), user: dict = Depends(current_user)) -> dict:
+    """Include or exclude a file from business-wide analytics without deleting its audit trail.
+
+    Excluding a file whose sales were posted to stock reverses those stock movements too.
+    """
     updated = dataset_store.set_included(business["id"], dataset_id, payload.included)
     if not updated:
         raise HTTPException(404, "Dataset not found.")
+    if not payload.included:
+        updated["stock_reversed"] = sync.reverse_dataset(config.DB_PATH, business["id"], dataset_id, user["id"])
     return updated
 
 

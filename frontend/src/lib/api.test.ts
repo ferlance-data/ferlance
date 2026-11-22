@@ -28,6 +28,17 @@ describe('api client', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/auth/refresh', expect.objectContaining({ method: 'POST', credentials: 'same-origin' }));
   });
 
+  it('keeps structured error details and uses their message', async () => {
+    fetchMock.mockResolvedValueOnce(json(200, { access_token: 'abc', token_type: 'bearer', business: null }));
+    await refreshSession();
+    const conflicts = [{ name: 'Rice', short: 2 }];
+    fetchMock.mockResolvedValueOnce(json(409, { detail: { message: 'Not enough stock.', conflicts } }));
+    const error = await request('/api/thing', { method: 'POST' }).catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).message).toBe('Not enough stock.');
+    expect((error as ApiError).detail).toEqual({ message: 'Not enough stock.', conflicts });
+  });
+
   it('sends the in-memory bearer token and JSON bodies', async () => {
     fetchMock.mockResolvedValueOnce(json(200, { access_token: 'abc', token_type: 'bearer', business: null }));
     await refreshSession();

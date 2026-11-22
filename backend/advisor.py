@@ -95,6 +95,10 @@ def _money(value: float, currency: str) -> str:
     return f"{sign}{prefix}{abs(value):,.0f}" if abs(value) >= 100 else f"{sign}{prefix}{abs(value):,.2f}"
 
 
+def _stock_label(item: dict[str, Any]) -> str:
+    return "In stock now (linked)" if item.get("linked") else "In stock now (matched by name)"
+
+
 def _norm(name: str) -> str:
     return " ".join(name.casefold().split())
 
@@ -273,7 +277,7 @@ def build(records: list[dict[str, Any]], from_date: date | None = None, to_date:
         if now.margin is not None:
             evidence.append(_evidence("Margin", round(now.margin, 1), "percent"))
         if item_stock is not None:
-            evidence.append(_evidence("In stock now (matched by name)", item_stock["quantity_on_hand"], "number"))
+            evidence.append(_evidence(_stock_label(item_stock), item_stock["quantity_on_hand"], "number"))
 
         if before.sales >= MIN_SALES_FOR_CHANGE and change is not None and change <= DECLINE_PCT:
             reasons, actions = _change_reasons(name, now, before, money, item_stock, ly_pair, calendar, falling=True)
@@ -326,7 +330,7 @@ def build(records: list[dict[str, Any]], from_date: date | None = None, to_date:
                 out.add("restock", name, "risk" if cover < URGENT_COVER_DAYS else "attention", f"Restock {name} soon",
                         f"About {cover:.0f} day{'s' if round(cover) != 1 else ''} of stock left at the current pace.",
                         per_day * (now.revenue / now.units) * max(LOW_COVER_DAYS - cover, 1), product=name,
-                        evidence=[_evidence("In stock now (matched by name)", on_hand, "number"), _evidence("Sold per day", round(per_day, 1), "number")],
+                        evidence=[_evidence(_stock_label(item_stock), on_hand, "number"), _evidence("Sold per day", round(per_day, 1), "number")],
                         reasons=[_reason(f"You sold {now.units:,.0f} in {days} days and have {on_hand:,.0f} left.", "likely", "stock")],
                         actions=[f"Order about {needed:,} more {name} to cover the next two weeks."])
 
@@ -343,12 +347,20 @@ def build(records: list[dict[str, Any]], from_date: date | None = None, to_date:
 
     if days >= SLOW_STOCK_MIN_DAYS:
         sold = {_norm(name): totals for name, totals in now_products.items()}
+        # A product can appear under its own name and under linked sales names: judge it once,
+        # counting units sold under every name it goes by.
+        names_by_product: dict[str, list[str]] = defaultdict(list)
+        for key, item in stock.items():
+            names_by_product[item.get("id") or key].append(key)
         for key, item in stock.items():
             value = item.get("stock_value")
-            if not value or item["quantity_on_hand"] <= 0:
+            if item.get("linked") or not value or item["quantity_on_hand"] <= 0:
                 continue
-            totals = sold.get(key)
-            units = totals.units if totals and totals.units_complete else (0 if not totals else None)
+            found = [sold[name] for name in names_by_product[item.get("id") or key] if name in sold]
+            if any(not totals.units_complete for totals in found):
+                units = None
+            else:
+                units = sum(totals.units for totals in found)
             if units is not None and units <= item["quantity_on_hand"] * 0.1:
                 out.add("slow_stock", item["name"], "attention", f"Money tied up in {item['name']}",
                         f"{item['quantity_on_hand']:,.0f} in stock worth {money(value)}, but {units:,.0f} sold in {days} days.", value,

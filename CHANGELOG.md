@@ -6,6 +6,26 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-11-22
+
+Inventory ↔ sales sync (PRD §5.5, #2).
+
+### Added
+- **Inventory → Link sales to stock.** Every product name in your sales files is listed with the units sold. For each one, choose the stock product it is, or mark it "Not a stock item".
+  - Names already matching a product exactly are recognised automatically.
+  - Similar names are suggested but never chosen for you.
+  - This handles each shop's own spelling ("RICE BAG 5KG" is "Rice 5kg").
+- **Data imports → Post to stock.** Takes a file's linked sales out of stock as sale movements. It is your choice per file, and sales files still never change stock on their own.
+  - **Once only:** a file can be posted once.
+  - **Never below zero:** if posting would take a product below zero, nothing is posted and you're told what is short, for example "Cooking oil 1L (short 3)", so you can record the purchase or a stocktake first.
+  - **Skipped lines are reported:** lines with unlinked names, ignored names or no quantity.
+- **Leaving a posted file out of analysis reverses its stock movements** with equal and opposite adjustments, so the ledger stays complete. It can be posted again later.
+- **Last stocktake differences:** per product, what the shelf count found against the records, with its value.
+- **Advice uses the links:** stock levels, restock and slow-stock advice follow linked names, and a product sold under several names is counted once.
+
+### Fixed
+- The stock movements list labelled every non-manual movement "Stocktake import". It now names scanned invoices, sales files and reversals.
+
 ## [1.6.0] - 2026-11-22
 
 Scan invoices into stock (PRD §5.4, #1).
@@ -184,7 +204,8 @@ The first versioned release. The frontend was migrated to React 19, TypeScript (
 - The old date window briefly renders after a file switch with a preset range.
 - The Product name column never sorts Z→A. This was kept for parity.
 
-[Unreleased]: https://github.com/ferlance-data/ferlance/compare/v1.6.0...HEAD
+[Unreleased]: https://github.com/ferlance-data/ferlance/compare/v1.7.0...HEAD
+[1.7.0]: https://github.com/ferlance-data/ferlance/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/ferlance-data/ferlance/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/ferlance-data/ferlance/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/ferlance-data/ferlance/compare/v1.3.0...v1.4.0

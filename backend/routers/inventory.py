@@ -12,7 +12,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile
 from pydantic import BaseModel, Field
 
-from .. import config, db, inventory, ocr
+from .. import config, db, inventory, ocr, sync
 from ..deps import current_user, data_writer, read_business, refund_ai_call, spend_ai_call
 
 router = APIRouter(prefix="/api/businesses/{business_id}/inventory", tags=["inventory"])
@@ -256,3 +256,51 @@ def discard_capture(capture_id: str, business: dict = Depends(data_writer)) -> d
         (capture_id, business["id"]),
     )
     return {"status": "discarded"}
+
+
+# ---------- Sync with sales: links, posting a file's sales to stock, reconciliation ----------
+
+class LinkRequest(BaseModel):
+    sales_name: str = Field(min_length=1, max_length=200)
+    product_id: str | None = Field(default=None, max_length=64)
+    ignore: bool = False
+
+
+@router.get("/links")
+def sales_links(business: dict = Depends(read_business)) -> dict:
+    rows = sync.sales_names(config.DB_PATH, business["id"])
+    return {"names": rows, "unlinked": sum(1 for row in rows if row["status"] == "unlinked")}
+
+
+@router.put("/links")
+def save_link(payload: LinkRequest, business: dict = Depends(data_writer)) -> dict:
+    try:
+        if payload.ignore or payload.product_id:
+            sync.set_link(config.DB_PATH, business["id"], payload.sales_name, None if payload.ignore else payload.product_id)
+        else:
+            sync.clear_link(config.DB_PATH, business["id"], payload.sales_name)
+    except inventory.InventoryError as error:
+        raise _error(error)
+    return {"status": "saved"}
+
+
+@router.get("/posts")
+def stock_posts(business: dict = Depends(read_business)) -> dict:
+    return sync.post_states(config.DB_PATH, business["id"])
+
+
+@router.post("/posts/{dataset_id}")
+def post_sales(dataset_id: str, business: dict = Depends(data_writer), user: dict = Depends(current_user)) -> dict:
+    try:
+        return sync.post_dataset(config.DB_PATH, business["id"], dataset_id, user["id"])
+    except sync.StockConflict as error:
+        raise HTTPException(409, {"message": str(error), "conflicts": error.conflicts})
+    except sync.AlreadyPosted as error:
+        raise HTTPException(409, {"message": str(error), "conflicts": []})
+    except inventory.InventoryError as error:
+        raise HTTPException(404 if str(error) == "Dataset not found." else 400, str(error))
+
+
+@router.get("/reconciliation")
+def reconciliation(business: dict = Depends(read_business)) -> list[dict]:
+    return sync.reconciliation(config.DB_PATH, business["id"])

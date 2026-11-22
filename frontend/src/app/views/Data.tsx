@@ -1,15 +1,15 @@
 // Data imports: file uploads, Mobile Money SMS, and the import history with
 // per-file inclusion switches.
 
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState, type DragEvent, type FormEvent, type ReactNode } from 'react';
 import { Link, useNavigate } from '../../lib/router';
-import { request } from '../../lib/api';
+import { ApiError, request } from '../../lib/api';
 import { formatDateTime, money, number, plural } from '../../lib/format';
 import { Icon } from '../../lib/icons';
 import { toast } from '../../lib/toast';
 import type { Dataset } from '../../lib/types';
-import { DataTable, Segmented, StatusText, type Column, ReadOnlyNotice } from '../components/ui';
+import { DataTable, Pill, Segmented, StatusText, type Column, ReadOnlyNotice } from '../components/ui';
 import { pagePath } from '../routes';
 import { keys, useScope, useWorkspace } from '../workspace';
 import { StatusPill } from './shared';
@@ -377,12 +377,30 @@ function History({
 }) {
   // Switch position shown while a PATCH is in flight, so the control responds at once.
   const [pending, setPending] = useState<Record<string, boolean>>({});
+  const { business, refreshInventory } = useWorkspace();
+  const queryClient = useQueryClient();
+  const postsKey = ['posts', business.id];
+  const posts = useQuery({ queryKey: postsKey, queryFn: ({ signal }) => request<Record<string, { status: string }>>(businessPath('/inventory/posts'), { signal }) });
+
+  async function postToStock(dataset: Dataset) {
+    try {
+      const result = await request<{ units: number; products: number; skipped: Record<string, number> }>(businessPath(`/inventory/posts/${dataset.id}`), { method: 'POST' });
+      const left = result.skipped.unlinked ? ` ${number(result.skipped.unlinked)} line(s) skipped: link their names in Inventory.` : '';
+      toast(`${number(result.units)} units across ${number(result.products)} product(s) taken out of stock.${left}`);
+    } catch (error) {
+      const detail = error instanceof ApiError ? (error.detail as { conflicts?: { name: string; short: number }[] } | undefined) : undefined;
+      const short = detail?.conflicts?.map((item) => `${item.name} (short ${number(item.short)})`).join(', ');
+      toast(short ? `Not enough stock recorded for ${short}. Record the purchase or a stocktake first.` : (error as Error).message, { error: true });
+    } finally {
+      await Promise.all([queryClient.invalidateQueries({ queryKey: postsKey }), refreshInventory()]);
+    }
+  }
 
   async function toggle(dataset: Dataset, included: boolean) {
     setPending((current) => ({ ...current, [dataset.id]: included }));
     try {
       await request(businessPath(`/datasets/${dataset.id}`), { method: 'PATCH', json: { included } });
-      await onImported();
+      await Promise.all([onImported(), queryClient.invalidateQueries({ queryKey: postsKey }), refreshInventory()]);
       toast(included ? `${dataset.filename} is back in your numbers.` : `${dataset.filename} is now left out of business-wide numbers.`);
     } catch (error) {
       toast((error as Error).message, { error: true });
@@ -434,6 +452,19 @@ function History({
             />
             <span />
           </label>
+        );
+      },
+    },
+    {
+      label: 'Stock',
+      value: (item) => {
+        if (item.status === 'failed') return null;
+        if (posts.data?.[item.id]?.status === 'posted') return <Pill tone="success">In stock</Pill>;
+        if (!canWrite || !(pending[item.id] ?? item.included)) return <span className="muted body-sm">Not posted</span>;
+        return (
+          <button className="btn btn-ghost btn-sm" type="button" onClick={() => void postToStock(item)}>
+            Post to stock
+          </button>
         );
       },
     },
