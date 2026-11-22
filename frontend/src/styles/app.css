@@ -1929,3 +1929,55 @@ svg.icon {
     grid-column: 1 / -1;
   }
 }
+
+/* ---------- Debt book ---------- */
+.debt-list {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.debt-card {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  border-top: 1px solid var(--border);
+}
+
+.debt-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.debt-amount {
+  display: grid;
+  gap: 4px;
+  justify-items: end;
+  font-weight: 600;
+}
+
+.debt-pay,
+.debt-remind {
+  padding: 10px 0 0;
+  display: grid;
+  gap: 10px;
+}
+
+.debt-message {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--muted);
+  white-space: pre-wrap;
+}
+
+.debt-payments {
+  margin: 0;
+  padding-left: 18px;
+  font-size: var(--text-sm);
+}

@@ -6,6 +6,30 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-11-22
+
+The debt book (PRD §9, G2): the notebook by the till, made quick.
+
+### Added
+- **Debt book page.** Recording a credit sale or a supplier credit takes a name and an amount; the phone, a note and a pay-by date are optional. Names are remembered, so "Akosua" and "akosua" are one person.
+- **Part-payments** by cash, MTN MoMo, Telecel Cash, AT Money or bank. Paying more than is owed is refused.
+- **Voids instead of deletes.** Voiding a debt also voids its payments, the history is kept, and the ledger entries are reversed.
+- **Ageing:** not due yet, then 1–30, 31–60, 61–90 and over 90 days late. With no pay-by date, a debt counts as late 30 days after it started.
+- **Reminders** open the owner's own WhatsApp or SMS with the balance and the "where to pay" MoMo details filled in. Nothing is sent automatically. Messages are in English, with a **draft** Twi version that a native speaker still needs to check.
+- **MoMo matching.** Incoming MoMo messages that may pay an open debt are suggested by matching phone number or name; the owner confirms each one. A matched message settles the debt and is not counted as a second sale. If its import is later left out, the payment goes on hold.
+- **In the books:**
+  - A new credit sale posts Receivables / Sales.
+  - A sale already in an import clears "Sales receipts to allocate" instead.
+  - Supplier credit for recorded stock clears "Payments to allocate"; for anything else it is booked as an expense.
+  - Payments move money in or out of cash, MoMo or bank.
+  - Debts dated before the books start only set the opening receivable or payable.
+  - The debt book's totals equal the ledger's receivables and payables (tested).
+- **Opening balances** propose only the part of a receivables or payables balance that isn't already in the debt book.
+
+### Not yet
+- The Twi reminder needs a native speaker's review.
+- Offline entry waits for the mobile app (#9, deferred).
+
 ## [1.10.0] - 2026-11-22
 
 The quiet ledger (PRD §9, G1): real double-entry books, kept automatically from what the business already records. They're shown beside the existing reports; the dashboards don't change yet.

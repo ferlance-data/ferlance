@@ -288,8 +288,14 @@ def _minor_of(record: dict[str, Any], field: str) -> int:
     return to_minor(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else 0
 
 
-def record_rule(record: dict[str, Any], domain: str) -> str:
-    """Which posting rule a line follows: 'momo_expense', 'expense' or 'sale'. Shared with the differences check."""
+def record_rule(record: dict[str, Any], domain: str, settles_debt: bool = False) -> str:
+    """Which posting rule a line follows. Shared with the differences check.
+
+    'debt_in' / 'debt_out': a MoMo message the owner matched to a debt-book payment (it settles the
+    debt instead of being a new sale or a new expense); 'momo_expense'; 'expense'; or 'sale'.
+    """
+    if settles_debt and record.get("category") in ("momo_sale_received", "momo_expense_paid"):
+        return "debt_in" if record["category"] == "momo_sale_received" else "debt_out"
     if record.get("category") == "momo_expense_paid":
         return "momo_expense"
     if domain == "cost" or (not _minor_of(record, "amount") and _minor_of(record, "cost") > 0):
@@ -313,7 +319,29 @@ def _stock_posted_lines(conn, business_id: str) -> Any:
     return posted
 
 
-def dataset_postings(conn, business_id: str, dataset: dict[str, Any], accounts: dict[str, str], books_start: str | None) -> tuple[list[Posting], list[str]]:
+# A debt payment counts unless it is voided, or it was matched to a MoMo message whose import is
+# now left out of analysis (then the message is not in the books, so neither is the payment).
+STANDING_PAYMENT = (
+    "x.voided_at IS NULL AND (x.momo_ref IS NULL OR EXISTS (SELECT 1 FROM datasets ds "
+    "WHERE ds.id = substr(x.momo_ref, 1, instr(x.momo_ref, ':') - 1) AND ds.status != 'failed' AND ds.review_status != 'excluded'))"
+)
+
+
+def debt_refs(conn, business_id: str) -> dict[str, set[str]]:
+    """dataset id -> MoMo transaction ids matched to a standing debt-book payment."""
+    found: dict[str, set[str]] = defaultdict(set)
+    rows = conn.execute(
+        "SELECT p.momo_ref FROM debt_payments p JOIN debts d ON d.id = p.debt_id "
+        "WHERE p.business_id = ? AND p.momo_ref IS NOT NULL AND p.voided_at IS NULL AND d.voided_at IS NULL",
+        (business_id,),
+    ).fetchall()
+    for row in rows:
+        dataset_id, _, transaction = str(row["momo_ref"]).partition(":")
+        found[dataset_id].add(transaction)
+    return found
+
+
+def dataset_postings(conn, business_id: str, dataset: dict[str, Any], accounts: dict[str, str], books_start: str | None, settled: set[str] | None = None) -> tuple[list[Posting], list[str]]:
     if dataset["status"] == "failed" or dataset.get("review_status") == dataset_store.EXCLUDED:
         return [], []
     try:
@@ -339,7 +367,14 @@ def dataset_postings(conn, business_id: str, dataset: dict[str, Any], accounts: 
         amount, cost = _minor_of(record, "amount"), _minor_of(record, "cost")
         label = str(record.get("product") or record.get("customer") or name)[:120]
         lines = by_day[day]
-        rule = record_rule(record, profile["domain"])
+        rule = record_rule(record, profile["domain"], str(record.get("transaction_id")) in (settled or ()))
+        if rule in ("debt_in", "debt_out"):
+            wallet = accounts[receipt_account(record)]
+            if rule == "debt_in":
+                lines += [(wallet, currency, amount, label), (accounts["receivables"], currency, -amount, label)]
+            else:
+                lines += [(accounts["payables"], currency, amount, label), (wallet, currency, -amount, label)]
+            continue
         if rule == "momo_expense":
             wallet = accounts[receipt_account(record)]
             lines += [(accounts["uncategorised"], currency, amount, label), (wallet, currency, -amount, label)]
@@ -413,13 +448,15 @@ def catch_up(path: Path, business_id: str, user_id: str | None = None) -> int:
             "SELECT d.*, p.status AS stock_status FROM datasets d LEFT JOIN dataset_stock_posts p ON p.dataset_id = d.id WHERE d.business_id = ?",
             (business_id,),
         ).fetchall()
+        refs = debt_refs(conn, business_id)
         for row in datasets:
             dataset = dict(row)
-            fingerprint = f"{RULES_VERSION}:{start}:{dataset['status']}:{dataset.get('review_status')}:{dataset['stock_status']}"
+            settled = refs.get(dataset["id"], set())
+            fingerprint = f"{RULES_VERSION}:{start}:{dataset['status']}:{dataset.get('review_status')}:{dataset['stock_status']}:{'|'.join(sorted(settled))}"
             key = f"dataset:{dataset['id']}"
             if known.get(key) == fingerprint:
                 continue
-            postings, issues = dataset_postings(conn, business_id, dataset, accounts, start)
+            postings, issues = dataset_postings(conn, business_id, dataset, accounts, start, settled)
             changed += _sync(conn, business_id, key, fingerprint, postings, issues, user_id)
         movements = conn.execute(
             "SELECT m.*, p.name AS product_name, p.unit_cost AS product_cost FROM inventory_movements m "
@@ -440,6 +477,68 @@ def catch_up(path: Path, business_id: str, user_id: str | None = None) -> int:
             if previous == fingerprint:
                 continue
             changed += _sync(conn, business_id, key, fingerprint, postings, issues, user_id)
+        changed += _catch_up_debts(conn, business_id, accounts, start, known, user_id)
+    return changed
+
+
+METHOD_ACCOUNTS = ("cash", "momo_mtn", "momo_telecel", "momo_at", "momo_other", "bank")
+
+
+def _catch_up_debts(conn, business_id: str, accounts: dict[str, str], start: str | None, known: dict[str, str], user_id: str | None) -> int:
+    """Debt-book rules. Before the books start, only the receivable or payable moves (cash is in the opening balances).
+
+    - Customer owes: Receivables / Sales (a new credit sale), or / Sales receipts to allocate (a sale
+      already in an imported file, so it is not counted twice).
+    - Business owes: Payments to allocate (a purchase already recorded in stock) or an expense / Payables.
+    - Payment: cash, MoMo or bank against Receivables or Payables. A payment matched to a MoMo
+      message posts nothing itself: the message's import posts it (see ``dataset_postings``).
+    """
+    changed = 0
+    currency = _currency(conn, business_id)
+    debts = conn.execute(
+        "SELECT d.*, p.name AS party_name FROM debts d JOIN debt_parties p ON p.id = d.party_id WHERE d.business_id = ?", (business_id,)
+    ).fetchall()
+    for row in debts:
+        debt = dict(row)
+        fingerprint = f"{RULES_VERSION}:{start}:{bool(debt['voided_at'])}"
+        key = f"debt:{debt['id']}"
+        if known.get(key) == fingerprint:
+            continue
+        postings: list[Posting] = []
+        if not debt["voided_at"]:
+            day, amount = debt["issued_on"], debt["amount_minor"]
+            label = f"{debt['party_name']}: {debt['description']}".strip(": ")[:120]
+            before = bool(start and day < start)
+            if debt["direction"] == "owed_to_us":
+                counter = "opening_equity" if before else "sales" if debt["basis"] == "new_sale" else "receipts_clearing"
+                postings = [(day, f"Credit: {label}", [(accounts["receivables"], debt["currency"], amount, label), (accounts[counter], debt["currency"], -amount, label)])]
+            else:
+                counter = "opening_equity" if before else "payments_clearing" if debt["basis"] == "recorded_purchase" else expense_account({"product": debt["description"]})
+                postings = [(day, f"Owed to supplier: {label}", [(accounts[counter], debt["currency"], amount, label), (accounts["payables"], debt["currency"], -amount, label)])]
+        changed += _sync(conn, business_id, key, fingerprint, postings, [], user_id)
+    payments = conn.execute(
+        "SELECT p.*, d.direction, d.currency, d.voided_at AS debt_voided, t.name AS party_name FROM debt_payments p "
+        "JOIN debts d ON d.id = p.debt_id JOIN debt_parties t ON t.id = d.party_id WHERE p.business_id = ?",
+        (business_id,),
+    ).fetchall()
+    for row in payments:
+        payment = dict(row)
+        void = bool(payment["voided_at"] or payment["debt_voided"])
+        fingerprint = f"{RULES_VERSION}:{start}:{void}:{payment['method']}"
+        key = f"debtpay:{payment['id']}"
+        if known.get(key) == fingerprint:
+            continue
+        postings = []
+        if not void and payment["method"] in METHOD_ACCOUNTS:
+            day, amount, cur = payment["paid_on"], payment["amount_minor"], payment["currency"] or currency
+            money_account = accounts["opening_equity" if start and day < start else payment["method"]]
+            label = f"{payment['party_name']} payment"
+            if payment["direction"] == "owed_to_us":
+                lines = [(money_account, cur, amount, label), (accounts["receivables"], cur, -amount, label)]
+            else:
+                lines = [(accounts["payables"], cur, amount, label), (money_account, cur, -amount, label)]
+            postings = [(day, label, lines)]
+        changed += _sync(conn, business_id, key, fingerprint, postings, [], user_id)
     return changed
 
 
@@ -452,12 +551,33 @@ def proposed_opening(path: Path, business_id: str, start: date) -> dict[str, Any
 
     position = financial_position.position_as_of(path, business_id, start)
     has_stock = db.one(path, "SELECT 1 FROM inventory_movements WHERE business_id = ? LIMIT 1", (business_id,)) is not None
+    # What the debt book already says was owed on the start day; only the rest of a receivables or
+    # payables balance is proposed, so debts in the book are not counted twice and others are not lost.
+    outstanding = {
+        row["direction"]: row["amount"] or 0
+        for row in db.many(
+            path,
+            f"SELECT d.direction, SUM(d.amount_minor - COALESCE((SELECT SUM(x.amount_minor) FROM debt_payments x WHERE x.debt_id = d.id AND x.paid_on < ? AND {STANDING_PAYMENT}), 0)) AS amount "
+            "FROM debts d WHERE d.business_id = ? AND d.voided_at IS NULL AND d.issued_on < ? GROUP BY d.direction",
+            (start.isoformat(), business_id, start.isoformat()),
+        )
+    }
+    from_debt_book = {"receivables": "owed_to_us", "payables": "we_owe"}
     lines, notes = [], []
     for group in ("assets", "liabilities", "equity"):
         for item in position[group]:
             if item["category"] == "inventory" and has_stock:
                 notes.append(f"Stock comes from your stock records, so the '{item['account_name']}' balance is not used.")
                 continue
+            direction = from_debt_book.get(item["category"])
+            if direction and outstanding.get(direction):
+                covered = min(outstanding[direction], to_minor(item["amount"]))
+                outstanding[direction] -= covered
+                rest = from_minor(to_minor(item["amount"]) - covered)
+                notes.append(f"{from_minor(covered):,.2f} of '{item['account_name']}' is already in your debt book, so only the rest ({rest:,.2f}) is proposed.")
+                if rest <= 0:
+                    continue
+                item = {**item, "amount": rest}
             key = POSITION_ACCOUNTS[item["category"]]
             if item["category"] == "cash":
                 key = _wallet(item["account_name"].casefold()) or key
@@ -790,6 +910,8 @@ def differences(path: Path, business_id: str, start: date, end: date) -> dict[st
     analytics_total = 0
     explained: dict[str, int] = defaultdict(int)  # each amount is (analytics minus ledger) for that reason
     expected: dict[str, int] = defaultdict(int)  # ledger sales each import should produce in the period
+    with db.connection(path) as conn:
+        refs = debt_refs(conn, business_id)
     for dataset in dataset_store.analysable(business_id):
         try:
             records = dataset_store.read_records(dataset)
@@ -797,10 +919,12 @@ def differences(path: Path, business_id: str, start: date, end: date) -> dict[st
             continue
         imported_day = str(dataset["created_at"])[:10]
         domain = analytics._data_profile(analytics._present([dict(r) for r in records]))["domain"]
+        settled = refs.get(dataset["id"], set())
         for record in records:
             amount = _minor_of(record, "amount")
             day, dated = _record_day(record, imported_day)
-            booked = record_rule(record, domain) == "sale" and first <= day <= last and not (books_start and day < books_start)
+            rule = record_rule(record, domain, str(record.get("transaction_id")) in settled)
+            booked = rule == "sale" and first <= day <= last and not (books_start and day < books_start)
             if booked:
                 expected[f"dataset:{dataset['id']}"] += amount
             if not dated:
@@ -812,8 +936,11 @@ def differences(path: Path, business_id: str, start: date, end: date) -> dict[st
             analytics_total += amount
             if booked:
                 continue
-            rule = record_rule(record, domain)
-            if rule == "momo_expense":
+            if rule == "debt_in":
+                explained["MoMo payments of customer debts (the sale was booked when the debt was recorded)"] += amount
+            elif rule == "debt_out":
+                explained["MoMo payments made (dashboards count them as revenue; the books treat them as spending)"] += amount
+            elif rule == "momo_expense":
                 explained["MoMo payments made (dashboards count them as revenue; the books treat them as spending)"] += amount
             elif rule == "expense":
                 explained["Amounts on expense lines"] += amount
@@ -832,6 +959,8 @@ def differences(path: Path, business_id: str, start: date, end: date) -> dict[st
         source = row["source_key"]
         if source.startswith("manual:"):
             explained["Manual journal entries"] -= row["amount"]
+        elif source.startswith("debt:"):
+            explained["Credit sales recorded in the debt book"] -= row["amount"]
         elif source.startswith("dataset:"):
             explained["Corrections dated after a locked period"] -= row["amount"] - expected.pop(source, 0)
         else:
