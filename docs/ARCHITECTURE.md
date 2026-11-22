@@ -115,7 +115,7 @@ React 19 + TypeScript (strict) built by Vite. Two entries: the landing page keep
 | `business_integrations` | Fernet-encrypted third-party keys (currently unused; kept for future provider keys) |
 | `insight_explanations` | cached AI explanations of advice items, keyed by the item's evidence |
 | `chat_conversations`, `chat_messages` | saved Ask Lance threads |
-| `rag_documents_fts` | FTS5 index of accepted rows |
+| `rag_records_fts` | FTS5 index of accepted rows: values only, record date for scope filtering, porter stemming |
 
 Runtime data under `data/` is local state and is not tracked in git.
 

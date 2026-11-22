@@ -164,7 +164,6 @@ CREATE TABLE IF NOT EXISTS financial_position_balances (
 CREATE INDEX IF NOT EXISTS financial_position_lookup
     ON financial_position_balances(business_id, category, account_name, as_of_date DESC, created_at DESC);
 CREATE INDEX IF NOT EXISTS datasets_business_date ON datasets(business_id, created_at DESC);
-CREATE VIRTUAL TABLE IF NOT EXISTS rag_documents_fts USING fts5(document_id UNINDEXED, business_id UNINDEXED, dataset_id UNINDEXED, content);
 -- v2 index: record values only (field names matched every row), the record date for scope
 -- filtering, and the porter stemmer so "payments" finds "payment".
 CREATE VIRTUAL TABLE IF NOT EXISTS rag_records_fts USING fts5(
@@ -225,7 +224,7 @@ def initialize(path: Path) -> None:
             db.execute("ALTER TABLE refresh_sessions ADD COLUMN replaced_by TEXT")
         # The v1 retrieval index (field names indexed, no dates) is replaced by rag_records_fts,
         # which rebuilds itself lazily per file on the next Ask Lance question.
-        db.execute("DELETE FROM rag_documents_fts")
+        db.execute("DROP TABLE IF EXISTS rag_documents_fts")
         # Brave web research was removed in favour of free sources; drop any stored Brave keys.
         db.execute("DELETE FROM business_integrations WHERE provider = 'brave_search'")
         movement_columns = {row[1] for row in db.execute("PRAGMA table_info(inventory_movements)").fetchall()}
