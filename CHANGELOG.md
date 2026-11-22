@@ -6,6 +6,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+- `docs/PRD.md` §9 drafts Phase 2, "Ghana-first books" (v2.x). It covers:
+  - a quiet double-entry ledger
+  - a debt book
+  - WhatsApp invoices
+  - reading exercise-book pages
+  - MoMo and bank reconciliation
+  - Ghana tax and payroll basics
+  - a credit-readiness report
+  - WhatsApp and local languages
+
+  It is benchmarked against QuickBooks, Xero and Wave.
+
 ## [1.9.0] - 2026-11-22
 
 Daily data export to AWS S3 (PRD #3).
