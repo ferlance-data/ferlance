@@ -753,7 +753,7 @@ def journal_csv(path: Path, business_id: str) -> str:
         amount = row["amount_minor"]
         cells = [row["entry_date"], row["id"], row["code"], row["name"], f"{max(amount, 0) / 100:.2f}" if amount > 0 else "", f"{-amount / 100:.2f}" if amount < 0 else "", row["currency"], row["memo"], row["description"]]
         # Spreadsheet formula injection: a cell starting with = + - @ is read as a formula.
-        writer.writerow([f"'{cell}" if isinstance(cell, str) and cell[:1] in ("=", "+", "-", "@") else cell for cell in cells])
+        writer.writerow([f"'{cell}" if isinstance(cell, str) and cell[:1] in ("=", "+", "-", "@", "\t", "\r") else cell for cell in cells])
     return buffer.getvalue()
 
 
