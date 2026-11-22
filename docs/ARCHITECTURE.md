@@ -80,7 +80,7 @@ Tapping an item calls `POST /insights/{id}/explain`. The server rebuilds the ite
 ### Ask Lance
 
 1. All included files are read; a currency-aware analytics snapshot is built (mixed currencies are never summed).
-2. `rag.retrieve` pulls the most relevant rows from an FTS5 index, restricted to the included files.
+2. `rag.retrieve` pulls the most relevant rows from an FTS5 index (`rag_records_fts`). The index holds record values only, uses porter stemming, and is restricted to the included files and the question's date scope. Common question words are dropped. The choice is backed by `tools/eval/rag_eval.py`.
 3. `llm.ask_lance` sends the snapshot, evidence and recent history to OpenRouter → Groq → AgentRouter, in order.
 4. The conversation is persisted only after a successful answer.
 

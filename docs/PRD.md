@@ -169,6 +169,17 @@ Today, sales files never change stock (by design), and inventory products and sa
 
 **Non-goal:** a hosted vector database. Reconsider it only if the per-business data outgrows SQLite.
 
+**Outcome (v1.8.0).** Measured with `tools/eval/rag_eval.py`:
+
+| Retriever | Precision@10 | Hit@10 | p95 latency |
+| --- | --- | --- | --- |
+| v1 FTS5 | 0.78 | 9/10 | 4 ms |
+| v2 FTS5 (adopted) | 0.90 | 9/10 | 4 ms |
+| v2 + embeddings | 0.91 | 10/10 | about 3,000 ms |
+
+- **v2 FTS5** indexes record values only, drops common question words, applies the date scope and uses porter stemming.
+- **v2 + embeddings** was not adopted: it misses the latency budget about 30 times over for a 0.01 gain.
+
 ### 5.7 #3: Data export to AWS (v1.7.0)
 
 **Recommendation:** At SME scale a full data lake (Glue catalogue, Lake Formation, Athena over many sources) is overkill. It adds standing cost and operational load without improving the app. Start with a **scheduled, per-business Parquet export to S3**, partitioned by business and date. Athena can query it on demand, so it costs nothing while idle. It can grow into a lake later without rework.

@@ -6,6 +6,24 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-11-22
+
+Better retrieval for Ask Lance (PRD §5.6, #8), measured before it was changed.
+
+### Added
+- `tools/eval/rag_eval.py`: a repeatable retrieval evaluation (10 questions over about 600 records), scored on precision@10, hit@10 and p95 latency. `--vectors` runs the hybrid-embeddings experiment.
+
+### Changed
+- **Ask Lance now finds the right records more often.** Precision@10 went from 0.78 to 0.90, still at about 4 ms. The new index:
+  - holds record values only (field names like "product" used to match every row)
+  - drops common question words
+  - respects the date range in scope
+  - matches word forms ("payments" finds "payment")
+- The old index is cleared on upgrade and rebuilt automatically, file by file, on the next question.
+
+### Not adopted
+- **A vector or hybrid index.** Embeddings through OpenRouter scored 0.91, about the same, but added about 3 s per question and 22 s of indexing per 600 rows. See the PRD for the numbers.
+
 ## [1.7.0] - 2026-11-22
 
 Inventory ↔ sales sync (PRD §5.5, #2).
@@ -204,7 +222,8 @@ The first versioned release. The frontend was migrated to React 19, TypeScript (
 - The old date window briefly renders after a file switch with a preset range.
 - The Product name column never sorts Z→A. This was kept for parity.
 
-[Unreleased]: https://github.com/ferlance-data/ferlance/compare/v1.7.0...HEAD
+[Unreleased]: https://github.com/ferlance-data/ferlance/compare/v1.8.0...HEAD
+[1.8.0]: https://github.com/ferlance-data/ferlance/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/ferlance-data/ferlance/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/ferlance-data/ferlance/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/ferlance-data/ferlance/compare/v1.4.0...v1.5.0
