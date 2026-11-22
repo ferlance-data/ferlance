@@ -51,6 +51,8 @@ OPENROUTER_MODELS = _csv(
     )
 )
 OPENROUTER_MAX_TOKENS = int(os.getenv("OPENROUTER_MAX_TOKENS", "800"))
+# Vision model for reading invoice photos and PDFs (OCR). Must accept image input on OpenRouter.
+OCR_MODEL = os.getenv("FERLANCE_OCR_MODEL", "google/gemini-2.5-flash-lite")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
 GROQ_API_URL = os.getenv("GROQ_API_URL", "https://api.groq.com/openai/v1/chat/completions")

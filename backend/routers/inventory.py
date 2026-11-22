@@ -2,15 +2,17 @@
 
 import csv
 import io
+import json
 import math
 import re
+import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile
 from pydantic import BaseModel, Field
 
-from .. import config, inventory
-from ..deps import current_user, data_writer, read_business
+from .. import config, db, inventory, ocr
+from ..deps import current_user, data_writer, read_business, refund_ai_call, spend_ai_call
 
 router = APIRouter(prefix="/api/businesses/{business_id}/inventory", tags=["inventory"])
 STOCKTAKE_HEADERS = "product,sku,unit,quantity_on_hand,unit_cost,reorder_level\n"
@@ -164,3 +166,88 @@ def import_template(business: dict = Depends(read_business)) -> Response:
         media_type="text/csv",
         headers={"Content-Disposition": 'attachment; filename="inventory-stocktake-template.csv"'},
     )
+
+
+# ---------- Scan an invoice (OCR) -> draft -> review -> confirm ----------
+
+class CaptureText(BaseModel):
+    text: str = Field(min_length=1, max_length=20_000)
+
+
+class CaptureDecision(BaseModel):
+    action: str = Field(pattern="^(add|create|skip)$")
+    product_id: str | None = Field(default=None, max_length=64)
+    name: str | None = Field(default=None, max_length=200)
+    unit: str | None = Field(default=None, max_length=40)
+    quantity: float | None = None
+    unit_cost: float | None = None
+    reason: str | None = Field(default=None, max_length=200)
+
+
+class CaptureConfirm(BaseModel):
+    lines: list[CaptureDecision] = Field(max_length=ocr.MAX_LINES)
+
+
+def _save_capture(business: dict, user: dict, source: str, filename: str, lines: list[dict]) -> dict:
+    if not lines:
+        raise HTTPException(422, "No product lines were found. Try a clearer photo, or type the lines in.")
+    products = inventory.list_products(config.DB_PATH, business["id"])["items"]
+    lines = ocr.match_products(lines, products)
+    capture_id = str(uuid.uuid4())
+    db.insert(
+        config.DB_PATH,
+        "INSERT INTO stock_captures (id, business_id, created_by, source, filename, status, lines, created_at) VALUES (?, ?, ?, ?, ?, 'draft', ?, ?)",
+        (capture_id, business["id"], user["id"], source, filename[:120], json.dumps(lines), db.now()),
+    )
+    return {"id": capture_id, "status": "draft", "source": source, "filename": filename[:120], "lines": lines}
+
+
+@router.post("/captures")
+def create_capture(file: UploadFile = File(...), business: dict = Depends(data_writer), user: dict = Depends(current_user)) -> dict:
+    """Read a photo or PDF into a draft. The file itself is not stored."""
+    content = file.file.read(ocr.MAX_BYTES + 1)
+    try:
+        ocr.sniff(content)
+    except ocr.OcrError as error:
+        raise HTTPException(415, str(error))
+    spend_ai_call(business["id"])
+    try:
+        lines = ocr.read_document(content, file.filename or "document")
+    except ocr.OcrError as error:
+        refund_ai_call(business["id"])
+        raise HTTPException(422 if "MB" in str(error) else 503, str(error))
+    return _save_capture(business, user, "vision", file.filename or "Photo", lines)
+
+
+@router.post("/captures/text")
+def create_text_capture(payload: CaptureText, business: dict = Depends(data_writer), user: dict = Depends(current_user)) -> dict:
+    """Free path: pasted lines such as "Rice 5kg, 10, 70" become a draft without any AI."""
+    return _save_capture(business, user, "text", "Typed list", ocr.parse_text(payload.text))
+
+
+@router.get("/captures/{capture_id}")
+def get_capture(capture_id: str, business: dict = Depends(read_business)) -> dict:
+    row = db.one(config.DB_PATH, "SELECT * FROM stock_captures WHERE id = ? AND business_id = ?", (capture_id, business["id"]))
+    if not row:
+        raise HTTPException(404, "Scan not found.")
+    return {**{k: row[k] for k in ("id", "status", "source", "filename", "created_at", "confirmed_at")}, "lines": json.loads(row["lines"]), "outcome": json.loads(row["outcome"] or "null")}
+
+
+@router.post("/captures/{capture_id}/confirm")
+def confirm_capture(capture_id: str, payload: CaptureConfirm, business: dict = Depends(data_writer), user: dict = Depends(current_user)) -> dict:
+    try:
+        return inventory.confirm_capture(config.DB_PATH, business["id"], user["id"], capture_id, [line.model_dump() for line in payload.lines])
+    except inventory.CaptureConflict as error:
+        raise HTTPException(409, str(error))
+    except inventory.InventoryError as error:
+        raise HTTPException(404 if str(error) in ("Scan not found.", "Product not found.") else 400, str(error))
+
+
+@router.delete("/captures/{capture_id}")
+def discard_capture(capture_id: str, business: dict = Depends(data_writer)) -> dict:
+    db.insert(
+        config.DB_PATH,
+        "UPDATE stock_captures SET status = 'discarded' WHERE id = ? AND business_id = ? AND status = 'draft'",
+        (capture_id, business["id"]),
+    )
+    return {"status": "discarded"}

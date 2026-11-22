@@ -11,10 +11,11 @@ import type { InventoryItem, Movement } from '../../lib/types';
 import { useBusinessQuery } from '../hooks';
 import { DataTable, Kpi, Pill, Segmented, StatusText, ReadOnlyNotice } from '../components/ui';
 import { PageActions } from '../page';
+import { ScanInvoice } from './ScanInvoice';
 import { keys, useWorkspace } from '../workspace';
 import { buildStocktakeTemplate, filterProducts, resolveSelectedProduct, STOCKTAKE_TEMPLATE_FILENAME } from './inventory.logic';
 
-type Tab = 'movement' | 'product' | 'stocktake';
+type Tab = 'movement' | 'product' | 'stocktake' | 'scan';
 type Busy = Tab | null;
 
 interface ProductForm {
@@ -289,6 +290,7 @@ export default function Inventory() {
                 { value: 'movement', label: 'Record movement' },
                 { value: 'product', label: 'Add product' },
                 { value: 'stocktake', label: 'Stocktake' },
+                { value: 'scan', label: 'Scan invoice' },
               ]}
             />
           </div>
@@ -398,6 +400,7 @@ export default function Inventory() {
                     Import counted stock
                   </button>
                 </form>
+                <ScanInvoice hidden={tab !== 'scan'} products={items} onApplied={refreshInventory} />
               </>
             ) : (
               <ReadOnlyNotice role={role} what="stock" />

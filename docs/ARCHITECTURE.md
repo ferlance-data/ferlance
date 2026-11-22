@@ -36,6 +36,7 @@ FastAPI (backend/main.py) — wiring, lifespan, built frontend + SPA fallback, c
   inventory.py ─ financial_position.py                        operational ledgers
   advisor.py ─ ghana_calendar.py                              plain-language advice (deterministic)
   rag.py (SQLite FTS5) ─ llm.py ─ news_context.py (GDELT)      optional AI and free news context
+  ocr.py                                                       invoice photo/PDF/text → reviewed stock draft
         │
   SQLite (metadata, ledgers, chats, FTS index)  +  data/raw (uploads)  +  data/processed (JSONL)
 ```
@@ -103,6 +104,7 @@ React 19 + TypeScript (strict) built by Vite. Two entries: the landing page keep
 | --- | --- |
 | `users`, `businesses`, `refresh_sessions` | identity, businesses, hashed single-use refresh sessions. A rotated token gets a one-shot 60 s grace (`replaced_by`), so a refresh whose response is lost on a flaky connection does not sign the user out. |
 | `business_members`, `business_invites` | who can access which business, and in what role. Invites are single-use hashed links that expire after 7 days. |
+| `stock_captures` | scanned-invoice drafts: extracted lines, then the per-line outcome once confirmed (no images stored) |
 | `admin_audit` | append-only log of admin role changes and account disables/enables |
 | `ai_usage` | uncached AI calls per business per day (`FERLANCE_AI_DAILY_LIMIT`, default 100) |
 | `datasets` | one row per import: status, counts, warnings, `checksum`, `review_status` (`accepted`/`excluded`) |
