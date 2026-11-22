@@ -14,14 +14,19 @@ def current_user(authorization: str | None = Header(default=None)) -> dict:
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(401, "Authentication required.")
     user_id = read_access_token(authorization.split(" ", 1)[1])
-    user = db.one(config.DB_PATH, "SELECT id, email, role, full_name FROM users WHERE id = ?", (user_id or "",))
+    # Disabled accounts are refused here, so a 15-minute access token stops working at once.
+    user = db.one(config.DB_PATH, "SELECT id, email, role, full_name FROM users WHERE id = ? AND disabled_at IS NULL", (user_id or "",))
     if not user:
         raise HTTPException(401, "Invalid or expired token.")
     return user
 
 
+def is_admin(user: dict) -> bool:
+    return user["role"] == "admin" or user["email"].lower() in config.ADMIN_EMAILS
+
+
 def admin_user(user: dict = Depends(current_user)) -> dict:
-    if user["role"] != "admin" and user["email"].lower() not in config.ADMIN_EMAILS:
+    if not is_admin(user):
         raise HTTPException(403, "Administrator privileges are required.")
     return user
 
