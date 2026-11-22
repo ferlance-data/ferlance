@@ -8,11 +8,14 @@ let refreshing: Promise<AuthResponse> | null = null;
 
 export class ApiError extends Error {
   readonly status: number;
+  /** Structured error body from the server, when it sent one (for example a list of conflicts). */
+  readonly detail: unknown;
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, detail?: unknown) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
+    this.detail = detail;
   }
 }
 
@@ -36,12 +39,15 @@ export function refreshSession(): Promise<AuthResponse> {
 }
 
 interface ErrorBody {
-  detail?: string | { msg: string }[];
+  detail?: string | { msg: string }[] | { message?: string };
 }
 
 function detail(body: ErrorBody | null, status: number): string {
-  if (Array.isArray(body?.detail)) return body.detail.map((item) => item.msg).join(' ');
-  return body?.detail || (status >= 500 ? 'The server could not complete that request.' : 'Request failed.');
+  const value = body?.detail;
+  if (Array.isArray(value)) return value.map((item) => item.msg).join(' ');
+  if (value && typeof value === 'object' && typeof value.message === 'string') return value.message;
+  if (typeof value === 'string' && value) return value;
+  return status >= 500 ? 'The server could not complete that request.' : 'Request failed.';
 }
 
 export interface RequestOptions {
@@ -77,7 +83,7 @@ export async function request<T>(path: string, { method = 'GET', json, body, sig
     response = await send();
   }
   const payload = (await response.json().catch(() => ({}))) as unknown;
-  if (!response.ok) throw new ApiError(detail(payload as ErrorBody, response.status), response.status);
+  if (!response.ok) throw new ApiError(detail(payload as ErrorBody, response.status), response.status, (payload as ErrorBody)?.detail);
   return payload as T;
 }
 

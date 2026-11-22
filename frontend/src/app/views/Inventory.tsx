@@ -11,6 +11,7 @@ import type { InventoryItem, Movement } from '../../lib/types';
 import { useBusinessQuery } from '../hooks';
 import { DataTable, Kpi, Pill, Segmented, StatusText, ReadOnlyNotice } from '../components/ui';
 import { PageActions } from '../page';
+import { Reconciliation, SalesLinks } from './SalesLinks';
 import { ScanInvoice } from './ScanInvoice';
 import { keys, useWorkspace } from '../workspace';
 import { buildStocktakeTemplate, filterProducts, resolveSelectedProduct, STOCKTAKE_TEMPLATE_FILENAME } from './inventory.logic';
@@ -47,6 +48,15 @@ function downloadTemplate() {
   link.download = STOCKTAKE_TEMPLATE_FILENAME;
   link.click();
   URL.revokeObjectURL(url);
+}
+
+/** Who or what recorded a movement, from its source. */
+export function movementSource(source: string, recordedBy: string | null | undefined): string {
+  if (source === 'manual') return recordedBy || 'Manual';
+  if (source === 'capture') return 'Scanned invoice';
+  if (source.startsWith('sales-reversal:')) return 'Sales file left out';
+  if (source.startsWith('sales:')) return 'Sales file';
+  return 'Stocktake import';
 }
 
 export default function Inventory() {
@@ -410,6 +420,9 @@ export default function Inventory() {
         </div>
       </div>
 
+      <SalesLinks products={items} />
+      <Reconciliation />
+
       <div className="card">
         <div className="card-header">
           <div>
@@ -430,7 +443,7 @@ export default function Inventory() {
                   value: (item) => <span className={item.quantity_delta < 0 ? 'negative' : 'positive'}>{`${item.quantity_delta > 0 ? '+' : ''}${number(item.quantity_delta, 3)} ${item.unit}`}</span>,
                 },
                 { label: 'Note', value: (item) => item.note || '—' },
-                { label: 'By', value: (item) => (item.source === 'manual' ? item.recorded_by : 'Stocktake import') },
+                { label: 'By', value: (item) => movementSource(item.source, item.recorded_by) },
               ]}
               rows={movements}
               rowKey={(item) => item.id}

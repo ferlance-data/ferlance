@@ -62,6 +62,25 @@ CREATE INDEX IF NOT EXISTS inventory_movements_business_date
     ON inventory_movements(business_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS inventory_movements_product_date
     ON inventory_movements(product_id, created_at DESC);
+CREATE TABLE IF NOT EXISTS product_links (
+    business_id TEXT NOT NULL,
+    sales_name_norm TEXT NOT NULL,
+    sales_name TEXT NOT NULL,
+    product_id TEXT,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY(business_id, sales_name_norm),
+    FOREIGN KEY(business_id) REFERENCES businesses(id)
+);
+CREATE TABLE IF NOT EXISTS dataset_stock_posts (
+    dataset_id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('posted', 'reversed')),
+    summary TEXT,
+    posted_at TEXT NOT NULL,
+    reversed_at TEXT,
+    FOREIGN KEY(business_id) REFERENCES businesses(id)
+);
+CREATE INDEX IF NOT EXISTS inventory_movements_source ON inventory_movements(business_id, source);
 CREATE TABLE IF NOT EXISTS stock_captures (
     id TEXT PRIMARY KEY,
     business_id TEXT NOT NULL,
