@@ -145,7 +145,7 @@ export function BarChart({
             {points.length <= 40 ? points.map(([px, value]) => <circle key={px} className="cost-dot" cx={px} cy={y(value)} r={3} />) : null}
           </>
         ) : null}
-        <rect x={PAD.left} y={PAD.top} width={innerWidth} height={innerHeight} fill="transparent" onPointerMove={onMove} onPointerDown={onMove} onPointerLeave={() => setActive(null)} />
+        <rect x={PAD.left} y={PAD.top} width={innerWidth} height={innerHeight} fill="transparent" onPointerMove={onMove} onPointerDown={onMove} onPointerLeave={(event) => event.pointerType !== 'touch' && setActive(null)} />
       </svg>
       <div
         className="chart-tooltip"

@@ -56,3 +56,17 @@ describe('RadialProgress rounding', () => {
     expect(screen.getByRole('meter')).toHaveTextContent('99%');
   });
 });
+
+describe('Donut edge cases', () => {
+  it('caps shares at 100% when the given total is below the positive sum', () => {
+    const slices = foldSlices([{ label: 'A', value: 600 }, { label: 'B', value: 400 }], 5, 800);
+    expect(slices.reduce((sum, slice) => sum + slice.share, 0)).toBeCloseTo(1);
+  });
+  it('keeps a tapped slice on touch and handles a product literally named Other', () => {
+    const { container } = render(<Donut title="Mix" items={[{ label: 'Other', value: 60 }, { label: 'Rice', value: 30 }, ...items.slice(0, 5)]} centerLabel="Revenue" centerValue="x" />);
+    const slice = container.querySelectorAll('.donut-slice')[1] as Element;
+    fireEvent.pointerDown(slice, { pointerType: 'touch' });
+    fireEvent.pointerLeave(slice, { pointerType: 'touch' });
+    expect(container.querySelector('.donut-center')).toHaveTextContent('Rice');
+  });
+});

@@ -27,7 +27,9 @@ export interface DonutSlice extends Slice {
 export function foldSlices(items: Slice[], max = MAX_SLICES, total?: number): DonutSlice[] {
   const positive = items.filter((item) => item.value > 0);
   const kept = positive.slice(0, max);
-  const sum = total && total > 0 ? total : positive.reduce((acc, item) => acc + item.value, 0);
+  const positiveSum = positive.reduce((acc, item) => acc + item.value, 0);
+  // A total lowered by refunds can be smaller than the slices; never let shares pass 100%.
+  const sum = Math.max(total && total > 0 ? total : 0, positiveSum);
   const rest = sum - kept.reduce((acc, item) => acc + item.value, 0);
   const slices: DonutSlice[] = kept.map((item, index) => ({ ...item, share: sum ? item.value / sum : 0, color: `var(--chart-cat-${index + 1})`, other: false }));
   if (rest > sum * 0.0005) slices.push({ label: 'Other', value: rest, share: sum ? rest / sum : 0, color: 'var(--chart-other)', other: true });
@@ -79,7 +81,7 @@ export function Donut({
           <g transform={`rotate(-90 ${SIZE / 2} ${SIZE / 2})`}>
             {arcs.map(({ slice, index, dash, offset: dashOffset }) => (
               <circle
-                key={slice.label}
+                key={index}
                 className={`donut-slice${active === index ? ' active' : ''}${active !== null && active !== index ? ' dim' : ''}`}
                 style={{ stroke: slice.color, animationDelay: `${index * 40}ms` }}
                 cx={SIZE / 2}
@@ -88,8 +90,8 @@ export function Donut({
                 strokeDasharray={dash}
                 strokeDashoffset={dashOffset}
                 onPointerEnter={() => setActive(index)}
-                onPointerLeave={() => setActive(null)}
-                onPointerDown={() => setActive(index)}
+                onPointerLeave={(event) => event.pointerType !== 'touch' && setActive(null)}
+                onPointerDown={(event) => event.pointerType === 'touch' && setActive((current) => (current === index ? null : index))}
               />
             ))}
           </g>
@@ -111,10 +113,10 @@ export function Donut({
         <tbody>
           {slices.map((slice, index) => (
             <tr
-              key={slice.label}
+              key={index}
               className={active === index ? 'active' : undefined}
-              onPointerEnter={() => setActive(index)}
-              onPointerLeave={() => setActive(null)}
+              onPointerEnter={(event) => event.pointerType !== 'touch' && setActive(index)}
+              onPointerLeave={(event) => event.pointerType !== 'touch' && setActive(null)}
             >
               <th scope="row">
                 <span className="swatch" style={{ background: slice.color }} aria-hidden="true" />
