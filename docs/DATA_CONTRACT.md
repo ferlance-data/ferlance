@@ -148,7 +148,9 @@ When an export destination is configured, a full snapshot of each business is wr
 | `inventory_products.parquet` | Products with `quantity_on_hand` from the ledger. |
 | `inventory_movements.parquet` | The append-only stock ledger. |
 
-A re-run on the same day replaces that day's files. Earlier days are never changed. Users, password hashes, sessions, chats and integration keys are never exported.
+A re-run on the same day replaces that day's files. Earlier days are never changed. Users, password hashes, sessions, chats and integration keys are never part of the Parquet export.
+
+**Restorable backup.** With the same daily run, a complete copy of the app's data goes to `exports/_backup/dt=<day>/`: a SQLite snapshot and the uploaded and processed files. Unlike the export, it holds everything, including accounts with their password hashes, sessions and encrypted integration keys, so that it can be restored. It belongs only in the operator's private bucket.
 
 ## Dated financial-position balances
 

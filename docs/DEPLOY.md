@@ -42,6 +42,10 @@ The server uses an **IAM role** instead of access keys, so no key is ever stored
 
 The server can add exports and backups, and read backups back only to restore them. It can't list or delete anything.
 
+5. **Keep 30 days of backups.** Open **S3 → ferlance-bucket → Management → Create lifecycle rule**. Name it `expire-old-backups`, limit it to the prefix `exports/_backup/`, tick **Expire current versions of objects**, and enter **30** days. Without this rule, a copy is kept every day forever.
+
+**What a backup contains:** everything the app holds, including accounts (passwords are stored only as salted hashes), sessions and encrypted integration keys. Keep the bucket private (Block all public access stays on) and share bucket access with no one you wouldn't give the server to.
+
 ### 2. Launch the server
 
 Open **EC2 → Launch instance** and set:
