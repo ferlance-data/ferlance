@@ -33,6 +33,12 @@ REFRESH_TOKEN_SECONDS = int(os.getenv("FERLANCE_REFRESH_TOKEN_SECONDS", "2592000
 COOKIE_SECURE = os.getenv("FERLANCE_COOKIE_SECURE", "false").lower() == "true"
 DEFAULT_CURRENCY = os.getenv("FERLANCE_DEFAULT_CURRENCY", "GHS")
 ADMIN_EMAILS = {email.lower() for email in _csv(os.getenv("FERLANCE_ADMIN_EMAILS", ""))}
+# A refresh token rotated this recently may be presented once more (its response was lost on a
+# flaky connection) and still get a session, as long as its replacement has not been revoked.
+REFRESH_REUSE_GRACE_SECONDS = int(os.getenv("FERLANCE_REFRESH_REUSE_GRACE_SECONDS", "60"))
+INVITE_DAYS = int(os.getenv("FERLANCE_INVITE_DAYS", "7"))
+# Uncached AI calls (Ask Lance answers and explanations) allowed per business per UTC day.
+AI_DAILY_LIMIT = int(os.getenv("FERLANCE_AI_DAILY_LIMIT", "100"))
 
 # Ask Lance providers, tried in order: OpenRouter models, Groq, then AgentRouter.
 OPENROUTER_KEY = os.getenv("OPENROUTER_KEY", "")

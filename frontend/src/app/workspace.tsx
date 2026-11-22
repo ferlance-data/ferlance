@@ -15,7 +15,7 @@ import {
   scopeParams,
   type Scope,
 } from '../lib/scope';
-import type { Business, Dataset, InventoryResponse, Period, User } from '../lib/types';
+import type { Business, BusinessRole, Dataset, InventoryResponse, Period, Permission, User } from '../lib/types';
 
 /* ---------- Query keys ---------- */
 // Every server read is cached under one of these keys. Writes invalidate them.
@@ -33,9 +33,46 @@ export interface SetupFlags {
   conversations: boolean;
 }
 
+/** Mirrors ROLE_PERMISSIONS in backend/deps.py; the server enforces it, the UI only hides what would fail. */
+export const ROLE_PERMISSIONS: Record<BusinessRole, readonly Permission[]> = {
+  owner: ['read', 'write_data', 'write_balances', 'use_ai', 'manage_team', 'manage_business'],
+  manager: ['read', 'write_data', 'write_balances', 'use_ai'],
+  accountant: ['read', 'write_balances', 'use_ai'],
+};
+
+export const ROLE_LABEL: Record<BusinessRole, string> = { owner: 'Owner', manager: 'Manager', accountant: 'Accountant' };
+
+const BUSINESS_KEY = 'ferlance-business';
+
+/** Remember which business to open next time (per browser). */
+export function rememberBusiness(id: string): void {
+  try {
+    localStorage.setItem(BUSINESS_KEY, id);
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+/** The business to open: the remembered one if the user still belongs to it, else the first. */
+export function chooseBusiness(identity: { business: Business | null; businesses?: Business[] }): Business | null {
+  const all = identity.businesses?.length ? identity.businesses : identity.business ? [identity.business] : [];
+  let saved: string | null = null;
+  try {
+    saved = localStorage.getItem(BUSINESS_KEY);
+  } catch {
+    /* storage unavailable */
+  }
+  return all.find((item) => item.id === saved) ?? all[0] ?? null;
+}
+
 interface WorkspaceValue {
   user: User;
   business: Business;
+  businesses: Business[];
+  role: BusinessRole;
+  can: (permission: Permission) => boolean;
+  /** Open another business the user belongs to (reloads the workspace). */
+  switchBusiness: (id: string) => void;
   /** Merge profile changes (Settings) into the identity shown everywhere. */
   updateIdentity: (patch: { user?: Partial<User>; business?: Partial<Business> }) => void;
   /** `/api/businesses/{id}{suffix}` */
@@ -59,11 +96,13 @@ export function useWorkspace(): WorkspaceValue {
 export function WorkspaceProvider({
   initialUser,
   initialBusiness,
+  initialBusinesses = [initialBusiness],
   initialSetup,
   children,
 }: {
   initialUser: User;
   initialBusiness: Business;
+  initialBusinesses?: Business[];
   initialSetup: SetupFlags;
   children: ReactNode;
 }) {
@@ -101,6 +140,13 @@ export function WorkspaceProvider({
     () => ({
       user,
       business,
+      businesses: initialBusinesses.map((item) => (item.id === business.id ? { ...item, ...business } : item)),
+      role: business.role ?? 'owner',
+      can: (permission: Permission) => ROLE_PERMISSIONS[business.role ?? 'owner'].includes(permission),
+      switchBusiness: (id: string) => {
+        rememberBusiness(id);
+        window.location.assign('/app/overview');
+      },
       updateIdentity,
       businessPath,
       datasets: datasetsQuery.data ?? [],
@@ -116,7 +162,7 @@ export function WorkspaceProvider({
       setup,
       markSetup,
     }),
-    [user, business, updateIdentity, businessPath, datasetsQuery.data, inventoryQuery.data, setup, markSetup, queryClient],
+    [user, business, initialBusinesses, updateIdentity, businessPath, datasetsQuery.data, inventoryQuery.data, setup, markSetup, queryClient],
   );
 
   return (

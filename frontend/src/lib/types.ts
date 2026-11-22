@@ -8,10 +8,15 @@ export interface User {
   full_name: string | null;
 }
 
+export type BusinessRole = 'owner' | 'manager' | 'accountant';
+export type Permission = 'read' | 'write_data' | 'write_balances' | 'use_ai' | 'manage_team' | 'manage_business';
+
 export interface Business {
   id: string;
   name: string;
   currency: string;
+  /** The signed-in user's role in this business. */
+  role?: BusinessRole;
 }
 
 export interface AuthResponse {
@@ -23,6 +28,8 @@ export interface AuthResponse {
 export interface Identity {
   user: User;
   business: Business | null;
+  /** Every business the user belongs to (owned first). */
+  businesses?: Business[];
 }
 
 export type DatasetStatus = 'processed' | 'partial' | 'failed';

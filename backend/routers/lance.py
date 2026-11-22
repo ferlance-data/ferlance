@@ -8,8 +8,8 @@ from pydantic import BaseModel, Field
 
 from .. import config, dataset_store, db
 from ..analytics import analyze
-from ..deps import DateRange, current_user, date_range, owned_business
-from ..llm import ask_lance
+from ..deps import ai_user, current_user, spend_ai_call, date_range, DateRange, read_business
+from ..llm import ask_lance, ai_available
 from ..rag import context as rag_context
 
 router = APIRouter(prefix="/api/businesses/{business_id}/ask-lance", tags=["ask lance"])
@@ -45,7 +45,7 @@ def ask(
     payload: AskLanceRequest,
     dataset_id: str | None = None,
     dates: DateRange = Depends(date_range),
-    business: dict = Depends(owned_business),
+    business: dict = Depends(ai_user),
     user: dict = Depends(current_user),
 ) -> dict:
     question = payload.question.strip()
@@ -86,6 +86,8 @@ def ask(
         )
     except dataset_store.RecordsUnavailableError as error:
         raise HTTPException(503, str(error))
+    if ai_available():
+        spend_ai_call(business["id"])
     try:
         answer = ask_lance(question, snapshot, history)
     except RuntimeError as error:
@@ -115,7 +117,7 @@ def ask(
 
 
 @router.get("/conversations")
-def conversations(business: dict = Depends(owned_business), user: dict = Depends(current_user)) -> list[dict]:
+def conversations(business: dict = Depends(read_business), user: dict = Depends(current_user)) -> list[dict]:
     return db.many(
         config.DB_PATH,
         "SELECT id, dataset_id, title, created_at, updated_at FROM chat_conversations "
@@ -125,7 +127,7 @@ def conversations(business: dict = Depends(owned_business), user: dict = Depends
 
 
 @router.get("/conversations/{conversation_id}")
-def conversation(conversation_id: str, business: dict = Depends(owned_business), user: dict = Depends(current_user)) -> dict:
+def conversation(conversation_id: str, business: dict = Depends(read_business), user: dict = Depends(current_user)) -> dict:
     item = db.one(
         config.DB_PATH,
         "SELECT id, dataset_id, title, created_at, updated_at FROM chat_conversations WHERE id = ? AND business_id = ? AND user_id = ?",

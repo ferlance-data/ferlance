@@ -9,7 +9,7 @@ import { printInventoryReport } from '../../lib/reports';
 import { toast } from '../../lib/toast';
 import type { InventoryItem, Movement } from '../../lib/types';
 import { useBusinessQuery } from '../hooks';
-import { DataTable, Kpi, Pill, Segmented, StatusText } from '../components/ui';
+import { DataTable, Kpi, Pill, Segmented, StatusText, ReadOnlyNotice } from '../components/ui';
 import { PageActions } from '../page';
 import { keys, useWorkspace } from '../workspace';
 import { buildStocktakeTemplate, filterProducts, resolveSelectedProduct, STOCKTAKE_TEMPLATE_FILENAME } from './inventory.logic';
@@ -49,7 +49,8 @@ function downloadTemplate() {
 }
 
 export default function Inventory() {
-  const { user, business, businessPath, inventory, refreshInventory } = useWorkspace();
+  const { user, business, businessPath, inventory, refreshInventory, can, role } = useWorkspace();
+  const canWrite = can('write_data');
   const queryClient = useQueryClient();
   const movementsQuery = useBusinessQuery<Movement[]>('/inventory/movements?limit=100');
   // The summary lives in the workspace (it outlives this page): re-read it on every visit.
@@ -251,7 +252,7 @@ export default function Inventory() {
                   {
                     label: '',
                     value: (item) => (
-                      <div className="row-actions">
+                      <div className="row-actions" hidden={!canWrite}>
                         <button className="btn btn-ghost btn-sm btn-icon" type="button" title={`Edit ${item.name}`} aria-label={`Edit ${item.name}`} onClick={() => startEdit(item)}>
                           <Icon name="edit" />
                         </button>
@@ -292,109 +293,115 @@ export default function Inventory() {
             />
           </div>
           <div className="card-body">
-            <form className="form-grid" id="movement-form" data-panel="movement" hidden={tab !== 'movement'} onSubmit={submitMovement}>
-              <label className="field">
-                Product
-                <select className="select" id="movement-product" required value={productId} onChange={(event) => setChosenProduct(event.target.value)}>
-                  {activeItems.map((item) => (
-                    <option key={item.id} value={item.id}>{`${item.name} · ${number(item.quantity_on_hand, 3)} ${item.unit}`}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="field">
-                Type
-                <select className="select" id="movement-type" value={movementType} onChange={(event) => setMovementType(event.target.value)}>
-                  <option value="purchase">Stock received / purchase</option>
-                  <option value="sale">Sale / stock issued</option>
-                  <option value="adjustment">Adjustment (+/−)</option>
-                </select>
-              </label>
-              <label className="field">
-                Quantity
-                <input
-                  className="input"
-                  id="movement-quantity"
-                  type="number"
-                  min={adjustment ? undefined : '0.000001'}
-                  step="any"
-                  required
-                  placeholder={adjustment ? 'Positive adds, negative removes' : 'Enter a positive quantity'}
-                  value={quantity}
-                  onChange={(event) => setQuantity(event.target.value)}
-                />
-              </label>
-              <label className="field">
-                Note <span className="field-hint">Supplier, reference or reason</span>
-                <input className="input" id="movement-note" maxLength={500} value={note} onChange={(event) => setNote(event.target.value)} />
-              </label>
-              <button className="btn btn-primary" id="movement-submit" type="submit" disabled={!productId || busy === 'movement'}>
-                Record movement
-              </button>
-            </form>
+            {canWrite ? (
+              <>
+                <form className="form-grid" id="movement-form" data-panel="movement" hidden={tab !== 'movement'} onSubmit={submitMovement}>
+                  <label className="field">
+                    Product
+                    <select className="select" id="movement-product" required value={productId} onChange={(event) => setChosenProduct(event.target.value)}>
+                      {activeItems.map((item) => (
+                        <option key={item.id} value={item.id}>{`${item.name} · ${number(item.quantity_on_hand, 3)} ${item.unit}`}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="field">
+                    Type
+                    <select className="select" id="movement-type" value={movementType} onChange={(event) => setMovementType(event.target.value)}>
+                      <option value="purchase">Stock received / purchase</option>
+                      <option value="sale">Sale / stock issued</option>
+                      <option value="adjustment">Adjustment (+/−)</option>
+                    </select>
+                  </label>
+                  <label className="field">
+                    Quantity
+                    <input
+                      className="input"
+                      id="movement-quantity"
+                      type="number"
+                      min={adjustment ? undefined : '0.000001'}
+                      step="any"
+                      required
+                      placeholder={adjustment ? 'Positive adds, negative removes' : 'Enter a positive quantity'}
+                      value={quantity}
+                      onChange={(event) => setQuantity(event.target.value)}
+                    />
+                  </label>
+                  <label className="field">
+                    Note <span className="field-hint">Supplier, reference or reason</span>
+                    <input className="input" id="movement-note" maxLength={500} value={note} onChange={(event) => setNote(event.target.value)} />
+                  </label>
+                  <button className="btn btn-primary" id="movement-submit" type="submit" disabled={!productId || busy === 'movement'}>
+                    Record movement
+                  </button>
+                </form>
 
-            <form className="form-grid" id="product-form" data-panel="product" hidden={tab !== 'product'} onSubmit={submitProduct}>
-              <label className="field">
-                Product name
-                <input className="input" id="product-name" ref={nameRef} maxLength={200} required value={product.name} onChange={setField('name')} />
-              </label>
-              <div className="form-row">
-                <label className="field">
-                  SKU
-                  <input className="input" id="product-sku" maxLength={100} placeholder="Optional" value={product.sku} onChange={setField('sku')} />
-                </label>
-                <label className="field">
-                  Unit
-                  <input className="input" id="product-unit" maxLength={40} required value={product.unit} onChange={setField('unit')} />
-                </label>
-              </div>
-              <div className="form-row">
-                <label className="field">
-                  Unit cost
-                  <input className="input" id="product-cost" type="number" min="0" step="0.01" placeholder="Optional" value={product.cost} onChange={setField('cost')} />
-                </label>
-                <label className="field">
-                  Reorder level
-                  <input className="input" id="product-reorder" type="number" min="0" step="any" required value={product.reorder} onChange={setField('reorder')} />
-                </label>
-              </div>
-              <label className="field" id="product-opening-field" hidden={editing !== null}>
-                Opening stock
-                <input className="input" id="product-opening" type="number" min="0" step="any" value={product.opening} onChange={setField('opening')} />
-              </label>
-              <div className="button-row">
-                <button className="btn btn-primary" id="product-submit" type="submit" disabled={busy === 'product'}>
-                  {editing ? `Save ${editingName}` : 'Add product'}
-                </button>
-                <button className="btn btn-ghost" id="product-cancel" type="button" hidden={editing === null} onClick={resetProductForm}>
-                  Cancel edit
-                </button>
-              </div>
-            </form>
+                <form className="form-grid" id="product-form" data-panel="product" hidden={tab !== 'product'} onSubmit={submitProduct}>
+                  <label className="field">
+                    Product name
+                    <input className="input" id="product-name" ref={nameRef} maxLength={200} required value={product.name} onChange={setField('name')} />
+                  </label>
+                  <div className="form-row">
+                    <label className="field">
+                      SKU
+                      <input className="input" id="product-sku" maxLength={100} placeholder="Optional" value={product.sku} onChange={setField('sku')} />
+                    </label>
+                    <label className="field">
+                      Unit
+                      <input className="input" id="product-unit" maxLength={40} required value={product.unit} onChange={setField('unit')} />
+                    </label>
+                  </div>
+                  <div className="form-row">
+                    <label className="field">
+                      Unit cost
+                      <input className="input" id="product-cost" type="number" min="0" step="0.01" placeholder="Optional" value={product.cost} onChange={setField('cost')} />
+                    </label>
+                    <label className="field">
+                      Reorder level
+                      <input className="input" id="product-reorder" type="number" min="0" step="any" required value={product.reorder} onChange={setField('reorder')} />
+                    </label>
+                  </div>
+                  <label className="field" id="product-opening-field" hidden={editing !== null}>
+                    Opening stock
+                    <input className="input" id="product-opening" type="number" min="0" step="any" value={product.opening} onChange={setField('opening')} />
+                  </label>
+                  <div className="button-row">
+                    <button className="btn btn-primary" id="product-submit" type="submit" disabled={busy === 'product'}>
+                      {editing ? `Save ${editingName}` : 'Add product'}
+                    </button>
+                    <button className="btn btn-ghost" id="product-cancel" type="button" hidden={editing === null} onClick={resetProductForm}>
+                      Cancel edit
+                    </button>
+                  </div>
+                </form>
 
-            <form className="form-grid" id="stocktake-form" data-panel="stocktake" hidden={tab !== 'stocktake'} onSubmit={submitStocktake}>
-              <p className="body-sm muted">
-                Upload a counted stock CSV to create products or reconcile on-hand quantities. Each difference is recorded as an auditable movement. Sales files never change stock.
-              </p>
-              <a
-                className="btn btn-ghost btn-sm"
-                id="stocktake-template"
-                href="#"
-                onClick={(event) => {
-                  event.preventDefault();
-                  downloadTemplate();
-                }}
-              >
-                <IconSlot name="download" />
-                Download CSV template
-              </a>
-              <label className="field">
-                Stocktake CSV
-                <input className="input" id="stocktake-file" ref={fileRef} type="file" accept=".csv" required onChange={() => setHasFile(Boolean(fileRef.current?.files?.length))} />
-              </label>
-              <button className="btn btn-primary" id="stocktake-submit" type="submit" disabled={!hasFile || busy === 'stocktake'}>
-                Import counted stock
-              </button>
-            </form>
+                <form className="form-grid" id="stocktake-form" data-panel="stocktake" hidden={tab !== 'stocktake'} onSubmit={submitStocktake}>
+                  <p className="body-sm muted">
+                    Upload a counted stock CSV to create products or reconcile on-hand quantities. Each difference is recorded as an auditable movement. Sales files never change stock.
+                  </p>
+                  <a
+                    className="btn btn-ghost btn-sm"
+                    id="stocktake-template"
+                    href="#"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      downloadTemplate();
+                    }}
+                  >
+                    <IconSlot name="download" />
+                    Download CSV template
+                  </a>
+                  <label className="field">
+                    Stocktake CSV
+                    <input className="input" id="stocktake-file" ref={fileRef} type="file" accept=".csv" required onChange={() => setHasFile(Boolean(fileRef.current?.files?.length))} />
+                  </label>
+                  <button className="btn btn-primary" id="stocktake-submit" type="submit" disabled={!hasFile || busy === 'stocktake'}>
+                    Import counted stock
+                  </button>
+                </form>
+              </>
+            ) : (
+              <ReadOnlyNotice role={role} what="stock" />
+            )}
             <StatusText id="inventory-status" message={status.message} error={status.error} />
           </div>
         </div>

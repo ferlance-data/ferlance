@@ -41,12 +41,13 @@ Ferlance follows [Semantic Versioning 2.0.0](https://semver.org/). The version l
 | 1.1.0 | Design system and interface refinement | #7 |
 | 1.2.0 | Insights that say what to do; free outside context (owner request, 2026-11-22) | A1 |
 | 1.3.0 | Analytics visuals | #6 |
-| 1.4.0 | Onboarding and team access, admin console | #4, #5 |
-| 1.5.0 | OCR inventory capture | #1 |
-| 1.6.0 | Inventory↔product sync | #2 |
-| 1.7.0 | Retrieval improvements for Ask Lance | #8 |
-| 1.8.0 | Data export to AWS | #3 |
-| 1.9.0 | Expo mobile app (internal testing) and shared API types | #9 |
+| 1.4.0 | Team access: roles, invites, business switcher, AI daily cap | #4 (4.2) |
+| 1.5.0 | Onboarding flow and admin console | #4 (4.1, 4.4), #5 |
+| 1.6.0 | OCR inventory capture | #1 |
+| 1.7.0 | Inventory↔product sync | #2 |
+| 1.8.0 | Retrieval improvements for Ask Lance | #8 |
+| 1.9.0 | Data export to AWS | #3 |
+| 1.10.0 | Expo mobile app (internal testing) and shared API types | #9 |
 
 The order follows the agreed handoff plan. #6 builds on the #7 tokens. #2 reuses the #1 review flow. #3 and #9 carry the most external cost and credentials, so they come last.
 

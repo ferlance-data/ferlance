@@ -11,7 +11,7 @@ import { PageErrorBoundary } from './components/PageErrorBoundary';
 import { SkeletonRows } from './components/ui';
 import { ActionsSlotContext } from './page';
 import { PAGES, pagePath, resolvePageName, type PageDef } from './routes';
-import { useScope, useWorkspace } from './workspace';
+import { ROLE_LABEL, useScope, useWorkspace } from './workspace';
 
 function BrandMark() {
   return (
@@ -39,7 +39,7 @@ function NavItem({ page, pendingCount, onNavigate }: { page: PageDef; pendingCou
 }
 
 function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { user, business, datasets } = useWorkspace();
+  const { user, business, businesses, datasets, role, switchBusiness } = useWorkspace();
   const name = business.name || 'Workspace';
   const pending = datasets.filter((item) => item.status === 'partial' || item.status === 'failed').length;
   const group = (key: PageDef['nav']['group']) => PAGES.filter((page) => page.nav.group === key);
@@ -61,9 +61,24 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
           </span>
           <span className="workspace-chip-text">
             <strong id="workspace-name">{name}</strong>
-            <small id="workspace-email">{user.email}</small>
+            <small id="workspace-email">{role === 'owner' ? user.email : `${ROLE_LABEL[role]} · ${user.email}`}</small>
           </span>
         </div>
+        {businesses.length > 1 ? (
+          <select
+            className="select business-switch"
+            id="business-switch"
+            aria-label="Switch business"
+            value={business.id}
+            onChange={(event) => switchBusiness(event.target.value)}
+          >
+            {businesses.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.role && item.role !== 'owner' ? `${item.name} (${ROLE_LABEL[item.role]})` : item.name}
+              </option>
+            ))}
+          </select>
+        ) : null}
         <nav className="nav" id="nav">
           <p className="nav-label">Analyse</p>
           {group('analyse').map((page) => (

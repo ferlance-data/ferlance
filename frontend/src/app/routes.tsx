@@ -78,7 +78,7 @@ export const PAGES: PageDef[] = [
   {
     name: 'settings',
     title: 'Settings',
-    description: 'Your profile, how the workspace looks, and connected services.',
+    description: 'Your profile, how the workspace looks, and who on your team can see it.',
     scoped: false,
     nav: { label: 'Settings', icon: 'settings', group: 'bottom' },
     Component: lazy(() => import('./views/Settings')),

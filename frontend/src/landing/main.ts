@@ -257,6 +257,40 @@ async function post(path: string, body: Record<string, FormDataEntryValue | null
   return payload;
 }
 
+/* ---------- Invite links (/?invite=TOKEN) ---------- */
+interface InviteInfo {
+  business_name: string;
+  role: 'manager' | 'accountant';
+}
+interface AuthResult {
+  access_token: string;
+  business: { id: string } | null;
+}
+
+let invite: { token: string; info: InviteInfo } | null = null;
+
+function rememberBusiness(id: string | undefined): void {
+  if (!id) return;
+  try {
+    localStorage.setItem('ferlance-business', id);
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+async function acceptInvite(accessToken: string): Promise<string | undefined> {
+  if (!invite) return undefined;
+  const response = await fetch(`/api/invites/${encodeURIComponent(invite.token)}/accept`, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  const payload = (await response.json().catch(() => ({}))) as ErrorPayload & { business?: { id: string } };
+  // Already a member is fine: open that business.
+  if (!response.ok && response.status !== 409) throw new Error(typeof payload.detail === 'string' ? payload.detail : 'The invite could not be accepted.');
+  return payload.business?.id;
+}
+
 function bindAuthForm(mode: Mode, path: string, fields: string[], pending: string): void {
   const form = forms[mode];
   const statusLine = $(`#${mode}-status`);
@@ -268,7 +302,15 @@ function bindAuthForm(mode: Mode, path: string, fields: string[], pending: strin
     statusLine.className = 'status-text';
     statusLine.textContent = pending;
     try {
-      await post(path, Object.fromEntries(fields.map((field) => [field, data.get(field)])));
+      const body: Record<string, FormDataEntryValue | null> = Object.fromEntries(fields.map((field) => [field, data.get(field)]));
+      if (invite && mode === 'signup') {
+        delete body.business_name;
+        body.invite_token = invite.token;
+      }
+      const result = (await post(path, body)) as AuthResult;
+      // Signup with an invite already joined the business; a sign-in still has to accept it.
+      const joined = invite && mode === 'login' ? await acceptInvite(result.access_token) : invite ? result.business?.id : undefined;
+      rememberBusiness(joined);
       window.location.assign('/app');
     } catch (error) {
       statusLine.className = 'status-text error';
@@ -281,4 +323,32 @@ bindAuthForm('login', '/api/auth/login', ['email', 'password'], 'Signing in…')
 bindAuthForm('signup', '/api/auth/signup', ['business_name', 'email', 'password'], 'Creating your workspace…');
 
 const params = new URLSearchParams(window.location.search);
-if (params.has('signin') || params.has('signup')) openAuth(params.has('signup') ? 'signup' : 'login');
+const inviteToken = params.get('invite');
+if (inviteToken) {
+  // Keep the token out of history, bookmarks and Referer headers once it has been read.
+  params.delete('invite');
+  window.history.replaceState(null, '', `${window.location.pathname}${params.size ? `?${params}` : ''}`);
+  void openInvite(inviteToken);
+} else if (params.has('signin') || params.has('signup')) {
+  openAuth(params.has('signup') ? 'signup' : 'login');
+}
+
+async function openInvite(token: string): Promise<void> {
+  const response = await fetch(`/api/invites/${encodeURIComponent(token)}`).catch(() => null);
+  const info = response?.ok ? ((await response.json()) as InviteInfo) : null;
+  openAuth('signup');
+  if (!info) {
+    $('#auth-subtitle').textContent = 'This invite link is not valid. It may have expired or already been used; ask for a new one.';
+    return;
+  }
+  invite = { token, info };
+  const role = info.role === 'accountant' ? 'an accountant' : 'a manager';
+  const subtitle = `You have been invited to ${info.business_name} as ${role}. Create an account, or sign in if you already have one.`;
+  copy.signup = [`Join ${info.business_name}`, subtitle];
+  copy.login = [`Join ${info.business_name}`, subtitle];
+  const businessField = $<HTMLInputElement>('input[name="business_name"]', forms.signup);
+  businessField.required = false;
+  const label = businessField.closest('label');
+  if (label) label.hidden = true;
+  setMode('signup');
+}

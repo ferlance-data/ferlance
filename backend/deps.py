@@ -1,15 +1,13 @@
 """Shared request dependencies: authentication, tenancy, and data scope."""
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime, timezone
 from typing import Any
 
 from fastapi import Depends, Header, HTTPException, Query
 
 from . import config, dataset_store, db
 from .security import read_access_token
-
-BUSINESS_FIELDS = "id, name, currency"
 
 
 def current_user(authorization: str | None = Header(default=None)) -> dict:
@@ -28,20 +26,81 @@ def admin_user(user: dict = Depends(current_user)) -> dict:
     return user
 
 
-def primary_business(user_id: str) -> dict | None:
-    return db.one(
+# Business roles (per business, in business_members). Not to be confused with users.role,
+# which is the platform role (admin or not). Every business route declares the permission it
+# needs through business_access(); tests check that no route under /api/businesses skips it.
+ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
+    "owner": frozenset({"read", "write_data", "write_balances", "use_ai", "manage_team", "manage_business"}),
+    "manager": frozenset({"read", "write_data", "write_balances", "use_ai"}),
+    "accountant": frozenset({"read", "write_balances", "use_ai"}),
+}
+PERMISSIONS = frozenset().union(*ROLE_PERMISSIONS.values())
+ROLE_ORDER = "CASE m.role WHEN 'owner' THEN 0 WHEN 'manager' THEN 1 ELSE 2 END"
+
+
+def memberships(user_id: str) -> list[dict]:
+    """Businesses the user belongs to, with their role: owned first, then oldest."""
+    return db.many(
         config.DB_PATH,
-        f"SELECT {BUSINESS_FIELDS} FROM businesses WHERE user_id = ? ORDER BY created_at LIMIT 1",
+        f"SELECT b.id, b.name, b.currency, m.role FROM business_members m JOIN businesses b ON b.id = m.business_id "
+        f"WHERE m.user_id = ? ORDER BY {ROLE_ORDER}, m.created_at",
         (user_id,),
     )
 
 
-def owned_business(business_id: str, user: dict = Depends(current_user)) -> dict:
-    """Path dependency: the business in the URL must belong to the signed-in user."""
-    business = db.one(config.DB_PATH, "SELECT * FROM businesses WHERE id = ? AND user_id = ?", (business_id, user["id"]))
-    if not business:
-        raise HTTPException(404, "Business not found.")
-    return business
+def primary_business(user_id: str) -> dict | None:
+    found = memberships(user_id)
+    return found[0] if found else None
+
+
+def business_access(permission: str):
+    """Dependency factory: the user must be a member of the business in the URL with `permission`.
+
+    Non-members get 404 (the business's existence is not revealed); members without the
+    permission get 403. The role is read on every request, so removing someone takes effect at once.
+    """
+    if permission not in PERMISSIONS:
+        raise ValueError(f"Unknown permission {permission!r}")
+
+    def dependency(business_id: str, user: dict = Depends(current_user)) -> dict:
+        row = db.one(
+            config.DB_PATH,
+            "SELECT b.*, m.role AS member_role FROM businesses b JOIN business_members m ON m.business_id = b.id "
+            "WHERE b.id = ? AND m.user_id = ?",
+            (business_id, user["id"]),
+        )
+        if not row:
+            raise HTTPException(404, "Business not found.")
+        if permission not in ROLE_PERMISSIONS.get(row["member_role"], frozenset()):
+            raise HTTPException(403, "Your role in this business does not allow that.")
+        return row
+
+    dependency.permission = permission  # type: ignore[attr-defined]  # read by the route-coverage test
+    return dependency
+
+
+read_business = business_access("read")
+data_writer = business_access("write_data")
+balance_writer = business_access("write_balances")
+ai_user = business_access("use_ai")
+team_manager = business_access("manage_team")
+business_manager = business_access("manage_business")
+
+
+def spend_ai_call(business_id: str) -> None:
+    """Count one uncached AI call against the business's daily cap (429 once it is reached)."""
+    day = datetime.now(timezone.utc).date().isoformat()
+    with db.connection(config.DB_PATH) as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute("SELECT calls FROM ai_usage WHERE business_id = ? AND day = ?", (business_id, day)).fetchone()
+        calls = row["calls"] if row else 0
+        if calls >= config.AI_DAILY_LIMIT:
+            raise HTTPException(429, f"This business has used today's {config.AI_DAILY_LIMIT} AI answers. Calculated insights still work; AI is back tomorrow.")
+        conn.execute(
+            "INSERT INTO ai_usage (business_id, day, calls) VALUES (?, ?, 1) "
+            "ON CONFLICT(business_id, day) DO UPDATE SET calls = calls + 1",
+            (business_id, day),
+        )
 
 
 @dataclass
@@ -90,7 +149,7 @@ def read_scope_records(datasets: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def scope(
-    business: dict = Depends(owned_business),
+    business: dict = Depends(read_business),
     dataset_id: str | None = Query(default=None, description="A dataset id, or 'all' (default) for every included file."),
 ) -> Scope:
     return resolve_scope(business["id"], dataset_id)

@@ -205,3 +205,12 @@ export function DataTable<Row>({
     </table>
   );
 }
+
+/** Shown in place of forms the signed-in user's role cannot use (the server refuses them anyway). */
+export function ReadOnlyNotice({ role, what }: { role: string; what: string }) {
+  return (
+    <Notice tone="info" icon="info">
+      {`As ${role === 'accountant' ? 'an accountant' : `a ${role}`} you can view ${what}, but not change it. Ask the business owner if you need to.`}
+    </Notice>
+  );
+}
