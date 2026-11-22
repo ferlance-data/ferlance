@@ -102,6 +102,21 @@ CREATE TABLE IF NOT EXISTS admin_audit (
     detail TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS export_runs (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    day TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('running', 'ok', 'failed')),
+    attempts INTEGER NOT NULL DEFAULT 0,
+    row_count INTEGER,
+    objects INTEGER,
+    bytes INTEGER,
+    error TEXT,
+    started_at TEXT NOT NULL,
+    finished_at TEXT,
+    UNIQUE(business_id, day),
+    FOREIGN KEY(business_id) REFERENCES businesses(id)
+);
 CREATE TABLE IF NOT EXISTS business_members (
     business_id TEXT NOT NULL,
     user_id TEXT NOT NULL,

@@ -13,3 +13,10 @@ backend/.venv/**
 data/
 *.sqlite3
 .claude/
+
+# Editor swap/backup files (may hold copies of .env)
+*.swp
+*.swo
+*~
+.env.*
+!.env.example

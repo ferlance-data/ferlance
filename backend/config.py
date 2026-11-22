@@ -61,6 +61,14 @@ AGENTROUTER_API_KEY = os.getenv("AGENTROUTER_API_KEY", "")
 AGENTROUTER_URL = os.getenv("AGENTROUTER_URL", "https://agentrouter.org/v1/chat/completions")
 AGENTROUTER_MODELS = _csv(os.getenv("AGENTROUTER_MODELS", ""))
 
+# Daily per-business Parquet export (backend/exports.py). Off unless a bucket or a folder is set.
+# AWS credentials come from the standard AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY variables.
+EXPORT_BUCKET = os.getenv("FERLANCE_EXPORT_BUCKET", "")
+EXPORT_DIR = os.getenv("FERLANCE_EXPORT_DIR", "")
+EXPORT_PREFIX = os.getenv("FERLANCE_EXPORT_PREFIX", "exports").strip("/") or "exports"
+EXPORT_HOUR_UTC = int(os.getenv("FERLANCE_EXPORT_HOUR_UTC", "2"))
+AWS_REGION = os.getenv("AWS_REGION", "")
+
 
 
 def ensure_storage() -> None:

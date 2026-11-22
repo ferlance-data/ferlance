@@ -125,6 +125,19 @@ The Insights page ranks plain-language suggestions calculated from the business'
 
 When an AI provider is configured, tapping a suggestion asks for an explanation. Only that suggestion's figures, reasons and actions are sent, with product names; never customer names or raw rows. Free news headlines from the GDELT index may be added for declines and losses; they are unverified leads, not causes. Brave Search and SerpAPI are no longer used, and any stored Brave keys are deleted on upgrade.
 
+## Daily data export
+
+When an export destination is configured, a full snapshot of each business is written once a day as Parquet, under `exports/business_id=<id>/dt=<YYYY-MM-DD>/`:
+
+| File | Contents |
+| --- | --- |
+| `sales_records.parquet` | The records that count in analysis (processed, not excluded): `dataset_id`, `filename`, the canonical text fields (`record_id`, `transaction_date`, `product`, `customer`, `vendor`, `employee`, `category`), the canonical numbers (`amount`, `cost`, `budget`, `variance`, `quantity`, `unit_price`), and `extra` (any other columns, as JSON). |
+| `datasets.parquet` | Every import, including excluded and failed ones, with row counts and review status. |
+| `inventory_products.parquet` | Products with `quantity_on_hand` from the ledger. |
+| `inventory_movements.parquet` | The append-only stock ledger. |
+
+A re-run on the same day replaces that day's files. Earlier days are never changed. Users, password hashes, sessions, chats and integration keys are never exported.
+
 ## Dated financial-position balances
 
 The Financial position workspace records append-only manual balances for named accounts in these categories: cash, bank, receivables, inventory, fixed assets, other assets, payables, loans, other liabilities, owner capital, retained earnings/accumulated loss, and other equity. Inventory value is manually entered separately from the unit-count inventory ledger.

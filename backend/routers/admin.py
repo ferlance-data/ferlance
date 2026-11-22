@@ -11,7 +11,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from .. import config, db
+from .. import config, db, exports
 from ..deps import admin_user
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -45,7 +45,7 @@ def _other_active_admins(excluding: str) -> int:
 
 @router.get("/capabilities")
 def admin_capabilities(user: dict = Depends(admin_user)) -> dict:
-    return {"role": user["role"], "capabilities": ["view_users", "manage_roles", "disable_users", "view_businesses", "view_onboarding", "view_audit"]}
+    return {"role": user["role"], "capabilities": ["view_users", "manage_roles", "disable_users", "view_businesses", "view_onboarding", "view_audit", "view_exports", "run_exports"]}
 
 
 @router.get("/users")
@@ -163,3 +163,23 @@ def admin_audit(limit: int = Query(default=50, ge=1, le=500), user: dict = Depen
         (limit,),
     )
     return [{**row, "detail": json.loads(row["detail"])} for row in rows]
+
+
+@router.get("/exports")
+def admin_exports(user: dict = Depends(admin_user)) -> dict:
+    """Where daily exports go and each business's latest run. Counts and errors only, never records."""
+    return exports.status()
+
+
+@router.post("/exports/run")
+def admin_run_exports(user: dict = Depends(admin_user)) -> dict:
+    """Export every business now, replacing today's files. Recorded in the audit log."""
+    if not exports.enabled():
+        raise HTTPException(400, "Data export is not set up. Set FERLANCE_EXPORT_BUCKET (or FERLANCE_EXPORT_DIR) first.")
+    try:
+        summary = exports.run(force=True)
+    except Exception as error:
+        _audit(user, "export_run", None, error=error.__class__.__name__)
+        raise HTTPException(502, "The export destination could not be reached. Check the server log.") from error
+    _audit(user, "export_run", None, **summary)
+    return {**summary, **exports.status()}

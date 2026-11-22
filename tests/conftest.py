@@ -9,3 +9,6 @@ def _no_real_ai_providers(monkeypatch):
     for name in ("OPENROUTER_KEY", "GROQ_API_KEY", "AGENTROUTER_API_KEY"):
         monkeypatch.setattr(llm, name, "")
     monkeypatch.setattr(config, "OPENROUTER_KEY", "")
+    # Likewise a real export bucket: tests export only to a temporary folder they choose.
+    monkeypatch.setattr(config, "EXPORT_BUCKET", "")
+    monkeypatch.setattr(config, "EXPORT_DIR", "")

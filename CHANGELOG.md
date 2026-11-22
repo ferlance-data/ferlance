@@ -6,6 +6,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-11-22
+
+Daily data export to AWS S3 (PRD #3).
+
+### Added
+- **Daily per-business export.** Each business's sales records, imports, products and stock ledger go to S3 as Parquet once a day, under `exports/business_id=<id>/dt=<date>/`, which Athena and Glue can query directly. It is off until `FERLANCE_EXPORT_BUCKET` (or `FERLANCE_EXPORT_DIR` for a local folder) is set.
+- The exporter only needs `s3:PutObject` on the export prefix. Objects are SSE-S3 encrypted, and credentials come from the standard AWS environment variables.
+- **Admin → Data export** shows where exports go and each business's latest run, with errors. "Export now" re-runs today's export and is recorded in the admin log.
+- `export_runs` records every run. A failed business is retried at the next check (every 15 minutes), up to 3 times a day.
+
+### Changed
+- New dependencies: `pyarrow` and `boto3`. Both load only when an export runs, so the app uses no extra memory when exports are off.
+
 ## [1.8.0] - 2026-11-22
 
 Better retrieval for Ask Lance (PRD §5.6, #8), measured before it was changed.

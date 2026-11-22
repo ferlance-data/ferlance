@@ -50,6 +50,12 @@ Copy `.env.example` to `.env` to configure secrets and the optional AI and searc
 
 Suggestions on the Insights page are calculated without AI. With an AI key configured (`OPENROUTER_KEY`, `GROQ_API_KEY` or `AGENTROUTER_API_KEY`), tapping a suggestion adds Lance's explanation, cached per suggestion. Outside context comes from free sources only: a built-in Ghana holiday and season calendar, and keyless GDELT news headlines (best effort). No search API key is needed.
 
+## Daily data export
+
+Set `FERLANCE_EXPORT_BUCKET` (with `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and `AWS_REGION`) to send each business's data to S3 once a day, after `FERLANCE_EXPORT_HOUR_UTC` (default 02:00 UTC). Or set `FERLANCE_EXPORT_DIR` to write the same files to a folder. Each business gets four Parquet files a day, under `exports/business_id=<id>/dt=<YYYY-MM-DD>/`: `sales_records`, `datasets`, `inventory_products` and `inventory_movements`. The layout is Hive-style, so Athena or Glue can query it as-is.
+
+The AWS user needs one permission only: `s3:PutObject` on `arn:aws:s3:::<bucket>/exports/*`. The exporter never reads, lists or deletes, and every object is written with SSE-S3 encryption. Never use root account keys. Administrators see each business's latest run, and any failure, on the Admin page, and can run an export on demand.
+
 ## Project layout
 
 ```text

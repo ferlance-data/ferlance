@@ -44,13 +44,35 @@ interface AuditEntry {
   target_email: string | null;
 }
 
+interface ExportRun {
+  business_id: string;
+  business_name: string;
+  day: string;
+  status: 'running' | 'ok' | 'failed';
+  attempts: number;
+  row_count: number | null;
+  bytes: number | null;
+  error: string | null;
+  finished_at: string | null;
+}
+interface ExportStatus {
+  enabled: boolean;
+  destination: string | null;
+  hour_utc: number;
+  failed: number;
+  runs: ExportRun[];
+}
+
 const ROLES = ['owner', 'member', 'admin'];
+const EXPORT_TONE = { ok: 'success', failed: 'error', running: 'info' } as const;
+const EXPORT_LABEL = { ok: 'Exported', failed: 'Failed', running: 'Running' } as const;
 
 function auditText(entry: AuditEntry): string {
   const who = entry.target_email ?? 'a deleted user';
   if (entry.action === 'role') return `changed ${who} from ${entry.detail.before} to ${entry.detail.after}`;
   if (entry.action === 'disable') return `disabled ${who}`;
   if (entry.action === 'enable') return `re-enabled ${who}`;
+  if (entry.action === 'export_run') return entry.detail.error ? 'ran the data export, which could not reach its destination' : `ran the data export (${entry.detail.exported ?? 0} exported, ${entry.detail.failed ?? 0} failed)`;
   return `${entry.action} ${who}`;
 }
 
@@ -84,6 +106,8 @@ export default function Admin() {
   });
   const funnel = useQuery({ queryKey: ['admin', 'onboarding'], queryFn: ({ signal }) => request<Funnel>('/api/admin/onboarding', { signal }), enabled: isAdmin });
   const audit = useQuery({ queryKey: ['admin', 'audit'], queryFn: ({ signal }) => request<AuditEntry[]>('/api/admin/audit', { signal }), enabled: isAdmin });
+  const exportStatus = useQuery({ queryKey: ['admin', 'exports'], queryFn: ({ signal }) => request<ExportStatus>('/api/admin/exports', { signal }), enabled: isAdmin });
+  const [exporting, setExporting] = useState(false);
 
   if (!isAdmin) return <EmptyState title="Administrators only" message="This page is for Ferlance platform administrators." />;
 
@@ -153,6 +177,32 @@ export default function Admin() {
     },
   ];
 
+  async function exportNow() {
+    setExporting(true);
+    try {
+      const result = await request<{ exported: number; failed: number }>('/api/admin/exports/run', { method: 'POST' });
+      toast(result.failed ? `${number(result.failed)} business(es) failed to export.` : `${number(result.exported)} business(es) exported.`, { error: result.failed > 0 });
+    } catch (error) {
+      toast((error as Error).message, { error: true });
+    } finally {
+      setExporting(false);
+      await queryClient.invalidateQueries({ queryKey: ['admin'] });
+    }
+  }
+
+  const exportColumns: Column<ExportRun>[] = [
+    {
+      label: 'Business',
+      value: (item) => (
+        <div className="file-cell">
+          <strong>{item.business_name}</strong>
+          <small>{item.error ?? `${formatDate(item.day)} · ${number(item.row_count ?? 0)} rows`}</small>
+        </div>
+      ),
+    },
+    { label: 'Status', value: (item) => <Pill tone={EXPORT_TONE[item.status]}>{item.attempts > 1 && item.status === 'failed' ? `Failed ${item.attempts}×` : EXPORT_LABEL[item.status]}</Pill> },
+  ];
+
   const businessColumns: Column<AdminBusiness>[] = [
     {
       label: 'Business',
@@ -220,11 +270,36 @@ export default function Admin() {
         </div>
       </div>
 
+      <div className="card" id="admin-exports">
+        <div className="card-header">
+          <div>
+            <h2 className="card-title">Data export</h2>
+            <p className="card-subtitle">
+              {exportStatus.data?.enabled
+                ? `Daily after ${String(exportStatus.data.hour_utc).padStart(2, '0')}:00 UTC to ${exportStatus.data.destination}${exportStatus.data.failed ? ` · ${number(exportStatus.data.failed)} failed` : ''}`
+                : 'Off. Set FERLANCE_EXPORT_BUCKET on the server to export each business to S3 daily.'}
+            </p>
+          </div>
+          {exportStatus.data?.enabled ? (
+            <button className="btn btn-ghost btn-sm" type="button" disabled={exporting} onClick={() => void exportNow()}>
+              {exporting ? 'Exporting…' : 'Export now'}
+            </button>
+          ) : null}
+        </div>
+        {exportStatus.data?.runs.length ? (
+          <div className="table-wrap">
+            <DataTable columns={exportColumns} rows={exportStatus.data.runs} rowKey={(item) => item.business_id} />
+          </div>
+        ) : exportStatus.data?.enabled ? (
+          <p className="body-sm muted card-body">No exports yet.</p>
+        ) : null}
+      </div>
+
       <div className="card">
         <div className="card-header">
           <div>
             <h2 className="card-title">Admin log</h2>
-            <p className="card-subtitle">Every role change, disable and enable</p>
+            <p className="card-subtitle">Every role change, disable, enable and manual export</p>
           </div>
         </div>
         <div className="card-body">
