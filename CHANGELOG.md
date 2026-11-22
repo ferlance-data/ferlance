@@ -6,6 +6,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.12.0] - 2026-11-22
+
+Deployment on a single AWS server, and a nightly backup that can be restored.
+
 ### Added
 - Deployment: a `Dockerfile` (it builds the frontend with Node, then serves it from Python) and a `.dockerignore` that keeps `.env` and local data out of the image.
 - `deploy/aws/user-data.sh`: a one-paste setup for an EC2 server. It adds swap, installs Docker and Caddy, builds the app, and serves free HTTPS at `<ip>.sslip.io`. It also installs `ferlance-update`, `ferlance-start` and `ferlance-restore`, and uses an instance role instead of stored AWS keys.
