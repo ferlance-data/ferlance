@@ -62,6 +62,14 @@ CREATE INDEX IF NOT EXISTS inventory_movements_business_date
     ON inventory_movements(business_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS inventory_movements_product_date
     ON inventory_movements(product_id, created_at DESC);
+CREATE TABLE IF NOT EXISTS admin_audit (
+    id TEXT PRIMARY KEY,
+    actor_id TEXT NOT NULL,
+    action TEXT NOT NULL,
+    target_user_id TEXT,
+    detail TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS business_members (
     business_id TEXT NOT NULL,
     user_id TEXT NOT NULL,
@@ -152,6 +160,8 @@ def initialize(path: Path) -> None:
         user_columns = {row[1] for row in db.execute("PRAGMA table_info(users)").fetchall()}
         if "role" not in user_columns:
             db.execute("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'owner'")
+        if "disabled_at" not in user_columns:
+            db.execute("ALTER TABLE users ADD COLUMN disabled_at TEXT")
         if "full_name" not in user_columns:
             db.execute("ALTER TABLE users ADD COLUMN full_name TEXT NOT NULL DEFAULT ''")
         dataset_columns = {row[1] for row in db.execute("PRAGMA table_info(datasets)").fetchall()}

@@ -25,7 +25,7 @@ interface MomoResult {
   dataset: Dataset;
   records: MomoRecord[];
 }
-interface Result {
+export interface Result {
   dataset: Dataset;
   records?: MomoRecord[];
 }
@@ -228,14 +228,14 @@ export default function Data() {
   );
 }
 
-interface FormProps {
+export interface FormProps {
   hidden: boolean;
   businessPath: (suffix?: string) => string;
   onResult: (result: Result) => void;
   onImported: () => Promise<void>;
 }
 
-function UploadForm({ hidden, businessPath, onResult, onImported }: FormProps) {
+export function UploadForm({ hidden, businessPath, onResult, onImported }: FormProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -316,7 +316,7 @@ function UploadForm({ hidden, businessPath, onResult, onImported }: FormProps) {
   );
 }
 
-function MomoForm({ hidden, businessPath, onResult, onImported }: FormProps) {
+export function MomoForm({ hidden, businessPath, onResult, onImported }: FormProps) {
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<Status | null>(null);

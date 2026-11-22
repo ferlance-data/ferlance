@@ -11,6 +11,7 @@ import { PageErrorBoundary } from './components/PageErrorBoundary';
 import { SkeletonRows } from './components/ui';
 import { ActionsSlotContext } from './page';
 import { PAGES, pagePath, resolvePageName, type PageDef } from './routes';
+import { useIsAdmin } from './hooks';
 import { ROLE_LABEL, useScope, useWorkspace } from './workspace';
 
 function BrandMark() {
@@ -42,7 +43,8 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { user, business, businesses, datasets, role, switchBusiness } = useWorkspace();
   const name = business.name || 'Workspace';
   const pending = datasets.filter((item) => item.status === 'partial' || item.status === 'failed').length;
-  const group = (key: PageDef['nav']['group']) => PAGES.filter((page) => page.nav.group === key);
+  const isAdmin = useIsAdmin();
+  const group = (key: PageDef['nav']['group']) => PAGES.filter((page) => page.nav.group === key && (!page.adminOnly || isAdmin));
   return (
     <>
       <aside className="sidebar" id="sidebar" aria-label="Workspace navigation">

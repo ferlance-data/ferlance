@@ -1,4 +1,6 @@
 import { useState, type ReactNode } from 'react';
+import { request } from '../../lib/api';
+import { toast } from '../../lib/toast';
 import { Link } from '../../lib/router';
 import { BarChart, type Bar } from '../../lib/chart/BarChart';
 import { Donut } from '../../lib/chart/Donut';
@@ -14,6 +16,7 @@ import { PageActions } from '../page';
 import { pagePath } from '../routes';
 import { useScope, useWorkspace } from '../workspace';
 import { AdviceList } from './advice';
+import { MomoForm, UploadForm, type Result as ImportResult } from './Data';
 import { AttentionItem, InsightCard, RankItems, type AttentionEntry } from './shared';
 
 type Comparison = Analytics['comparison'];
@@ -128,8 +131,61 @@ export default function Overview() {
 }
 
 /* ---------- Setup guide ---------- */
+/** First-run import without leaving Overview: confirm the currency, then upload a file or paste MoMo alerts. */
+function QuickImport() {
+  const { business, businessPath, refreshDatasets, can, updateIdentity } = useWorkspace();
+  const [tab, setTab] = useState<'file' | 'momo'>('file');
+  const done = (result: ImportResult) => {
+    toast(`${result.dataset.filename}: ${number(result.dataset.accepted_rows)} rows ready.`);
+  };
+  async function changeCurrency(code: string) {
+    try {
+      await request(businessPath(''), { method: 'PATCH', json: { name: business.name, currency: code } });
+      setCurrency(code);
+      updateIdentity({ business: { currency: code } });
+    } catch (error) {
+      toast((error as Error).message, { error: true });
+    }
+  }
+  return (
+    <div className="quick-import" id="quick-import">
+      <div className="quick-import-head">
+        <h3>Start with your records</h3>
+        {can('manage_business') ? (
+          <label className="field field-inline-label">
+            Currency
+            <select className="select" id="quick-currency" value={business.currency} onChange={(event) => void changeCurrency(event.target.value)}>
+              {CURRENCIES.map((code) => (
+                <option key={code} value={code}>
+                  {code}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+      </div>
+      <Segmented
+        id="quick-import-tabs"
+        mode="tabs"
+        label="Import method"
+        value={tab}
+        onChange={setTab}
+        options={[
+          { value: 'file', label: 'Upload a file' },
+          { value: 'momo', label: 'Paste MoMo SMS' },
+        ]}
+      />
+      <UploadForm hidden={tab !== 'file'} businessPath={businessPath} onResult={done} onImported={refreshDatasets} />
+      <MomoForm hidden={tab !== 'momo'} businessPath={businessPath} onResult={done} onImported={refreshDatasets} />
+    </div>
+  );
+}
+
+// Currencies small businesses in the region commonly report in.
+const CURRENCIES = ['GHS', 'NGN', 'XOF', 'KES', 'USD', 'GBP', 'EUR'];
+
 function SetupGuide() {
-  const { business, datasets, inventory, setup } = useWorkspace();
+  const { business, datasets, inventory, setup, can } = useWorkspace();
   const dismissKey = `ferlance-setup-dismissed:${business.id}`;
   const [hidden, setHidden] = useState(false);
   const steps: { done: boolean; title: string; detail: string; to: string; action: string }[] = [
@@ -170,6 +226,7 @@ function SetupGuide() {
           </button>
         ) : null}
       </div>
+      {!steps[0]?.done && can('write_data') ? <QuickImport /> : null}
       <ol className="setup-steps">
         {steps.map((step) => (
           <li className={`setup-step${step.done ? ' done' : ''}`} key={step.title}>

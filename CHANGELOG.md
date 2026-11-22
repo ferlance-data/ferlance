@@ -6,6 +6,23 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-22
+
+Onboarding and the admin console (PRD §5.3, 4.1 and 4.3–4.4).
+
+### Added
+- **First-run import on Overview.** Until the first file is in, the setup guide lets a new owner pick the currency and either upload a file or paste MoMo alerts there and then, without going to another page.
+- **Admin page** (`/app/admin`), visible only to platform administrators:
+  - setup progress across all businesses: imported, stock, balances, asked Lance, invited a teammate (counts only)
+  - users, with search, platform role and disable/enable
+  - businesses, with search and counts of people, files, products, balances and chats (never their records)
+  - a log of every admin change
+- **Disabling an account** signs the person out everywhere at once: refresh sessions are revoked and access tokens are refused on the next request. Login is refused until the account is re-enabled. Admins can't disable themselves, the last admin, or admins listed in `FERLANCE_ADMIN_EMAILS`.
+
+### Changed
+- The admin card moved from Settings to the Admin page.
+- Role changes are recorded in the audit log, and the last administrator can't be demoted.
+
 ## [1.4.0] - 2026-11-22
 
 Team access (PRD §5.3, 4.2): owners give managers and accountants their own sign-in.
@@ -146,7 +163,8 @@ The first versioned release. The frontend was migrated to React 19, TypeScript (
 - The old date window briefly renders after a file switch with a preset range.
 - The Product name column never sorts Z→A. This was kept for parity.
 
-[Unreleased]: https://github.com/ferlance-data/ferlance/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/ferlance-data/ferlance/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/ferlance-data/ferlance/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/ferlance-data/ferlance/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/ferlance-data/ferlance/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/ferlance-data/ferlance/compare/v1.1.0...v1.2.0

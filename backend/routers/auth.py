@@ -104,6 +104,8 @@ def login(payload: LoginRequest, response: Response) -> dict:
     user = db.one(config.DB_PATH, "SELECT * FROM users WHERE email = ?", (payload.email.strip().lower(),))
     if not user or not verify_password(payload.password, user["password_hash"]):
         raise HTTPException(401, "Invalid email or password.")
+    if user.get("disabled_at"):
+        raise HTTPException(403, "This account has been disabled. Contact Ferlance support.")
     return _issue_session(user["id"], primary_business(user["id"]), response)
 
 
@@ -130,6 +132,9 @@ def refresh(response: Response, refresh_token: str | None = Cookie(default=None,
         now = datetime.now(timezone.utc)
         if not session or datetime.fromisoformat(session["expires_at"]) <= now:
             raise HTTPException(401, "Refresh session is invalid or expired.")
+        owner = connection.execute("SELECT disabled_at FROM users WHERE id = ?", (session["user_id"],)).fetchone()
+        if not owner or owner["disabled_at"]:
+            raise HTTPException(401, "This account is no longer active.")
         if session["revoked_at"] is not None:
             # A rotated token is presented again. Allow it for a short grace period, as long as the
             # session it was replaced by is still live: the earlier response was probably lost on a
