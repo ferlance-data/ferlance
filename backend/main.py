@@ -7,7 +7,7 @@ Layout
 - ``dataset_store`` import persistence and the "which records count" rules.
 - ``processor`` / ``universal_ingestion`` / ``sms_parser``  ingestion.
 - ``analytics`` / ``insights``  deterministic metrics (the source of truth).
-- ``llm`` / ``rag`` / ``market_research``  optional AI and web context.
+- ``llm`` / ``rag`` / ``news_context``  optional AI and free news context; ``advisor`` builds plain-language advice.
 """
 
 import os
@@ -21,7 +21,7 @@ from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from . import config, dataset_store, db
-from .routers import admin, analytics, auth, datasets, financial_position, integrations, inventory, lance
+from .routers import admin, analytics, auth, datasets, financial_position, inventory, lance
 
 
 @asynccontextmanager
@@ -43,11 +43,11 @@ class _BuildAssets(StaticFiles):
         await super().__call__(scope, receive, send)
 
 
-app = FastAPI(title="Ferlance", version="1.1.0", lifespan=lifespan)
+app = FastAPI(title="Ferlance", version="1.2.0", lifespan=lifespan)
 # The React frontend is a Vite build (frontend/dist). check_dir=False keeps the API
 # importable before the first build; pages then explain how to build instead.
 app.mount("/assets", _BuildAssets(directory=config.FRONTEND_DIST / "assets", check_dir=False), name="assets")
-for module in (auth, admin, datasets, analytics, inventory, financial_position, integrations, lance):
+for module in (auth, admin, datasets, analytics, inventory, financial_position, lance):
     app.include_router(module.router)
 
 # Vite names bundles like app-CTxM_byd.js: the hash changes whenever the content does.

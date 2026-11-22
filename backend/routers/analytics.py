@@ -1,8 +1,12 @@
-"""Deterministic reporting: metrics, period comparison, insights, fixed questions, and web research."""
+"""Deterministic reporting: metrics, period comparison, insights and advice, fixed questions, AI explanations."""
+
+import hashlib
+import json
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from .. import config, market_research
+from .. import advisor, config, db, inventory, llm, news_context
 from ..analytics import analyze, compare
 from ..deps import DateRange, Scope, date_range, owned_business, resolve_scope, scope
 from ..insights import QUESTION_NAMES, answer_question, generate_insights
@@ -21,11 +25,69 @@ def business_analytics(dates: DateRange = Depends(date_range), data: Scope = Dep
     return metrics
 
 
+def _advice(business_id: str, dates: DateRange, data: Scope) -> dict:
+    stock = inventory.list_products(config.DB_PATH, business_id)["items"]
+    return advisor.build(data.records, dates.start, dates.end, stock)
+
+
 @router.get("/insights")
-def business_insights(dates: DateRange = Depends(date_range), data: Scope = Depends(scope)) -> dict:
+def business_insights(
+    dates: DateRange = Depends(date_range),
+    data: Scope = Depends(scope),
+    business: dict = Depends(owned_business),
+) -> dict:
     result = generate_insights(data.records, dates.start, dates.end)
     result["dataset"] = data.descriptor
+    result["advice"] = {**_advice(business["id"], dates, data), "ai_available": llm.ai_available()}
     return result
+
+
+# News is only worth a slow outside lookup for items about one product that went wrong.
+_NEWS_KINDS = {"decline", "stopped", "loss", "margin"}
+
+
+# Old explanations are dropped after this long; they are cheap to regenerate if needed.
+EXPLANATION_RETENTION_DAYS = 90
+
+
+@router.post("/insights/{insight_id}/explain")
+def explain_insight(
+    insight_id: str,
+    dates: DateRange = Depends(date_range),
+    data: Scope = Depends(scope),
+    business: dict = Depends(owned_business),
+) -> dict:
+    """AI explanation of one advice item. The item is rebuilt on the server from the scope, never taken from the client."""
+    advice = _advice(business["id"], dates, data)
+    item = next((entry for entry in advice["items"] if entry["id"] == insight_id), None)
+    if item is None:
+        raise HTTPException(404, "That suggestion no longer applies to this data. Refresh the page.")
+    if not llm.ai_available():
+        raise HTTPException(503, "AI explanations are not set up on this server. The reasons and actions above are calculated without AI.")
+    # Same finding with the same evidence → same explanation, so taps never pay twice.
+    fingerprint = json.dumps({key: item[key] for key in ("title", "summary", "evidence", "reasons", "actions")}, sort_keys=True, default=str)
+    cache_key = hashlib.sha256(f"{advice['period']}|{advice['comparison_period']}|{fingerprint}".encode()).hexdigest()
+    cached = db.one(config.DB_PATH, "SELECT text, created_at FROM insight_explanations WHERE business_id = ? AND cache_key = ?", (business["id"], cache_key))
+    if cached:
+        stored = json.loads(cached["text"])
+        return {"id": insight_id, "explanation": stored["text"], "news": stored["news"], "cached": True, "created_at": cached["created_at"]}
+
+    news = []
+    if item["kind"] in _NEWS_KINDS and item.get("product"):
+        news = news_context.search(item["product"], dates.start, dates.end)
+    try:
+        text = llm.explain(advisor.EXPLAIN_SYSTEM, advisor.explain_prompt(item, advice, news))
+    except RuntimeError as error:
+        raise HTTPException(503, str(error))
+    created = db.now()
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=EXPLANATION_RETENTION_DAYS)).isoformat()
+    db.insert(config.DB_PATH, "DELETE FROM insight_explanations WHERE business_id = ? AND created_at < ?", (business["id"], cutoff))
+    db.insert(
+        config.DB_PATH,
+        "INSERT OR REPLACE INTO insight_explanations (business_id, cache_key, text, created_at) VALUES (?, ?, ?, ?)",
+        (business["id"], cache_key, json.dumps({"text": text, "news": news}), created),
+    )
+    return {"id": insight_id, "explanation": text, "news": news, "cached": False, "created_at": created}
 
 
 @router.get("/questions")
@@ -44,15 +106,3 @@ def business_question(
         raise HTTPException(404, "That business question is not available.")
     data = resolve_scope(business["id"], dataset_id)
     return answer_question(question, data.records, dates.start, dates.end)
-
-
-@router.post("/performance-research")
-def performance_research(
-    dates: DateRange = Depends(date_range),
-    data: Scope = Depends(scope),
-    business: dict = Depends(owned_business),
-) -> dict:
-    try:
-        return market_research.research_performance(config.DB_PATH, business["id"], data.records, dates.start, dates.end)
-    except market_research.MarketResearchError as error:
-        raise HTTPException(503, str(error))

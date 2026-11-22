@@ -21,11 +21,10 @@ Browser (React + TypeScript, built by Vite into frontend/dist)
 FastAPI (backend/main.py) — wiring, lifespan, built frontend + SPA fallback, cache headers
   routers/auth.py            signup, login, refresh (single-use rotation), logout, profile
   routers/datasets.py        file uploads, Mobile Money SMS import, history, include/exclude
-  routers/analytics.py       metrics + period comparison, insights, instant questions, web research
+  routers/analytics.py       metrics + period comparison, insights and advice, instant questions, AI explanations
   routers/inventory.py       catalogue, stock ledger, stocktake CSV import
   routers/financial_position.py  dated balances and point-in-time statements
   routers/lance.py           Ask Lance conversations (LLM + retrieval)
-  routers/integrations.py    per-business encrypted API keys (Brave Search)
   routers/admin.py           platform operator role management
         │
   deps.py          current user, tenant ownership, date range, data scope
@@ -34,7 +33,8 @@ FastAPI (backend/main.py) — wiring, lifespan, built frontend + SPA fallback, c
   processor.py ─ universal_ingestion.py ─ sms_parser.py      ingestion (CSV/XLSX/TSV/TXT/MD/SMS)
   analytics.py ─ insights.py                                  deterministic metrics
   inventory.py ─ financial_position.py                        operational ledgers
-  rag.py (SQLite FTS5) ─ llm.py ─ market_research.py          optional AI and web context
+  advisor.py ─ ghana_calendar.py                              plain-language advice (deterministic)
+  rag.py (SQLite FTS5) ─ llm.py ─ news_context.py (GDELT)      optional AI and free news context
         │
   SQLite (metadata, ledgers, chats, FTS index)  +  data/raw (uploads)  +  data/processed (JSONL)
 ```
@@ -47,7 +47,7 @@ FastAPI (backend/main.py) — wiring, lifespan, built frontend + SPA fallback, c
 
 ### Scope
 
-Every analytical endpoint (`/analytics`, `/insights`, `/questions/*`, `/performance-research`, `/ask-lance`) accepts:
+Every analytical endpoint (`/analytics`, `/insights`, `/insights/{id}/explain`, `/questions/*`, `/ask-lance`) accepts:
 
 - `dataset_id` — omitted or `all` means **every processed file the owner has not excluded**; an id means that single file (even if excluded).
 - `from` / `to` — an inclusive date window.
@@ -64,6 +64,12 @@ Previously the dashboard used all files while insights and research silently use
 ### Analytics
 
 `analyze()` returns totals, trends at five grains, product and customer rankings, profit when costs are complete, and data-quality warnings. `compare()` adds a **previous-period comparison** for the same-length window immediately before the selected one, and reports "no earlier period" instead of a misleading +100% when that window is empty.
+
+### Advice ("What to do now")
+
+`advisor.build` turns the scoped records (and the inventory list) into ranked, plain-language items: products to sell more of, decliners, loss-makers, squeezed margins, stock about to run out, money tied up in slow stock, and dependence on one product or customer. Each item carries its evidence, possible reasons labelled *likely* or *possible* (price vs volume, fewer vs smaller sales, regular buyers who stopped, out of stock, same time last year, Ghanaian holidays and seasons from `ghana_calendar.py`) and concrete actions. It is deterministic, needs no AI, and reports which missing columns would unlock more.
+
+Tapping an item calls `POST /insights/{id}/explain`. The server rebuilds the item from the scope (nothing is taken from the client), optionally adds free news headlines from GDELT (`news_context.py`: keyless, rate-limited, best effort, short timeouts), and asks the AI provider chain for a short explanation. Customer names never go into the prompt; file text is wrapped as data. Explanations are cached per business and evidence, so repeat taps cost nothing.
 
 ### Ask Lance
 
@@ -95,7 +101,8 @@ React 19 + TypeScript (strict) built by Vite. Two entries: the landing page keep
 | `datasets` | one row per import: status, counts, warnings, `checksum`, `review_status` (`accepted`/`excluded`) |
 | `inventory_products`, `inventory_movements` | catalogue and append-only stock ledger |
 | `financial_position_balances` | append-only dated balances |
-| `business_integrations` | Fernet-encrypted third-party keys |
+| `business_integrations` | Fernet-encrypted third-party keys (currently unused; kept for future provider keys) |
+| `insight_explanations` | cached AI explanations of advice items, keyed by the item's evidence |
 | `chat_conversations`, `chat_messages` | saved Ask Lance threads |
 | `rag_documents_fts` | FTS5 index of accepted rows |
 

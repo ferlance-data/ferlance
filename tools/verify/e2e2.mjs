@@ -1,4 +1,4 @@
-// Second e2e pass: drawer, custom range, view-only-this-file, admin, Brave, Lance across navigation.
+// Second e2e pass: drawer, custom range, view-only-this-file, admin, insights advice, Lance across navigation.
 // usage: node e2e2.mjs http://127.0.0.1:8791   (admin email = demo, secret key set, 3s mock LLM)
 import { chromium } from 'playwright';
 const base = process.argv[2];
@@ -66,16 +66,16 @@ const ownRow = page.locator('tr', { hasText: 'demo@ferlance.test' });
 check('admin card renders for admin email', await ownRow.count() > 0);
 check('own role select is disabled', await ownRow.locator('select').isDisabled());
 
-// Brave connect / disconnect.
-await page.getByLabel('API key').fill('BSA-test-key-1234567890');
-const saved = page.waitForResponse((r) => r.url().includes('brave-search') && r.request().method() === 'PUT');
-await page.getByRole('button', { name: 'Save key' }).click();
-await saved;
-await page.locator('#brave-pill', { hasText: /^Connected/ }).waitFor({ timeout: 5000 }).catch(() => {});
-check('Brave key saves and pill shows Connected', (await page.locator('#brave-pill').textContent()).includes('Connected'));
-await page.getByRole('button', { name: /Disconnect|Remove/ }).click();
-await page.locator('#brave-pill', { hasText: /^Not connected/ }).waitFor({ timeout: 5000 }).catch(() => {});
-check('Disconnect returns to Not connected', (await page.locator('#brave-pill').textContent()).includes('Not connected'));
+// Insights advice: tap a suggestion, the detail sheet opens with reasons and actions, Escape closes it.
+await page.goto(`${base}/app/insights`, { waitUntil: 'networkidle' });
+const firstAdvice = page.locator('#advice-list .advice-card').first();
+check('advice cards render', (await firstAdvice.count()) > 0);
+await firstAdvice.click();
+const sheet = page.locator('dialog[open].advice-sheet');
+check('tapping a suggestion opens the detail sheet', await sheet.isVisible());
+check('sheet lists what to do', (await sheet.locator('.advice-actions li').count()) > 0);
+await page.keyboard.press('Escape');
+check('Escape closes the sheet', (await page.locator('dialog[open].advice-sheet').count()) === 0);
 
 // Lance: leave mid-answer (3s mock), come back, answer is there.
 await page.goto(`${base}/app/lance`, { waitUntil: 'networkidle' });

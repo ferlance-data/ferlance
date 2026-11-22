@@ -20,7 +20,7 @@ Goal: **exact visual and behavioural parity** with the legacy vanilla-JS view. N
 1. File: `src/app/views/<Name>.tsx`, `export default function <Name>()`. The Shell already renders the `<section class="view" data-view=...>` wrapper and the page title/description — render only the section's *inner* content.
 2. **Markup parity**: same elements, class names, ids, `aria-*`, `role`, `data-*` attributes and text as the legacy static HTML **plus** what the legacy JS generated. CSS (`src/styles/*.css`, unchanged) targets these. Where legacy HTML had `<span data-icon="x"></span>` use `<IconSlot name="x" />`; where an element itself carried `data-icon` (icon buttons) keep `data-icon` on it and put `<Icon>` inside.
 3. **Data**:
-   - Scoped endpoints (`/analytics`, `/insights`, `/questions/{id}`, `/performance-research`, `/ask-lance`) use the current scope. For GETs use `useScopedQuery`.
+   - Scoped endpoints (`/analytics`, `/insights`, `/insights/{id}/explain`, `/questions/{id}`, `/ask-lance`) use the current scope. For GETs use `useScopedQuery`.
    - Unscoped reads: `useBusinessQuery`. Datasets and inventory already live in `useWorkspace()` — don't refetch them separately.
    - Writes: `request()` (or TanStack `useMutation`), then refresh caches: `refreshDatasets()`, `refreshInventory()`, or `queryClient.invalidateQueries({ queryKey: keys.business(business.id) })` (prefix match) as appropriate.
    - Load errors are already toasted globally by the query client (except 401). Action errors: `toast(error.message, { error: true })` or the view's `StatusText`, matching legacy.

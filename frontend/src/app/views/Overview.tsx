@@ -11,6 +11,7 @@ import { useScopedQuery } from '../hooks';
 import { PageActions } from '../page';
 import { pagePath } from '../routes';
 import { useScope, useWorkspace } from '../workspace';
+import { AdviceList } from './advice';
 import { AttentionItem, InsightCard, RankItems, type AttentionEntry } from './shared';
 
 type Comparison = Analytics['comparison'];
@@ -73,8 +74,8 @@ export default function Overview() {
         <div className="card">
           <div className="card-header">
             <div>
-              <h2 className="card-title">Latest insights</h2>
-              <p className="card-subtitle">Calculated from your records — no guesswork</p>
+              <h2 className="card-title">What to do now</h2>
+              <p className="card-subtitle">From your records. Tap one to see why.</p>
             </div>
             <Link className="btn btn-ghost btn-sm" to={pagePath('insights')}>
               All insights
@@ -85,7 +86,9 @@ export default function Overview() {
             <div className="insight-stack" id="overview-insights">
               {!hasData ? (
                 <EmptyState title="No insights yet" message="Insights are calculated from your imported records." />
-              ) : !analytics || insightsPending ? null : insights?.insights?.length ? (
+              ) : !analytics || insightsPending ? null : insights?.advice ? (
+                <AdviceList advice={insights.advice} limit={3} />
+              ) : insights?.insights?.length ? (
                 insights.insights.slice(0, 3).map((item, index) => <InsightCard key={index} item={item} compact />)
               ) : (
                 <EmptyState title="No insights for this period" message="Try a wider date range." />
