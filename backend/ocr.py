@@ -49,7 +49,15 @@ PROMPT = (
 
 
 class OcrError(RuntimeError):
-    """The document could not be read; the message is safe to show to the user."""
+    """The document could not be read; the message is safe to show to the user.
+
+    ``status`` is the HTTP status to report: 4xx when the input should change, 503 when the
+    reading service is unavailable.
+    """
+
+    def __init__(self, message: str, status: int = 503):
+        super().__init__(message)
+        self.status = status
 
 
 def sniff(content: bytes) -> str:
@@ -58,7 +66,7 @@ def sniff(content: bytes) -> str:
             return mime
     if content[:4] == b"RIFF" and content[8:12] == b"WEBP":
         return "image/webp"
-    raise OcrError("Use a photo (JPEG, PNG or WebP) or a PDF.")
+    raise OcrError("Use a photo (JPEG, PNG or WebP) or a PDF.", 415)
 
 
 def _number(value: Any, limit: float) -> float | None:
@@ -132,6 +140,9 @@ def parse_text(text: str) -> list[dict[str, Any]]:
     """
     raw = []
     for line in text.splitlines()[:MAX_LINES]:
+        # "1,250.00" is one number: drop thousands separators (a comma followed by exactly three
+        # digits) before commas are used to split fields such as "Rice, 10, 70".
+        line = re.sub(r"(?<=\d),(?=\d{3}(?!\d))", "", line)
         tokens = [token for token in re.split(r"[\s,;:]+", line.strip()) if token]
         numbers: list[str] = []
         while tokens and (_NUMBER.match(tokens[-1]) or tokens[-1].casefold() in _SEPARATORS):
@@ -153,11 +164,11 @@ def _reply_json(content: str) -> Any:
         text = fenced.group(1)
     start, end = text.find("{"), text.rfind("}")
     if start == -1 or end <= start:
-        raise OcrError("The document could not be read. Try a sharper, flatter photo.")
+        raise OcrError("The document could not be read. Try a sharper, flatter photo.", 422)
     try:
         return json.loads(text[start:end + 1])
     except ValueError as error:
-        raise OcrError("The document could not be read. Try a sharper, flatter photo.") from error
+        raise OcrError("The document could not be read. Try a sharper, flatter photo.", 422) from error
 
 
 def read_document(content: bytes, filename: str = "document") -> list[dict[str, Any]]:
@@ -165,7 +176,7 @@ def read_document(content: bytes, filename: str = "document") -> list[dict[str, 
     if not config.OPENROUTER_KEY:
         raise OcrError("Reading photos needs an AI key on the server. You can paste the invoice text instead.")
     if len(content) > MAX_BYTES:
-        raise OcrError("That file is over 8 MB. Take the photo again at a lower resolution.")
+        raise OcrError("That file is over 8 MB. Take the photo again at a lower resolution.", 413)
     mime = sniff(content)
     data_url = f"data:{mime};base64,{base64.b64encode(content).decode()}"
     part = (
@@ -193,7 +204,7 @@ def read_document(content: bytes, filename: str = "document") -> list[dict[str, 
         logger.warning("OCR provider failed: HTTP %s", error.response.status_code)
         if error.response.status_code == 402 and mime == "application/pdf":
             # OpenRouter reads files only when the account holds a minimum credit balance.
-            raise OcrError("Reading PDFs needs credit on the AI account. Take a photo of the page instead.") from error
+            raise OcrError("Reading PDFs needs credit on the AI account. Take a photo of the page instead.", 422) from error
         raise OcrError("The reading service did not answer. Try again in a moment, or paste the text instead.") from error
     except (httpx.HTTPError, KeyError, IndexError, TypeError, ValueError) as error:
         logger.warning("OCR provider failed: %s", type(error).__name__)

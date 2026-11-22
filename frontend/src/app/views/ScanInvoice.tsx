@@ -77,7 +77,8 @@ export function ScanInvoice({ hidden, products, onApplied }: { hidden: boolean; 
   const [capture, setCapture] = useState<Capture | null>(null);
   const [decisions, setDecisions] = useState<Decision[]>([]);
   const [status, setStatus] = useState<{ message: string; error: boolean } | null>(null);
-  const active = products.filter((item) => item.active);
+  // Archived products stay choosable: a scanned line may be for something you stopped selling.
+  const choosable = [...products].sort((a, b) => Number(b.active) - Number(a.active));
 
   async function read(event: FormEvent) {
     event.preventDefault();
@@ -179,9 +180,9 @@ export function ScanInvoice({ hidden, products, onApplied }: { hidden: boolean; 
                       Product
                       <select className="select" value={decision.product_id} onChange={(event) => update(index, { product_id: event.target.value })}>
                         <option value="">Choose…</option>
-                        {active.map((item) => (
+                        {choosable.map((item) => (
                           <option key={item.id} value={item.id}>
-                            {item.name}
+                            {item.active ? item.name : `${item.name} (archived)`}
                           </option>
                         ))}
                       </select>

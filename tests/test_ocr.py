@@ -148,3 +148,14 @@ def test_pdf_without_provider_credit_explains_itself(monkeypatch):
     monkeypatch.setattr(ocr.httpx, "post", lambda *args, **kwargs: response)
     with pytest.raises(ocr.OcrError, match="photo of the page"):
         ocr.read_document(b"%PDF-1.7 test", "invoice.pdf")
+
+
+def test_typed_thousands_and_archived_matches(client):
+    lines = ocr.parse_text("Cement 50kg, 10, 1,250.00\nIron rods x 3 @ 2,400")
+    assert [(l["name"], l["quantity"], l["unit_cost"]) for l in lines] == [("Cement 50kg", 10, 1250), ("Iron rods", 3, 2400)]
+    headers, base, _ = owner(client)
+    product = client.post(f"{base}/inventory/products", headers=headers, json={"name": "Milo 400g", "unit": "tin"}).json()
+    client.patch(f"{base}/inventory/products/{product['id']}", headers=headers, json={"active": False})
+    draft = client.post(f"{base}/inventory/captures/text", headers=headers, json={"text": "Milo 400g, 12, 47"}).json()
+    assert draft["lines"][0]["match"] == {"product_id": product["id"], "name": "Milo 400g", "kind": "exact"}
+    assert client.post(f"{base}/inventory/captures", headers=headers, files={"file": ("a.svg", b"<svg/>", "image/svg+xml")}).status_code == 415

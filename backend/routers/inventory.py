@@ -6,6 +6,7 @@ import json
 import math
 import re
 import uuid
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile
@@ -191,9 +192,13 @@ class CaptureConfirm(BaseModel):
 def _save_capture(business: dict, user: dict, source: str, filename: str, lines: list[dict]) -> dict:
     if not lines:
         raise HTTPException(422, "No product lines were found. Try a clearer photo, or type the lines in.")
-    products = inventory.list_products(config.DB_PATH, business["id"])["items"]
+    # Archived products are matched too: their names are taken, so "create" would be refused.
+    products = inventory.list_products(config.DB_PATH, business["id"], include_archived=True)["items"]
     lines = ocr.match_products(lines, products)
     capture_id = str(uuid.uuid4())
+    # Drafts nobody confirmed within 30 days are dropped (they hold supplier prices).
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+    db.insert(config.DB_PATH, "DELETE FROM stock_captures WHERE business_id = ? AND status != 'confirmed' AND created_at < ?", (business["id"], cutoff))
     db.insert(
         config.DB_PATH,
         "INSERT INTO stock_captures (id, business_id, created_by, source, filename, status, lines, created_at) VALUES (?, ?, ?, ?, ?, 'draft', ?, ?)",
@@ -209,13 +214,13 @@ def create_capture(file: UploadFile = File(...), business: dict = Depends(data_w
     try:
         ocr.sniff(content)
     except ocr.OcrError as error:
-        raise HTTPException(415, str(error))
+        raise HTTPException(error.status, str(error))
     spend_ai_call(business["id"])
     try:
         lines = ocr.read_document(content, file.filename or "document")
     except ocr.OcrError as error:
         refund_ai_call(business["id"])
-        raise HTTPException(422 if "MB" in str(error) else 503, str(error))
+        raise HTTPException(error.status, str(error))
     return _save_capture(business, user, "vision", file.filename or "Photo", lines)
 
 
