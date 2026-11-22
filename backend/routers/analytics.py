@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from .. import advisor, config, db, inventory, llm, news_context
 from ..analytics import analyze, compare
-from ..deps import DateRange, Scope, date_range, owned_business, resolve_scope, scope
+from ..deps import ai_user, refund_ai_call, spend_ai_call, date_range, DateRange, read_business, resolve_scope, Scope, scope
 from ..insights import QUESTION_NAMES, answer_question, generate_insights
 
 router = APIRouter(prefix="/api/businesses/{business_id}", tags=["analytics"])
@@ -34,7 +34,7 @@ def _advice(business_id: str, dates: DateRange, data: Scope) -> dict:
 def business_insights(
     dates: DateRange = Depends(date_range),
     data: Scope = Depends(scope),
-    business: dict = Depends(owned_business),
+    business: dict = Depends(read_business),
 ) -> dict:
     result = generate_insights(data.records, dates.start, dates.end)
     result["dataset"] = data.descriptor
@@ -55,7 +55,7 @@ def explain_insight(
     insight_id: str,
     dates: DateRange = Depends(date_range),
     data: Scope = Depends(scope),
-    business: dict = Depends(owned_business),
+    business: dict = Depends(ai_user),
 ) -> dict:
     """AI explanation of one advice item. The item is rebuilt on the server from the scope, never taken from the client."""
     advice = _advice(business["id"], dates, data)
@@ -72,12 +72,14 @@ def explain_insight(
         stored = json.loads(cached["text"])
         return {"id": insight_id, "explanation": stored["text"], "news": stored["news"], "cached": True, "created_at": cached["created_at"]}
 
+    spend_ai_call(business["id"])
     news = []
     if item["kind"] in _NEWS_KINDS and item.get("product"):
         news = news_context.search(item["product"], dates.start, dates.end)
     try:
         text = llm.explain(advisor.EXPLAIN_SYSTEM, advisor.explain_prompt(item, advice, news))
     except RuntimeError as error:
+        refund_ai_call(business["id"])
         raise HTTPException(503, str(error))
     created = db.now()
     cutoff = (datetime.now(timezone.utc) - timedelta(days=EXPLANATION_RETENTION_DAYS)).isoformat()
@@ -91,7 +93,7 @@ def explain_insight(
 
 
 @router.get("/questions")
-def list_questions(business: dict = Depends(owned_business)) -> list[dict]:
+def list_questions(business: dict = Depends(read_business)) -> list[dict]:
     return [{"id": key, "label": label} for key, label in QUESTION_NAMES.items()]
 
 
@@ -100,7 +102,7 @@ def business_question(
     question: str,
     dataset_id: str | None = None,
     dates: DateRange = Depends(date_range),
-    business: dict = Depends(owned_business),
+    business: dict = Depends(read_business),
 ) -> dict:
     if question not in QUESTION_NAMES:
         raise HTTPException(404, "That business question is not available.")

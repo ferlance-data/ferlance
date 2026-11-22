@@ -360,7 +360,41 @@ def test_refresh_token_is_single_use_under_concurrent_requests(tmp_path, monkeyp
     with ThreadPoolExecutor(max_workers=2) as pool:
         results = list(pool.map(lambda _: rotate(), range(2)))
 
-    assert sorted(results) == [200, 401]
+    # One request rotates the token; the other is served once by the reuse grace window.
+    assert sorted(results) == [200, 200]
+    # The grace is one-shot: a third use of the same token is refused.
+    assert _refresh_status(refresh_token) == 401
+
+
+def _refresh_status(token):
+    try:
+        auth.refresh(Response(), refresh_token=token)
+        return 200
+    except HTTPException as error:
+        return error.status_code
+
+
+def test_rotated_refresh_token_grace_window(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "DB_PATH", tmp_path / "test.sqlite3")
+    monkeypatch.setattr(config, "RAW_DIR", tmp_path / "raw")
+    monkeypatch.setattr(config, "PROCESSED_DIR", tmp_path / "processed")
+    config.RAW_DIR.mkdir()
+    config.PROCESSED_DIR.mkdir()
+    db.initialize(config.DB_PATH)
+    client = TestClient(main.app)
+    signup = client.post("/api/auth/signup", json={"email": "grace@example.com", "password": "password123", "business_name": "G"})
+    old = signup.cookies.get("ferlance_refresh")
+    first = Response()
+    auth.refresh(first, refresh_token=old)  # rotates; pretend this response was lost
+    assert _refresh_status(old) == 200  # retried within the grace window
+    assert _refresh_status(old) == 401  # only once
+
+    # Outside the window, or after sign-out, a rotated token is refused.
+    signup2 = client.post("/api/auth/signup", json={"email": "grace2@example.com", "password": "password123", "business_name": "G"})
+    old2 = signup2.cookies.get("ferlance_refresh")
+    auth.refresh(Response(), refresh_token=old2)
+    monkeypatch.setattr(config, "REFRESH_REUSE_GRACE_SECONDS", -1)
+    assert _refresh_status(old2) == 401
 
 
 def test_profile_update_and_admin_capabilities(tmp_path, monkeypatch):
@@ -374,10 +408,11 @@ def test_profile_update_and_admin_capabilities(tmp_path, monkeypatch):
     signup = client.post("/api/auth/signup", json={"email": "admin@example.com", "password": "password123", "business_name": "Old Name"})
     headers = {"Authorization": f"Bearer {signup.json()['access_token']}"}
 
-    profile = client.patch("/api/auth/profile", headers=headers, json={"full_name": "Admin User", "business_name": "New Name"})
+    profile = client.patch("/api/auth/profile", headers=headers, json={"full_name": "Admin User"})
     assert profile.status_code == 200
     assert profile.json()["user"]["full_name"] == "Admin User"
-    assert profile.json()["business"]["name"] == "New Name"
+    renamed = client.patch(f"/api/businesses/{signup.json()['business']['id']}", headers=headers, json={"name": "New Name"})
+    assert renamed.status_code == 200 and renamed.json()["name"] == "New Name"
     assert client.get("/api/admin/capabilities", headers=headers).status_code == 403
 
     db.insert(config.DB_PATH, "UPDATE users SET role = 'admin' WHERE email = ?", ("admin@example.com",))

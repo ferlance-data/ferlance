@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from .. import config, financial_position
-from ..deps import current_user, owned_business
+from ..deps import balance_writer, current_user, read_business
 
 router = APIRouter(prefix="/api/businesses/{business_id}/financial-position", tags=["financial position"])
 
@@ -21,7 +21,7 @@ class BalanceRequest(BaseModel):
 
 
 @router.post("/balances")
-def add_balance(payload: BalanceRequest, business: dict = Depends(owned_business), user: dict = Depends(current_user)) -> dict:
+def add_balance(payload: BalanceRequest, business: dict = Depends(balance_writer), user: dict = Depends(current_user)) -> dict:
     try:
         if not math.isfinite(payload.amount):
             raise financial_position.FinancialPositionError("Balance must be a finite number.")
@@ -40,10 +40,10 @@ def add_balance(payload: BalanceRequest, business: dict = Depends(owned_business
 
 
 @router.get("")
-def position(as_of_date: date = Query(default_factory=date.today, alias="as_of"), business: dict = Depends(owned_business)) -> dict:
+def position(as_of_date: date = Query(default_factory=date.today, alias="as_of"), business: dict = Depends(read_business)) -> dict:
     return financial_position.position_as_of(config.DB_PATH, business["id"], as_of_date)
 
 
 @router.get("/history")
-def history(limit: int = Query(default=200, ge=1, le=1000), business: dict = Depends(owned_business)) -> list[dict]:
+def history(limit: int = Query(default=200, ge=1, le=1000), business: dict = Depends(read_business)) -> list[dict]:
     return financial_position.balance_history(config.DB_PATH, business["id"], limit)

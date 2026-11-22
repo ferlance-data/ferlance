@@ -1722,3 +1722,45 @@ svg.icon {
     font-size: 10.5px;
   }
 }
+
+/* ---------- Team (Settings) ---------- */
+.role-help {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding-left: 18px;
+  font-size: var(--text-sm);
+  color: var(--subtle-foreground);
+}
+
+.invite-link {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.invite-link .field {
+  flex: 1 1 260px;
+}
+
+.pending-invites {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+}
+
+.pending-invites li {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.business-switch {
+  width: 100%;
+  margin-top: 6px;
+}

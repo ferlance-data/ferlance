@@ -62,6 +62,35 @@ CREATE INDEX IF NOT EXISTS inventory_movements_business_date
     ON inventory_movements(business_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS inventory_movements_product_date
     ON inventory_movements(product_id, created_at DESC);
+CREATE TABLE IF NOT EXISTS business_members (
+    business_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    role TEXT NOT NULL CHECK(role IN ('owner', 'manager', 'accountant')),
+    created_at TEXT NOT NULL,
+    PRIMARY KEY(business_id, user_id),
+    FOREIGN KEY(business_id) REFERENCES businesses(id),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+);
+CREATE INDEX IF NOT EXISTS business_members_user ON business_members(user_id);
+CREATE TABLE IF NOT EXISTS business_invites (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    role TEXT NOT NULL CHECK(role IN ('manager', 'accountant')),
+    token_hash TEXT UNIQUE NOT NULL,
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    accepted_by TEXT,
+    accepted_at TEXT,
+    revoked_at TEXT,
+    FOREIGN KEY(business_id) REFERENCES businesses(id)
+);
+CREATE TABLE IF NOT EXISTS ai_usage (
+    business_id TEXT NOT NULL,
+    day TEXT NOT NULL,
+    calls INTEGER NOT NULL,
+    PRIMARY KEY(business_id, day)
+);
 CREATE TABLE IF NOT EXISTS insight_explanations (
     business_id TEXT NOT NULL,
     cache_key TEXT NOT NULL,
@@ -138,6 +167,14 @@ def initialize(path: Path) -> None:
             db.execute("ALTER TABLE datasets ADD COLUMN period_from TEXT")
         if "period_to" not in dataset_columns:
             db.execute("ALTER TABLE datasets ADD COLUMN period_to TEXT")
+        # Every business has its creator as owner in the membership table (one code path for access).
+        db.execute(
+            "INSERT OR IGNORE INTO business_members (business_id, user_id, role, created_at) "
+            "SELECT id, user_id, 'owner', created_at FROM businesses"
+        )
+        session_columns = {row[1] for row in db.execute("PRAGMA table_info(refresh_sessions)").fetchall()}
+        if "replaced_by" not in session_columns:
+            db.execute("ALTER TABLE refresh_sessions ADD COLUMN replaced_by TEXT")
         # Brave web research was removed in favour of free sources; drop any stored Brave keys.
         db.execute("DELETE FROM business_integrations WHERE provider = 'brave_search'")
         movement_columns = {row[1] for row in db.execute("PRAGMA table_info(inventory_movements)").fetchall()}

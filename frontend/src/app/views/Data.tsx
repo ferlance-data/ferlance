@@ -9,7 +9,7 @@ import { formatDateTime, money, number, plural } from '../../lib/format';
 import { Icon } from '../../lib/icons';
 import { toast } from '../../lib/toast';
 import type { Dataset } from '../../lib/types';
-import { DataTable, Segmented, StatusText, type Column } from '../components/ui';
+import { DataTable, Segmented, StatusText, type Column, ReadOnlyNotice } from '../components/ui';
 import { pagePath } from '../routes';
 import { keys, useScope, useWorkspace } from '../workspace';
 import { StatusPill } from './shared';
@@ -48,7 +48,11 @@ function ImportResult({ result }: { result: Result }) {
   const navigate = useNavigate();
   const { dataset } = result;
   const failed = dataset.status === 'failed';
-  const title = failed ? 'This file could not be imported' : dataset.status === 'partial' ? 'Imported with some rows rejected' : 'Every row imported';
+  const title = failed
+    ? 'This file could not be imported'
+    : dataset.status === 'partial'
+      ? 'Imported with some rows rejected'
+      : 'Every row imported';
   const counts: [string, number][] = [
     ['Rows found', dataset.source_rows],
     ['Accepted', dataset.accepted_rows],
@@ -110,7 +114,8 @@ function ImportResult({ result }: { result: Result }) {
 }
 
 export default function Data() {
-  const { business, datasets, refreshDatasets, businessPath } = useWorkspace();
+  const { business, datasets, refreshDatasets, businessPath, can, role } = useWorkspace();
+  const canWrite = can('write_data');
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<Tab>('file');
 
@@ -144,8 +149,14 @@ export default function Data() {
             />
           </div>
           <div className="card-body">
-            <UploadForm hidden={tab !== 'file'} businessPath={businessPath} onResult={setResult} onImported={refreshDatasets} />
-            <MomoForm hidden={tab !== 'momo'} businessPath={businessPath} onResult={setResult} onImported={refreshDatasets} />
+            {canWrite ? (
+              <>
+                <UploadForm hidden={tab !== 'file'} businessPath={businessPath} onResult={setResult} onImported={refreshDatasets} />
+                <MomoForm hidden={tab !== 'momo'} businessPath={businessPath} onResult={setResult} onImported={refreshDatasets} />
+              </>
+            ) : (
+              <ReadOnlyNotice role={role} what="imports" />
+            )}
             <div id="import-result" ref={resultRef}>
               {result ? <ImportResult key={result.dataset.id} result={result} /> : null}
             </div>
@@ -204,6 +215,7 @@ export default function Data() {
           <History
             datasets={datasets}
             businessPath={businessPath}
+            canWrite={canWrite}
             onImported={refreshDatasets}
             onShowNotes={(dataset) => {
               setResult({ dataset });
@@ -353,11 +365,13 @@ function MomoForm({ hidden, businessPath, onResult, onImported }: FormProps) {
 function History({
   datasets,
   businessPath,
+  canWrite,
   onImported,
   onShowNotes,
 }: {
   datasets: Dataset[];
   businessPath: (suffix?: string) => string;
+  canWrite: boolean;
   onImported: () => Promise<void>;
   onShowNotes: (dataset: Dataset) => void;
 }) {
@@ -415,6 +429,7 @@ function History({
               type="checkbox"
               checked={included}
               aria-label={`Include ${item.filename} in analysis`}
+              disabled={!canWrite}
               onChange={(event) => void toggle(item, event.target.checked)}
             />
             <span />

@@ -13,7 +13,7 @@ import { toast, Toasts } from '../lib/toast';
 import type { Business, BalanceHistoryRow, ConversationSummary, Dataset, Identity, InventoryResponse, User } from '../lib/types';
 import { pagePath, resolvePageName } from './routes';
 import { Shell } from './Shell';
-import { keys, WorkspaceProvider, type SetupFlags } from './workspace';
+import { chooseBusiness, keys, WorkspaceProvider, type SetupFlags } from './workspace';
 
 const queryClient = new QueryClient({
   queryCache: new QueryCache({
@@ -33,6 +33,7 @@ const queryClient = new QueryClient({
 interface Boot {
   user: User;
   business: Business;
+  businesses: Business[];
   setup: SetupFlags;
 }
 
@@ -63,7 +64,8 @@ function App() {
         navigation.replace('/?signin');
         return;
       }
-      const { user, business } = identity;
+      const { user } = identity;
+      const business = chooseBusiness(identity);
       if (!business) {
         toast('This account has no business workspace.', { error: true });
         return;
@@ -81,7 +83,7 @@ function App() {
           queryFn: ({ signal }) => request<InventoryResponse>(path('/inventory?include_archived=true'), { signal }),
         }),
       ]);
-      if (!cancelled) setBoot({ user, business, setup: { balances: history.length > 0, conversations: conversations.length > 0 } });
+      if (!cancelled) setBoot({ user, business, businesses: identity.businesses ?? [business], setup: { balances: history.length > 0, conversations: conversations.length > 0 } });
     })();
     return () => {
       cancelled = true;
@@ -91,7 +93,7 @@ function App() {
   return (
     <>
       {boot ? (
-        <WorkspaceProvider initialUser={boot.user} initialBusiness={boot.business} initialSetup={boot.setup}>
+        <WorkspaceProvider initialUser={boot.user} initialBusiness={boot.business} initialBusinesses={boot.businesses} initialSetup={boot.setup}>
           <Shell />
         </WorkspaceProvider>
       ) : (

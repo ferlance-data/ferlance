@@ -6,6 +6,30 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-22
+
+Team access (PRD §5.3, 4.2): owners give managers and accountants their own sign-in.
+
+### Added
+- Business roles: **owner**, **manager** and **accountant**. The server enforces them on every business route through declared permissions.
+  - Accountants can see everything, record balances and use AI, but can't change sales or stock.
+  - Managers can do everything except manage the team or rename the business.
+- Invite links from Settings → Team. They are single-use, expire after 7 days and can be cancelled, and are shared by copy and paste (for example on WhatsApp).
+  - New people sign up through the link without creating a business. Existing users sign in through it.
+  - The token is removed from the address bar once it has been read.
+- The owner can change a member's role or remove them, and it takes effect on their next request.
+- A business switcher in the sidebar for people who belong to more than one business.
+- A daily cap on uncached AI calls per business (`FERLANCE_AI_DAILY_LIMIT`, default 100), shared by Ask Lance and the explanations.
+- The Data and Inventory pages show a clear read-only notice instead of forms the user's role can't use.
+
+### Changed
+- Renaming the business moved to `PATCH /api/businesses/{id}` (owner only). `PATCH /api/auth/profile` now updates only your own name.
+- `/api/auth/me` also returns `businesses`, with your role in each.
+- Refresh tokens: a token rotated in the last 60 seconds can be used once more, if its replacement was never used. This stops users on flaky connections being signed out when a refresh response is lost. Signed-out tokens never get this grace.
+
+### Fixed
+- The landing page's privacy copy still described the removed Brave web research.
+
 ## [1.3.0] - 2026-11-22
 
 Analytics visuals (PRD §5.2, #6): circular, animated and responsive, accessible, and with no chart library.
@@ -122,7 +146,8 @@ The first versioned release. The frontend was migrated to React 19, TypeScript (
 - The old date window briefly renders after a file switch with a preset range.
 - The Product name column never sorts Z→A. This was kept for parity.
 
-[Unreleased]: https://github.com/ferlance-data/ferlance/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/ferlance-data/ferlance/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/ferlance-data/ferlance/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/ferlance-data/ferlance/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/ferlance-data/ferlance/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/ferlance-data/ferlance/compare/v1.0.1...v1.1.0

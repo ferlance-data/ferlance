@@ -27,7 +27,7 @@ FastAPI (backend/main.py) — wiring, lifespan, built frontend + SPA fallback, c
   routers/lance.py           Ask Lance conversations (LLM + retrieval)
   routers/admin.py           platform operator role management
         │
-  deps.py          current user, tenant ownership, date range, data scope
+  deps.py          current user, business roles and permissions, date range, data scope, AI daily cap
   dataset_store.py import persistence and "which records count" rules
         │
   processor.py ─ universal_ingestion.py ─ sms_parser.py      ingestion (CSV/XLSX/TSV/TXT/MD/SMS)
@@ -41,7 +41,10 @@ FastAPI (backend/main.py) — wiring, lifespan, built frontend + SPA fallback, c
 
 ### Request lifecycle
 
-1. `deps.current_user` validates the JWT access token; `deps.owned_business` ensures the business in the URL belongs to that user (tenant isolation).
+1. `deps.current_user` validates the JWT access token. Every route under `/api/businesses/{id}` declares the permission it needs with `deps.business_access(...)`: `read`, `write_data`, `write_balances`, `use_ai`, `manage_team` or `manage_business`. The dependency looks up the user's role in `business_members` on every request.
+   - **Roles:** owner (everything), manager (data, stock, balances, AI) and accountant (read, balances, AI).
+   - **Denials:** a non-member gets 404, so the business's existence is not revealed; a member without the permission gets 403.
+   - **Coverage test:** `tests/test_team.py` fails if a business route declares no permission, or if a mutating route only requires `read`.
 2. Analytical routes depend on `deps.date_range` (validated before any data is read) and `deps.scope`, which resolves the dataset scope and reads records through `dataset_store`.
 3. Routers stay thin: they translate HTTP to service calls and service errors to status codes.
 
@@ -97,7 +100,9 @@ React 19 + TypeScript (strict) built by Vite. Two entries: the landing page keep
 
 | Table | Purpose |
 | --- | --- |
-| `users`, `businesses`, `refresh_sessions` | identity, tenancy, hashed single-use refresh sessions |
+| `users`, `businesses`, `refresh_sessions` | identity, businesses, hashed single-use refresh sessions. A rotated token gets a one-shot 60 s grace (`replaced_by`), so a refresh whose response is lost on a flaky connection does not sign the user out. |
+| `business_members`, `business_invites` | who can access which business, and in what role. Invites are single-use hashed links that expire after 7 days. |
+| `ai_usage` | uncached AI calls per business per day (`FERLANCE_AI_DAILY_LIMIT`, default 100) |
 | `datasets` | one row per import: status, counts, warnings, `checksum`, `review_status` (`accepted`/`excluded`) |
 | `inventory_products`, `inventory_movements` | catalogue and append-only stock ledger |
 | `financial_position_balances` | append-only dated balances |

@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, Up
 from pydantic import BaseModel, Field
 
 from .. import config, inventory
-from ..deps import current_user, owned_business
+from ..deps import current_user, data_writer, read_business
 
 router = APIRouter(prefix="/api/businesses/{business_id}/inventory", tags=["inventory"])
 STOCKTAKE_HEADERS = "product,sku,unit,quantity_on_hand,unit_cost,reorder_level\n"
@@ -65,12 +65,12 @@ def _cell(row: dict, header_map: dict[str, str], name: str) -> str | None:
 
 
 @router.get("")
-def inventory_list(include_archived: bool = False, business: dict = Depends(owned_business)) -> dict:
+def inventory_list(include_archived: bool = False, business: dict = Depends(read_business)) -> dict:
     return inventory.list_products(config.DB_PATH, business["id"], include_archived)
 
 
 @router.post("/products")
-def create_product(payload: InventoryProductCreate, business: dict = Depends(owned_business), user: dict = Depends(current_user)) -> dict:
+def create_product(payload: InventoryProductCreate, business: dict = Depends(data_writer), user: dict = Depends(current_user)) -> dict:
     try:
         return inventory.create_product(
             config.DB_PATH,
@@ -88,7 +88,7 @@ def create_product(payload: InventoryProductCreate, business: dict = Depends(own
 
 
 @router.patch("/products/{product_id}")
-def update_product(product_id: str, payload: InventoryProductUpdate, business: dict = Depends(owned_business)) -> dict:
+def update_product(product_id: str, payload: InventoryProductUpdate, business: dict = Depends(data_writer)) -> dict:
     try:
         return inventory.update_product(config.DB_PATH, business["id"], product_id, payload.model_dump(exclude_unset=True))
     except inventory.InventoryError as error:
@@ -99,7 +99,7 @@ def update_product(product_id: str, payload: InventoryProductUpdate, business: d
 def record_movement(
     product_id: str,
     payload: InventoryMovementRequest,
-    business: dict = Depends(owned_business),
+    business: dict = Depends(data_writer),
     user: dict = Depends(current_user),
 ) -> dict:
     try:
@@ -111,12 +111,12 @@ def record_movement(
 
 
 @router.get("/movements")
-def movement_history(limit: int = Query(default=100, ge=1, le=500), business: dict = Depends(owned_business)) -> list[dict]:
+def movement_history(limit: int = Query(default=100, ge=1, le=500), business: dict = Depends(read_business)) -> list[dict]:
     return inventory.list_movements(config.DB_PATH, business["id"], limit)
 
 
 @router.post("/import")
-def import_stocktake(file: UploadFile = File(...), business: dict = Depends(owned_business), user: dict = Depends(current_user)) -> dict:
+def import_stocktake(file: UploadFile = File(...), business: dict = Depends(data_writer), user: dict = Depends(current_user)) -> dict:
     if Path(file.filename or "").suffix.lower() != ".csv":
         raise HTTPException(415, "Inventory stocktake imports must be CSV files.")
     content = file.file.read(config.MAX_UPLOAD_BYTES + 1)
@@ -158,7 +158,7 @@ def import_stocktake(file: UploadFile = File(...), business: dict = Depends(owne
 
 
 @router.get("/import-template")
-def import_template(business: dict = Depends(owned_business)) -> Response:
+def import_template(business: dict = Depends(read_business)) -> Response:
     return Response(
         STOCKTAKE_HEADERS,
         media_type="text/csv",
