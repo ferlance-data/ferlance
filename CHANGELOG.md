@@ -6,6 +6,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+- Deployment: a `Dockerfile` (it builds the frontend with Node, then serves it from Python), a `.dockerignore` that keeps `.env` and local data out of the image, a `render.yaml` blueprint (one web service and a 1 GB persistent disk) and `docs/DEPLOY.md`.
+
+### Security
+- In production (`FERLANCE_COOKIE_SECURE=true`), the server now refuses to start with the development secret key or one shorter than 32 characters.
+
 ## [1.11.0] - 2026-11-22
 
 The debt book (PRD §9, G2): the notebook by the till, made quick.
