@@ -132,8 +132,9 @@ def refresh(response: Response, refresh_token: str | None = Cookie(default=None,
         now = datetime.now(timezone.utc)
         if not session or datetime.fromisoformat(session["expires_at"]) <= now:
             raise HTTPException(401, "Refresh session is invalid or expired.")
-        if connection.execute("SELECT disabled_at FROM users WHERE id = ?", (session["user_id"],)).fetchone()["disabled_at"]:
-            raise HTTPException(401, "This account has been disabled.")
+        owner = connection.execute("SELECT disabled_at FROM users WHERE id = ?", (session["user_id"],)).fetchone()
+        if not owner or owner["disabled_at"]:
+            raise HTTPException(401, "This account is no longer active.")
         if session["revoked_at"] is not None:
             # A rotated token is presented again. Allow it for a short grace period, as long as the
             # session it was replaced by is still live: the earlier response was probably lost on a

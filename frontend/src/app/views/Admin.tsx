@@ -2,7 +2,7 @@
 // businesses (counts only) and the audit log of admin changes.
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useDeferredValue, useEffect, useState } from 'react';
 import { request } from '../../lib/api';
 import { RadialProgress } from '../../lib/chart/RadialProgress';
 import { formatDate, formatDateTime, number } from '../../lib/format';
@@ -54,20 +54,32 @@ function auditText(entry: AuditEntry): string {
   return `${entry.action} ${who}`;
 }
 
+/** The value after typing pauses for 300 ms, so a search sends one request instead of one per key. */
+function useDebounced(value: string): string {
+  const [settled, setSettled] = useState(value);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSettled(value), 300);
+    return () => window.clearTimeout(timer);
+  }, [value]);
+  return useDeferredValue(settled);
+}
+
 export default function Admin() {
   const isAdmin = useIsAdmin();
   const { user } = useWorkspace();
   const queryClient = useQueryClient();
   const [userSearch, setUserSearch] = useState('');
   const [businessSearch, setBusinessSearch] = useState('');
+  const userQuery = useDebounced(userSearch);
+  const businessQuery = useDebounced(businessSearch);
   const users = useQuery({
-    queryKey: ['admin', 'users', userSearch],
-    queryFn: ({ signal }) => request<AdminUser[]>(`/api/admin/users?q=${encodeURIComponent(userSearch)}`, { signal }),
+    queryKey: ['admin', 'users', userQuery],
+    queryFn: ({ signal }) => request<AdminUser[]>(`/api/admin/users?q=${encodeURIComponent(userQuery)}`, { signal }),
     enabled: isAdmin,
   });
   const businesses = useQuery({
-    queryKey: ['admin', 'businesses', businessSearch],
-    queryFn: ({ signal }) => request<AdminBusiness[]>(`/api/admin/businesses?q=${encodeURIComponent(businessSearch)}`, { signal }),
+    queryKey: ['admin', 'businesses', businessQuery],
+    queryFn: ({ signal }) => request<AdminBusiness[]>(`/api/admin/businesses?q=${encodeURIComponent(businessQuery)}`, { signal }),
     enabled: isAdmin,
   });
   const funnel = useQuery({ queryKey: ['admin', 'onboarding'], queryFn: ({ signal }) => request<Funnel>('/api/admin/onboarding', { signal }), enabled: isAdmin });
