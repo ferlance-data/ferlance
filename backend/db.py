@@ -117,6 +117,95 @@ CREATE TABLE IF NOT EXISTS export_runs (
     UNIQUE(business_id, day),
     FOREIGN KEY(business_id) REFERENCES businesses(id)
 );
+CREATE TABLE IF NOT EXISTS ledger_accounts (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    code TEXT NOT NULL,
+    name TEXT NOT NULL,
+    type TEXT NOT NULL CHECK(type IN ('asset', 'liability', 'equity', 'income', 'expense')),
+    system_key TEXT,
+    active INTEGER NOT NULL DEFAULT 1 CHECK(active IN (0, 1)),
+    created_at TEXT NOT NULL,
+    UNIQUE(business_id, code),
+    UNIQUE(business_id, system_key),
+    FOREIGN KEY(business_id) REFERENCES businesses(id)
+);
+CREATE TABLE IF NOT EXISTS journal_entries (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    entry_date TEXT NOT NULL,
+    memo TEXT NOT NULL,
+    source_key TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK(kind IN ('auto', 'reversal', 'opening', 'manual')),
+    status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft', 'posted')),
+    user_id TEXT,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(business_id) REFERENCES businesses(id)
+);
+CREATE INDEX IF NOT EXISTS journal_entries_business_date ON journal_entries(business_id, entry_date);
+CREATE INDEX IF NOT EXISTS journal_entries_source ON journal_entries(business_id, source_key);
+CREATE TABLE IF NOT EXISTS journal_lines (
+    id TEXT PRIMARY KEY,
+    entry_id TEXT NOT NULL,
+    business_id TEXT NOT NULL,
+    account_id TEXT NOT NULL,
+    currency TEXT NOT NULL,
+    amount_minor INTEGER NOT NULL CHECK(amount_minor != 0),
+    description TEXT NOT NULL DEFAULT '',
+    FOREIGN KEY(entry_id) REFERENCES journal_entries(id),
+    FOREIGN KEY(account_id) REFERENCES ledger_accounts(id)
+);
+CREATE INDEX IF NOT EXISTS journal_lines_entry ON journal_lines(entry_id);
+CREATE INDEX IF NOT EXISTS journal_lines_account ON journal_lines(account_id);
+-- Double entry, enforced by the database: an entry becomes 'posted' only if it has two or more
+-- lines summing to zero in every currency; posted entries and their lines never change.
+CREATE TRIGGER IF NOT EXISTS journal_post_balanced BEFORE UPDATE OF status ON journal_entries
+WHEN OLD.status = 'draft' AND NEW.status = 'posted' AND (
+    (SELECT COUNT(*) FROM journal_lines WHERE entry_id = NEW.id) < 2
+    OR EXISTS (SELECT 1 FROM journal_lines WHERE entry_id = NEW.id GROUP BY currency HAVING SUM(amount_minor) != 0)
+)
+BEGIN SELECT RAISE(ABORT, 'journal entry does not balance'); END;
+CREATE TRIGGER IF NOT EXISTS journal_insert_as_draft BEFORE INSERT ON journal_entries
+WHEN NEW.status IS NOT 'draft'
+BEGIN SELECT RAISE(ABORT, 'journal entries start as drafts'); END;
+CREATE TRIGGER IF NOT EXISTS journal_posted_immutable BEFORE UPDATE ON journal_entries
+WHEN OLD.status = 'posted'
+BEGIN SELECT RAISE(ABORT, 'posted journal entries cannot change'); END;
+CREATE TRIGGER IF NOT EXISTS journal_posted_undeletable BEFORE DELETE ON journal_entries
+WHEN OLD.status = 'posted'
+BEGIN SELECT RAISE(ABORT, 'posted journal entries cannot be deleted'); END;
+CREATE TRIGGER IF NOT EXISTS journal_lines_draft_only BEFORE INSERT ON journal_lines
+WHEN (SELECT status FROM journal_entries WHERE id = NEW.entry_id) IS NOT 'draft'
+BEGIN SELECT RAISE(ABORT, 'lines can only be added to a draft entry'); END;
+CREATE TRIGGER IF NOT EXISTS journal_lines_immutable BEFORE UPDATE ON journal_lines
+WHEN (SELECT status FROM journal_entries WHERE id = OLD.entry_id) = 'posted'
+BEGIN SELECT RAISE(ABORT, 'posted journal lines cannot change'); END;
+CREATE TRIGGER IF NOT EXISTS journal_lines_undeletable BEFORE DELETE ON journal_lines
+WHEN (SELECT status FROM journal_entries WHERE id = OLD.entry_id) = 'posted'
+BEGIN SELECT RAISE(ABORT, 'posted journal lines cannot be deleted'); END;
+CREATE TABLE IF NOT EXISTS ledger_sources (
+    business_id TEXT NOT NULL,
+    source_key TEXT NOT NULL,
+    fingerprint TEXT NOT NULL,
+    issues TEXT NOT NULL DEFAULT '[]',
+    synced_at TEXT NOT NULL,
+    PRIMARY KEY(business_id, source_key)
+);
+CREATE TABLE IF NOT EXISTS ledger_lock_log (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    before_date TEXT,
+    after_date TEXT,
+    created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS ledger_settings (
+    business_id TEXT PRIMARY KEY,
+    books_start TEXT,
+    lock_date TEXT,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY(business_id) REFERENCES businesses(id)
+);
 CREATE TABLE IF NOT EXISTS business_members (
     business_id TEXT NOT NULL,
     user_id TEXT NOT NULL,

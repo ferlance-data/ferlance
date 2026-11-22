@@ -35,9 +35,9 @@ export interface SetupFlags {
 
 /** Mirrors ROLE_PERMISSIONS in backend/deps.py; the server enforces it, the UI only hides what would fail. */
 export const ROLE_PERMISSIONS: Record<BusinessRole, readonly Permission[]> = {
-  owner: ['read', 'write_data', 'write_balances', 'use_ai', 'manage_team', 'manage_business'],
+  owner: ['read', 'write_data', 'write_balances', 'use_ai', 'manage_team', 'manage_business', 'manage_books'],
   manager: ['read', 'write_data', 'write_balances', 'use_ai'],
-  accountant: ['read', 'write_balances', 'use_ai'],
+  accountant: ['read', 'write_balances', 'use_ai', 'manage_books'],
 };
 
 export const ROLE_LABEL: Record<BusinessRole, string> = { owner: 'Owner', manager: 'Manager', accountant: 'Accountant' };

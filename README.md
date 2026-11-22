@@ -50,6 +50,10 @@ Copy `.env.example` to `.env` to configure secrets and the optional AI and searc
 
 Suggestions on the Insights page are calculated without AI. With an AI key configured (`OPENROUTER_KEY`, `GROQ_API_KEY` or `AGENTROUTER_API_KEY`), tapping a suggestion adds Lance's explanation, cached per suggestion. Outside context comes from free sources only: a built-in Ghana holiday and season calendar, and keyless GDELT news headlines (best effort). No search API key is needed.
 
+## Books (double-entry ledger)
+
+The Books page keeps real double-entry books automatically from imports, MoMo SMS and stock movements (`backend/ledger.py`). Owners see profit and loss, what the business owns and owes, and money in and out in plain words. The "For your accountant" tab has the journal, manual journals, a period lock, the chart of accounts and a CSV journal export. The database refuses unbalanced or edited entries, and corrections are reversals. Posting rules are listed at the top of `backend/ledger.py`. In v1.10 the books sit beside the dashboards; a comparison card names every difference.
+
 ## Daily data export
 
 Set `FERLANCE_EXPORT_BUCKET` (with `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and `AWS_REGION`) to send each business's data to S3 once a day, after `FERLANCE_EXPORT_HOUR_UTC` (default 02:00 UTC). Or set `FERLANCE_EXPORT_DIR` to write the same files to a folder. Each business gets four Parquet files a day, under `exports/business_id=<id>/dt=<YYYY-MM-DD>/`: `sales_records`, `datasets`, `inventory_products` and `inventory_movements`. A `manifest.json` (run id, row counts, sizes) is written last, so a folder whose manifest is missing or mismatched holds an interrupted run. The layout is Hive-style, so Athena or Glue can query it as-is.

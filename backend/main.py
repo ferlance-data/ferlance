@@ -21,7 +21,7 @@ from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from . import config, dataset_store, db, exports
-from .routers import admin, analytics, auth, datasets, financial_position, inventory, lance, team
+from .routers import admin, analytics, auth, books, datasets, financial_position, inventory, lance, team
 
 
 @asynccontextmanager
@@ -46,11 +46,11 @@ class _BuildAssets(StaticFiles):
         await super().__call__(scope, receive, send)
 
 
-app = FastAPI(title="Ferlance", version="1.9.0", lifespan=lifespan)
+app = FastAPI(title="Ferlance", version="1.10.0", lifespan=lifespan)
 # The React frontend is a Vite build (frontend/dist). check_dir=False keeps the API
 # importable before the first build; pages then explain how to build instead.
 app.mount("/assets", _BuildAssets(directory=config.FRONTEND_DIST / "assets", check_dir=False), name="assets")
-for module in (auth, admin, datasets, analytics, inventory, financial_position, lance, team):
+for module in (auth, admin, datasets, analytics, inventory, financial_position, books, lance, team):
     app.include_router(module.router)
 app.include_router(team.public)
 
