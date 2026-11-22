@@ -37,7 +37,7 @@ Read this first when continuing the Ferlance work in a new session.
 3. **Done.** Restructure `docs/UPDATE_PLAN.md` into `docs/PRD.md`: goals, per-feature requirements, non-goals, risks and acceptance criteria. Adopt SemVer (v1.0.0 = the React migration), add `CHANGELOG.md` in Keep a Changelog format, and tag releases.
 
 ### Gate B — features
-The requirements and acceptance criteria for each feature are in `docs/PRD.md` §5. Migration follow-ups are F0 (v1.0.x) and come first.
+The requirements and acceptance criteria for each feature are in `docs/PRD.md` §5. Migration follow-ups are F0 (v1.0.x) and come first. Phase 2, "Ghana-first books" (v2.x, starting after #9), is in §9.
 
 Each feature gets its own `feat/*` branch off `main`. Planned order:
 1. Interface refinement and design system (#7), then analytics visuals (#6): circular, animated and responsive, respecting `prefers-reduced-motion`.
