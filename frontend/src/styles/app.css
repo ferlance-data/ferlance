@@ -1764,3 +1764,36 @@ svg.icon {
   width: 100%;
   margin-top: 6px;
 }
+
+.admin-search {
+  max-width: 260px;
+}
+
+/* ---------- First-run import (Overview setup guide) ---------- */
+.quick-import {
+  display: grid;
+  gap: 12px;
+  grid-column: 1 / -1;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.quick-import-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.quick-import-head h3 {
+  font-size: var(--text-base);
+}
+
+.field-inline-label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}

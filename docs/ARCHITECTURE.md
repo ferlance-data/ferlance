@@ -25,7 +25,8 @@ FastAPI (backend/main.py) — wiring, lifespan, built frontend + SPA fallback, c
   routers/inventory.py       catalogue, stock ledger, stocktake CSV import
   routers/financial_position.py  dated balances and point-in-time statements
   routers/lance.py           Ask Lance conversations (LLM + retrieval)
-  routers/admin.py           platform operator role management
+  routers/admin.py           admin console: users (role, disable), businesses (counts), setup funnel, audit log
+  routers/team.py            business rename, members, roles and invite links
         │
   deps.py          current user, business roles and permissions, date range, data scope, AI daily cap
   dataset_store.py import persistence and "which records count" rules
@@ -102,6 +103,7 @@ React 19 + TypeScript (strict) built by Vite. Two entries: the landing page keep
 | --- | --- |
 | `users`, `businesses`, `refresh_sessions` | identity, businesses, hashed single-use refresh sessions. A rotated token gets a one-shot 60 s grace (`replaced_by`), so a refresh whose response is lost on a flaky connection does not sign the user out. |
 | `business_members`, `business_invites` | who can access which business, and in what role. Invites are single-use hashed links that expire after 7 days. |
+| `admin_audit` | append-only log of admin role changes and account disables/enables |
 | `ai_usage` | uncached AI calls per business per day (`FERLANCE_AI_DAILY_LIMIT`, default 100) |
 | `datasets` | one row per import: status, counts, warnings, `checksum`, `review_status` (`accepted`/`excluded`) |
 | `inventory_products`, `inventory_movements` | catalogue and append-only stock ledger |
