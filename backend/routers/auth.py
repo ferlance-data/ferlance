@@ -78,8 +78,14 @@ def signup(payload: SignupRequest, response: Response) -> dict:
         (user_id, email, hash_password(payload.password), db.now(), "owner", ""),
     )
     if payload.invite_token:
-        # Joining a team: no business of their own is created.
-        return _issue_session(user_id, accept_invite(payload.invite_token, user_id), response)
+        # Joining a team: no business of their own is created. If the link was used up between the
+        # check above and now, remove the half-made account so the person can simply try again.
+        try:
+            joined = accept_invite(payload.invite_token, user_id)
+        except HTTPException:
+            db.insert(config.DB_PATH, "DELETE FROM users WHERE id = ?", (user_id,))
+            raise
+        return _issue_session(user_id, joined, response)
     db.insert(
         config.DB_PATH,
         "INSERT INTO businesses (id, user_id, name, created_at, currency) VALUES (?, ?, ?, ?, ?)",
