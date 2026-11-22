@@ -6,7 +6,7 @@ Ferlance is business intelligence for small and growing businesses, starting wit
 import records -> validate every row -> scoped metrics + period comparison -> insights -> ask Lance
 ```
 
-For how the system fits together, the product benchmarks behind the redesign, and what was removed and why, read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Implementation status lives in [MVP_PROGRESS.md](MVP_PROGRESS.md) and the import rules in [docs/DATA_CONTRACT.md](docs/DATA_CONTRACT.md). The update-phase requirements and release plan are in [docs/PRD.md](docs/PRD.md), the target users in [docs/PERSONAS.md](docs/PERSONAS.md), and release history in [CHANGELOG.md](CHANGELOG.md).
+For how the system fits together, the product benchmarks behind the redesign, and what was removed and why, read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Implementation status lives in [MVP_PROGRESS.md](MVP_PROGRESS.md) and the import rules in [docs/DATA_CONTRACT.md](docs/DATA_CONTRACT.md). The update-phase requirements and release plan are in [docs/PRD.md](docs/PRD.md), the target users in [docs/PERSONAS.md](docs/PERSONAS.md), the design system in [docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md), and release history in [CHANGELOG.md](CHANGELOG.md).
 
 ## What it does
 

@@ -15,7 +15,8 @@
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check": "npm run typecheck && npm run lint && npm test"
+    "check": "npm run typecheck && npm run lint && npm run lint:colors && npm test",
+    "lint:colors": "node scripts/lint-colors.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.108.2",

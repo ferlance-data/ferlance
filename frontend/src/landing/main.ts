@@ -59,9 +59,10 @@ function drawSkyline(svg: SVGSVGElement): void {
   const random = seeded(7);
   svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
   const layers = [
-    { count: 30, min: 180, max: 520, color: '#26302c', windows: 0.12, opacity: 0.55 },
-    { count: 22, min: 260, max: 760, color: '#1c2522', windows: 0.2, opacity: 0.85 },
-    { count: 14, min: 320, max: 860, color: '#131b19', windows: 0.26, opacity: 1 },
+    // Colours are tokens (landing.css, --skyline-*); inline style accepts var(), SVG attributes do not.
+    { count: 30, min: 180, max: 520, color: 'var(--skyline-far)', windows: 0.12, opacity: 0.55 },
+    { count: 22, min: 260, max: 760, color: 'var(--skyline-mid)', windows: 0.2, opacity: 0.85 },
+    { count: 14, min: 320, max: 860, color: 'var(--skyline-near)', windows: 0.26, opacity: 1 },
   ];
   const fragment = document.createDocumentFragment();
   layers.forEach((layer, depth) => {
@@ -79,14 +80,14 @@ function drawSkyline(svg: SVGSVGElement): void {
       body.setAttribute('y', top.toFixed(1));
       body.setAttribute('width', buildingWidth.toFixed(1));
       body.setAttribute('height', buildingHeight.toFixed(1));
-      body.setAttribute('fill', layer.color);
+      body.style.fill = layer.color;
       group.append(body);
       const edge = document.createElementNS(SVG_NS, 'rect');
       edge.setAttribute('x', x.toFixed(1));
       edge.setAttribute('y', top.toFixed(1));
       edge.setAttribute('width', buildingWidth.toFixed(1));
       edge.setAttribute('height', '2');
-      edge.setAttribute('fill', depth === 2 && random() > 0.7 ? '#7af0c2' : '#f3c77a');
+      edge.style.fill = depth === 2 && random() > 0.7 ? 'var(--skyline-mint)' : 'var(--skyline-amber)';
       edge.setAttribute('opacity', depth === 2 ? '0.55' : '0.25');
       group.append(edge);
       for (let wy = top + 14; wy < height - 12; wy += 16) {
@@ -97,7 +98,7 @@ function drawSkyline(svg: SVGSVGElement): void {
           light.setAttribute('y', wy.toFixed(1));
           light.setAttribute('width', '5');
           light.setAttribute('height', '7');
-          light.setAttribute('fill', random() > 0.85 ? '#7af0c2' : '#f3c77a');
+          light.style.fill = random() > 0.85 ? 'var(--skyline-mint)' : 'var(--skyline-amber)';
           light.setAttribute('opacity', (0.25 + random() * 0.55).toFixed(2));
           group.append(light);
         }

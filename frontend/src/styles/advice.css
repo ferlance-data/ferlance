@@ -139,7 +139,7 @@
 }
 
 .advice-sheet::backdrop {
-  background: #0000007a;
+  background: var(--dialog-backdrop);
 }
 
 @media (min-width: 768px) {

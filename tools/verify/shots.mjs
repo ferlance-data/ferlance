@@ -6,13 +6,13 @@ import fs from 'node:fs';
 const [base, out] = process.argv.slice(2);
 fs.mkdirSync(out, { recursive: true });
 const VIEWS = ['overview', 'products', 'insights', 'lance', 'inventory', 'position', 'data', 'settings'];
-const SIZES = { desktop: { width: 1440, height: 900 }, phone: { width: 390, height: 844 } };
+const SIZES = { desktop: { width: 1440, height: 900 }, phone: { width: 390, height: 844 }, small: { width: 360, height: 740 } };
 const errors = [];
 
 const browser = await chromium.launch();
 for (const theme of ['light', 'dark']) {
   for (const [sizeName, viewport] of Object.entries(SIZES)) {
-    const ctx = await browser.newContext({ viewport, colorScheme: theme });
+    const ctx = await browser.newContext({ viewport, colorScheme: theme, reducedMotion: 'reduce' });
     await ctx.addInitScript((t) => localStorage.setItem('ferlance-theme', t), theme);
     const page = await ctx.newPage();
     page.on('console', (m) => m.type() === 'error' && errors.push(`${theme}/${sizeName} ${page.url()}: ${m.text()}`));

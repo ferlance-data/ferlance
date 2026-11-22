@@ -121,7 +121,7 @@ svg.icon {
   margin: 12px 8px 4px;
   color: var(--muted-foreground);
   font-family: var(--font-mono);
-  font-size: 0.625rem;
+  font-size: var(--text-2xs);
   font-weight: 500;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -132,10 +132,10 @@ svg.icon {
   align-items: center;
   gap: 10px;
   width: 100%;
-  height: 34px;
-  padding: 0 10px;
+  height: var(--nav-item-height);
+  padding: 0 var(--nav-item-padding-x);
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--nav-item-radius);
   background: transparent;
   color: var(--subtle-foreground);
   font-size: var(--text-sm);
@@ -145,7 +145,7 @@ svg.icon {
 }
 
 .nav-item:hover {
-  background: color-mix(in srgb, var(--foreground) 5%, transparent);
+  background: var(--nav-item-hover);
   color: var(--foreground);
 }
 
@@ -184,7 +184,7 @@ svg.icon {
   position: fixed;
   inset: 0;
   z-index: 40;
-  background: #0a151466;
+  background: var(--ink-950-a40);
 }
 
 /* ---------- Main + topbar ---------- */
@@ -538,7 +538,7 @@ svg.icon {
 .chart .axis {
   fill: var(--muted-foreground);
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: var(--text-2xs);
 }
 
 .chart-tooltip {
@@ -814,7 +814,7 @@ svg.icon {
   display: block;
   height: 100%;
   background: var(--accent);
-  transition: width 0.3s;
+  transition: width var(--duration-slow);
 }
 
 .setup-steps {
@@ -854,7 +854,7 @@ svg.icon {
 .setup-step.done .setup-check {
   border: 0;
   background: var(--accent);
-  color: #fff;
+  color: var(--white);
 }
 
 .setup-step.done strong {
@@ -1217,7 +1217,7 @@ svg.icon {
   flex-wrap: nowrap;
   overflow-x: auto;
   scrollbar-width: none;
-  mask-image: linear-gradient(90deg, #000 85%, transparent);
+  mask-image: linear-gradient(90deg, var(--black) 85%, transparent);
 }
 
 .suggestion {
@@ -1243,7 +1243,7 @@ svg.icon {
 .suggestion small {
   color: var(--ai-foreground);
   font-family: var(--font-mono);
-  font-size: 0.625rem;
+  font-size: var(--text-2xs);
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -1256,7 +1256,7 @@ svg.icon {
   border-radius: 16px;
   background: var(--surface);
   box-shadow: var(--shadow-sm);
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: border-color var(--duration-fast), box-shadow var(--duration-fast);
 }
 
 .composer:focus-within {
@@ -1331,7 +1331,7 @@ svg.icon {
   text-align: center;
   font-size: var(--text-sm);
   cursor: pointer;
-  transition: border-color 0.15s, background-color 0.15s;
+  transition: border-color var(--duration-fast), background-color var(--duration-fast);
 }
 
 .dropzone:hover,
@@ -1502,7 +1502,7 @@ svg.icon {
   position: fixed;
   right: 16px;
   bottom: 16px;
-  z-index: 80;
+  z-index: var(--z-toast);
   display: grid;
   gap: 8px;
   width: min(360px, calc(100vw - 32px));
@@ -1512,9 +1512,9 @@ svg.icon {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  padding: 12px 14px;
+  padding: var(--toast-padding);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--toast-radius);
   background: var(--surface);
   box-shadow: var(--shadow-lg);
   font-size: var(--text-sm);
@@ -1650,8 +1650,14 @@ svg.icon {
     max-width: 90%;
   }
 
+  /* Icon-only on phones, but the label stays in the accessibility tree as the button's name. */
   .topbar-actions .btn-label {
-    display: none;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
   }
 
   .scope-custom {
@@ -1662,7 +1668,7 @@ svg.icon {
 /* ---------- Print ---------- */
 .print-report {
   font-family: var(--font-sans);
-  color: #111;
+  color: var(--print-ink);
 }
 
 @media print {
@@ -1683,11 +1689,11 @@ svg.icon {
   .print-report header {
     padding-bottom: 12px;
     margin-bottom: 18px;
-    border-bottom: 2px solid #0d3928;
+    border-bottom: 2px solid var(--green-900);
   }
 
   .print-report header p {
-    color: #555;
+    color: var(--print-muted);
     font-size: 11px;
   }
 
@@ -1714,13 +1720,13 @@ svg.icon {
   .print-report th,
   .print-report td {
     padding: 5px 6px;
-    border-bottom: 1px solid #ddd;
+    border-bottom: 1px solid var(--print-rule);
     text-align: left;
   }
 
   .print-report .note {
     margin-top: 10px;
-    color: #555;
+    color: var(--print-muted);
     font-size: 10.5px;
   }
 }
