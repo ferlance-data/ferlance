@@ -802,19 +802,11 @@ svg.icon {
   font-size: var(--text-sm);
 }
 
-.setup-progress {
-  height: 6px;
-  margin-top: 18px;
-  border-radius: 6px;
-  background: var(--muted);
-  overflow: hidden;
-}
-
-.setup-progress i {
-  display: block;
-  height: 100%;
-  background: var(--accent);
-  transition: width var(--duration-slow);
+.setup-ring {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 16px;
 }
 
 .setup-steps {

@@ -1,0 +1,243 @@
+/* Composition and progress charts (#6). Semantic tokens only; motion uses transform and
+   opacity so it stays smooth on low-end phones, and is switched off under reduced motion. */
+
+/* ---------- Donut ---------- */
+.donut {
+  display: grid;
+  grid-template-columns: minmax(120px, 160px) 1fr;
+  gap: 18px;
+  align-items: center;
+  margin: 0;
+}
+
+@media (max-width: 420px) {
+  .donut {
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+}
+
+.donut-solo {
+  grid-template-columns: 1fr;
+  justify-items: center;
+}
+
+.donut-plot {
+  position: relative;
+  width: 100%;
+  max-width: 160px;
+  aspect-ratio: 1;
+}
+
+.donut-plot svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.donut-track {
+  fill: none;
+  stroke: var(--chart-track);
+  stroke-width: 22;
+}
+
+.donut-slice {
+  fill: none;
+  stroke-width: 22;
+  cursor: pointer;
+  transform-box: view-box;
+  transform-origin: center;
+  transition: opacity var(--duration-fast), stroke-width var(--duration-fast);
+  animation: donut-slice-in var(--duration-slow) var(--ease-out) both;
+}
+
+.donut-slice.active {
+  stroke-width: 26;
+}
+
+.donut-slice.dim {
+  opacity: 0.45;
+}
+
+@keyframes donut-slice-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+}
+
+.donut-center {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  padding: 26px;
+  text-align: center;
+  pointer-events: none;
+}
+
+.donut-center-label {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.donut-center strong {
+  font-size: var(--text-lg);
+  font-weight: 500;
+}
+
+.donut-legend {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.donut-legend th,
+.donut-legend td {
+  padding: 6px 4px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 400;
+  text-align: left;
+}
+
+.donut-legend tr:last-child th,
+.donut-legend tr:last-child td {
+  border-bottom: 0;
+}
+
+.donut-legend td {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.donut-legend th {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.donut-legend tr.active {
+  background: var(--surface-muted);
+}
+
+.donut-legend-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.swatch {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+/* ---------- Radial progress ---------- */
+.radial {
+  position: relative;
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+}
+
+.radial svg {
+  width: 100%;
+  height: 100%;
+}
+
+.radial-track {
+  fill: none;
+  stroke: var(--chart-track);
+  stroke-width: 7;
+}
+
+.radial-fill {
+  fill: none;
+  stroke: var(--chart-revenue);
+  stroke-linecap: round;
+  stroke-width: 7;
+  transform-box: view-box;
+  transform-origin: center;
+  animation: radial-in var(--duration-slow) var(--ease-out) both;
+}
+
+.radial-good .radial-fill {
+  stroke: var(--success-foreground);
+}
+
+.radial-warn .radial-fill {
+  stroke: var(--warning-foreground);
+}
+
+@keyframes radial-in {
+  from {
+    opacity: 0;
+    transform: rotate(-90deg) scale(0.9);
+  }
+}
+
+.radial-value {
+  position: absolute;
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.completeness {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 14px;
+}
+
+.completeness-item {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: var(--text-sm);
+}
+
+.completeness-item small {
+  display: block;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+
+/* ---------- Bar chart entrance ---------- */
+.chart .bar {
+  transform-box: fill-box;
+  transform-origin: bottom;
+  animation: bar-grow var(--duration-slow) var(--ease-out) both;
+}
+
+@keyframes bar-grow {
+  from {
+    opacity: 0;
+    transform: scaleY(0.4);
+  }
+}
+
+.chart-table summary {
+  width: fit-content;
+  margin-top: 8px;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.chart-table table {
+  margin-top: 8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .donut-slice,
+  .radial-fill,
+  .chart .bar {
+    animation: none;
+  }
+}

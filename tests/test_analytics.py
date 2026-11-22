@@ -104,3 +104,16 @@ def test_undated_records_are_excluded_from_time_based_metrics():
 
     assert result["revenue"]["total"] == 100.0
     assert result["revenue"]["transactions"] == 1
+
+
+def test_coverage_reports_share_of_records_with_each_optional_field():
+    from backend.analytics import analyze
+
+    records = [
+        {"transaction_date": "2026-01-01", "amount": 10, "product": "Rice", "cost": 5, "quantity": 1, "customer": "Ama"},
+        {"transaction_date": "2026-01-02", "amount": 10, "product": "Rice", "cost": None},
+        {"transaction_date": "2026-01-03", "amount": 10, "product": "", "quantity": 2},
+        {"transaction_date": "2026-01-04", "amount": 10},
+    ]
+    assert analyze(records)["coverage"] == {"records": 4, "product": 50.0, "cost": 25.0, "quantity": 50.0, "customer": 25.0}
+    assert analyze([])["coverage"]["records"] == 0

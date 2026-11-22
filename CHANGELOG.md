@@ -6,6 +6,23 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-22
+
+Analytics visuals (PRD §5.2, #6): circular, animated and responsive, accessible, and with no chart library.
+
+### Added
+- Donut charts:
+  - "Where your revenue comes from", on Overview and Products
+  - "Where your profit comes from", on Products, when costs are complete
+  - Each shows the top five products plus Other. Tap or hover a slice to see its share.
+- "How complete your records are" on Overview: progress rings for product, cost, quantity and customer coverage, each saying what it unlocks. `/analytics` now returns `coverage`.
+- A validated categorical chart palette (`--chart-cat-1`…`5`, `--chart-other`) for both themes.
+- Bar chart: tooltips work on touch, and a "Show as table" view is added.
+
+### Changed
+- The setup guide's progress bar is now a progress ring.
+- Bars, slices and rings animate in once (0.3 s or less, transform and opacity only). Nothing animates under reduced motion.
+
 ## [1.2.0] - 2026-11-22
 
 Insights that say what to do. Free outside context replaces paid search.
@@ -105,7 +122,8 @@ The first versioned release. The frontend was migrated to React 19, TypeScript (
 - The old date window briefly renders after a file switch with a preset range.
 - The Product name column never sorts Z→A. This was kept for parity.
 
-[Unreleased]: https://github.com/ferlance-data/ferlance/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/ferlance-data/ferlance/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/ferlance-data/ferlance/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/ferlance-data/ferlance/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/ferlance-data/ferlance/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/ferlance-data/ferlance/compare/v1.0.0...v1.0.1
