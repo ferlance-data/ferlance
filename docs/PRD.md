@@ -47,7 +47,8 @@ Ferlance follows [Semantic Versioning 2.0.0](https://semver.org/). The version l
 | 1.7.0 | Inventory↔product sync | #2 |
 | 1.8.0 | Retrieval improvements for Ask Lance | #8 |
 | 1.9.0 | Data export to AWS | #3 |
-| 1.10.0 | Expo mobile app (internal testing) and shared API types | #9 |
+| 1.10.0 | G1 ledger beside the existing reports (§9) | G1 |
+| later | Expo mobile app (internal testing) and shared API types. **Deferred by the owner, 2026-11-22.** | #9 |
 
 The order follows the agreed handoff plan. #6 builds on the #7 tokens. #2 reuses the #1 review flow. #3 and #9 carry the most external cost and credentials, so they come last.
 
@@ -285,8 +286,9 @@ The global tools assume someone types clean transactions in. **Ferlance becomes 
 
 | Version | Content | ID |
 | --- | --- | --- |
-| 1.10.0 | Expo app with offline capture in mind (§5.8). Comes first. | #9 |
-| 2.0.0 | The quiet ledger. Reports switch to the ledger (a breaking change to report semantics, hence MAJOR). | G1 |
+| 1.10.0 | The quiet ledger, shown **beside** the existing reports (additive, hence MINOR) | G1 |
+| 2.0.0 | Switch-over: the ledger becomes the source of truth for money reports, after an accountant signs off the chart of accounts and posting rules (a change to report semantics, hence MAJOR) | G1 |
+| later | Expo app with offline capture in mind (§5.8). **Deferred by the owner, 2026-11-22.** | #9 |
 | 2.1.0 | Debt book: customer and supplier credit | G2 |
 | 2.2.0 | Invoices, quotes and receipts, shareable on WhatsApp | G3 |
 | 2.3.0 | Read paper books: exercise-book pages to drafts | G4 |
@@ -306,7 +308,7 @@ The global tools assume someone types clean transactions in. **Ferlance becomes 
 
 ### 9.4 Feature requirements
 
-#### G1: The quiet ledger (v2.0.0)
+#### G1: The quiet ledger (v1.10.0 beside reports; v2.0.0 switch-over)
 
 | ID | Requirement | Acceptance |
 | --- | --- | --- |

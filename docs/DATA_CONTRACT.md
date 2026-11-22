@@ -125,6 +125,18 @@ The Insights page ranks plain-language suggestions calculated from the business'
 
 When an AI provider is configured, tapping a suggestion asks for an explanation. Only that suggestion's figures, reasons and actions are sent, with product names; never customer names or raw rows. Free news headlines from the GDELT index may be added for declines and losses; they are unverified leads, not causes. Brave Search and SerpAPI are no longer used, and any stored Brave keys are deleted on upgrade.
 
+## Books (ledger)
+
+The ledger is built from the same records the dashboards use, plus the stock ledger and confirmed opening balances. It never changes them.
+
+- Amounts are integer minor units (pesewas) per currency, and every posted entry balances. Posted entries are never edited or deleted; corrections are reversing entries.
+- Imports and stock movements are re-posted whenever their state changes: included or excluded, posted to stock, or the books start date moving. Each change reverses the old entries and posts new ones.
+- Payment method decides the receipt account. Lines with no payment method wait in "Sales receipts to allocate", and purchases and costs with no payment record wait in "Payments to allocate". They are never assumed to be cash.
+- Lines before the books start date stay on the dashboards only. Undated lines are booked on their file's import day, and the Books page lists them.
+- A stock movement with no unit cost is listed and not posted. It is never valued at zero.
+- Lock changes are logged with the user and the before and after dates.
+- The ledger tables are not in the daily S3 export yet.
+
 ## Daily data export
 
 When an export destination is configured, a full snapshot of each business is written once a day as Parquet, under `exports/business_id=<id>/dt=<YYYY-MM-DD>/`:

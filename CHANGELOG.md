@@ -6,6 +6,38 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-11-22
+
+The quiet ledger (PRD §9, G1): real double-entry books, kept automatically from what the business already records. They're shown beside the existing reports; the dashboards don't change yet.
+
+### Added
+- **Books page.** Profit and loss, "what the business owns and owes" (balance sheet) and "money in and out" (cash flow) in plain words, for any dates. A "Books and dashboards compared" card names every difference from the dashboards.
+- **The ledger.**
+  - Amounts are kept in pesewas, per currency.
+  - SQLite triggers refuse any entry that doesn't balance, and any change or delete of a posted entry.
+  - Corrections are reversing entries.
+- **A Ghana chart of accounts:** cash, MTN Mobile Money, Telecel Cash, AT Money, bank, receivables, stock, payables, VAT and levies, loans, owner capital and drawings, sales, cost of goods sold, and common costs (rent, transport, data and airtime, electricity and water, wages, MoMo and bank charges).
+- **Posting rules,** each with a test:
+  - Sales lines go to cash, a MoMo wallet or the bank by their payment method. If the method is unknown, they go to "Sales receipts to allocate".
+  - MoMo payments made are booked as spending.
+  - Cost-only lines are booked as expenses.
+  - Stock purchases, sales, counts and opening stock are valued once and keep that value.
+  - A file posted to stock takes cost of goods sold from stock, line by line, so nothing is counted twice.
+  - Leaving a file out reverses its entries.
+- **"Where you stand on day one."** The owner picks the day the books start and confirms opening balances suggested from Financial position. Sales before that day stay on the dashboards only, and opening stock comes from the stock records, so nothing is counted twice.
+- **For your accountant:**
+  - the journal with debits and credits
+  - manual journals
+  - a period lock (changes are logged with who made them, and late corrections land on the first open day)
+  - the chart of accounts (add and rename)
+  - a CSV journal export, with spreadsheet formulas neutralised
+- **New permission, `manage_books`,** for owners and accountants. Managers can read the books but not post to them.
+
+### Not yet
+- The CSV export is a plain journal. Importing it into QuickBooks Online or Xero has not been checked against their templates.
+- The chart of accounts and posting rules need an accountant's sign-off before v2.0.0 makes the ledger the source of truth.
+- The dashboards still count MoMo payments made as revenue. The books don't, and the comparison card names the difference.
+
 ### Added
 - `docs/PRD.md` §9 drafts Phase 2, "Ghana-first books" (v2.x). It covers:
   - a quiet double-entry ledger
