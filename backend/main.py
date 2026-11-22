@@ -26,6 +26,7 @@ from .routers import admin, analytics, auth, books, datasets, debts, financial_p
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    config.require_production_secret()
     config.ensure_storage()
     db.initialize(config.DB_PATH)
     db.repair_dataset_paths(config.DB_PATH, config.RAW_DIR, config.PROCESSED_DIR)

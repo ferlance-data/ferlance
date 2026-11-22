@@ -673,3 +673,18 @@ def test_backfill_retries_files_that_are_unreadable(tmp_path, monkeypatch):
     hidden.rename(processed)
     dataset_store.backfill_periods()
     assert client.get(f"{base}/datasets", headers=headers).json()[0]["period"] == {"from": "2026-02-03", "to": "2026-02-03"}
+
+
+def test_production_refuses_a_weak_secret(monkeypatch):
+    import pytest
+    from backend import config
+
+    monkeypatch.setattr(config, "COOKIE_SECURE", True)
+    monkeypatch.setattr(config, "SECRET_KEY", "development-only-change-me")
+    with pytest.raises(RuntimeError, match="FERLANCE_SECRET_KEY"):
+        config.require_production_secret()
+    monkeypatch.setattr(config, "SECRET_KEY", "x" * 40)
+    config.require_production_secret()
+    monkeypatch.setattr(config, "COOKIE_SECURE", False)
+    monkeypatch.setattr(config, "SECRET_KEY", "short")
+    config.require_production_secret()  # local development is unaffected

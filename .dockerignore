@@ -1,0 +1,19 @@
+# Never send secrets or local data into the image build.
+.env
+.env.*
+!.env.example
+*.swp
+data/
+*.sqlite3
+.git/
+.claude/
+.vscode/
+.venv/
+backend/.venv/
+**/__pycache__/
+.pytest_cache/
+frontend/node_modules/
+frontend/dist/
+tests/
+tools/
+docs/
