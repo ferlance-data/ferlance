@@ -65,6 +65,8 @@ def create_debt(path: Path, business_id: str, user_id: str, *, direction: str, p
         raise DebtError("The amount must be more than zero.")
     if due_on and due_on < issued_on:
         raise DebtError("The due date cannot be before the debt started.")
+    if issued_on > _latest_day():
+        raise DebtError("A debt cannot start in the future.")
     with db.connection(path) as conn:
         conn.execute("BEGIN IMMEDIATE")
         currency = ledger._currency(conn, business_id)
@@ -79,9 +81,14 @@ def create_debt(path: Path, business_id: str, user_id: str, *, direction: str, p
     return {"id": debt_id}
 
 
+def _latest_day() -> date:
+    """Tomorrow: the latest date a debt or payment may carry (allows for time zones; nothing further ahead)."""
+    return date.today() + timedelta(days=1)
+
+
 def _balance(conn, debt_id: str) -> int:
     row = conn.execute(
-        "SELECT d.amount_minor - COALESCE((SELECT SUM(amount_minor) FROM debt_payments WHERE debt_id = d.id AND voided_at IS NULL), 0) AS balance FROM debts d WHERE d.id = ?",
+        f"SELECT d.amount_minor - COALESCE((SELECT SUM(x.amount_minor) FROM debt_payments x WHERE x.debt_id = d.id AND {ledger.STANDING_PAYMENT}), 0) AS balance FROM debts d WHERE d.id = ?",
         (debt_id,),
     ).fetchone()
     return row["balance"] if row else 0
@@ -124,6 +131,8 @@ def add_payment(path: Path, business_id: str, user_id: str, debt_id: str, *, amo
             raise DebtError("This debt was voided.")
         if record and (record["category"] == "momo_sale_received") != (debt["direction"] == "owed_to_us"):
             raise DebtError("That MoMo message goes the other way.")
+        if paid_on > _latest_day():
+            raise DebtError("A payment cannot be in the future.")
         if paid_on.isoformat() < debt["issued_on"]:
             raise DebtError("A payment cannot be before the debt started.")
         balance = _balance(conn, debt_id)
@@ -177,19 +186,21 @@ def book(path: Path, business_id: str, today: date | None = None) -> dict[str, A
         path,
         "SELECT d.id, d.direction, d.basis, d.description, d.amount_minor, d.currency, d.issued_on, d.due_on, d.voided_at, d.created_at, "
         "p.id AS party_id, p.name AS party_name, p.phone, "
-        "COALESCE((SELECT SUM(x.amount_minor) FROM debt_payments x WHERE x.debt_id = d.id AND x.voided_at IS NULL), 0) AS paid_minor "
+        f"COALESCE((SELECT SUM(x.amount_minor) FROM debt_payments x WHERE x.debt_id = d.id AND {ledger.STANDING_PAYMENT}), 0) AS paid_minor "
         "FROM debts d JOIN debt_parties p ON p.id = d.party_id WHERE d.business_id = ? ORDER BY d.issued_on DESC, d.created_at DESC",
         (business_id,),
     )
     payments = db.many(
         path,
-        "SELECT id, debt_id, amount_minor, paid_on, method, momo_ref, voided_at FROM debt_payments WHERE business_id = ? ORDER BY paid_on, created_at",
+        f"SELECT x.id, x.debt_id, x.amount_minor, x.paid_on, x.method, x.momo_ref, x.voided_at, ({ledger.STANDING_PAYMENT}) AS standing "
+        "FROM debt_payments x WHERE x.business_id = ? ORDER BY x.paid_on, x.created_at",
         (business_id,),
     )
     by_debt: dict[str, list[dict[str, Any]]] = {}
     for payment in payments:
         by_debt.setdefault(payment["debt_id"], []).append(
-            {"id": payment["id"], "amount": ledger.from_minor(payment["amount_minor"]), "paid_on": payment["paid_on"], "method": payment["method"], "from_momo": bool(payment["momo_ref"]), "voided": bool(payment["voided_at"])}
+            {"id": payment["id"], "amount": ledger.from_minor(payment["amount_minor"]), "paid_on": payment["paid_on"], "method": payment["method"], "from_momo": bool(payment["momo_ref"]), "voided": bool(payment["voided_at"]),
+             "on_hold": not payment["voided_at"] and not payment["standing"]}
         )
     sides = {direction: {"total": 0, "open": 0, "buckets": dict.fromkeys(BUCKETS, 0)} for direction in DIRECTIONS}
     rows = []
@@ -250,6 +261,8 @@ def suggestions(path: Path, business_id: str, limit: int = 20) -> list[dict[str,
     used = {row["momo_ref"] for row in db.many(path, "SELECT momo_ref FROM debt_payments WHERE business_id = ? AND momo_ref IS NOT NULL AND voided_at IS NULL", (business_id,))}
     found = []
     for dataset in dataset_store.analysable(business_id):
+        if dataset["extension"] != ".txt":  # MoMo messages are pasted text; spreadsheets never hold them
+            continue
         try:
             records = dataset_store.read_records(dataset)
         except dataset_store.RecordsUnavailableError:

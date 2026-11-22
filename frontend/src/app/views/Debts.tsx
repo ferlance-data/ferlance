@@ -232,7 +232,11 @@ function DebtCard({ debt, book, editable, onDone }: { debt: Debt; book: DebtBook
               className="btn btn-secondary btn-sm"
               type="button"
               aria-expanded={mode === 'pay'}
-              onClick={() => setMode(mode === 'pay' ? 'none' : 'pay')}
+              onClick={() => {
+                setAmount(String(debt.balance));
+                setStatus(null);
+                setMode(mode === 'pay' ? 'none' : 'pay');
+              }}
             >
               Record payment
             </button>
@@ -316,8 +320,8 @@ function DebtCard({ debt, book, editable, onDone }: { debt: Debt; book: DebtBook
       {debt.payments.length ? (
         <ul className="debt-payments">
           {debt.payments.map((payment) => (
-            <li key={payment.id} className={payment.voided ? 'muted' : ''}>
-              {`${formatDate(payment.paid_on)} · ${money(payment.amount, { code: debt.currency })} · ${METHOD_LABEL[payment.method] ?? payment.method}${payment.voided ? ' · void' : ''}`}
+            <li key={payment.id} className={payment.voided || payment.on_hold ? 'muted' : ''}>
+              {`${formatDate(payment.paid_on)} · ${money(payment.amount, { code: debt.currency })} · ${METHOD_LABEL[payment.method] ?? payment.method}${payment.voided ? ' · void' : payment.on_hold ? ' · on hold: its MoMo import is left out' : ''}`}
             </li>
           ))}
         </ul>

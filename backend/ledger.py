@@ -319,6 +319,14 @@ def _stock_posted_lines(conn, business_id: str) -> Any:
     return posted
 
 
+# A debt payment counts unless it is voided, or it was matched to a MoMo message whose import is
+# now left out of analysis (then the message is not in the books, so neither is the payment).
+STANDING_PAYMENT = (
+    "x.voided_at IS NULL AND (x.momo_ref IS NULL OR EXISTS (SELECT 1 FROM datasets ds "
+    "WHERE ds.id = substr(x.momo_ref, 1, instr(x.momo_ref, ':') - 1) AND ds.status != 'failed' AND ds.review_status != 'excluded'))"
+)
+
+
 def debt_refs(conn, business_id: str) -> dict[str, set[str]]:
     """dataset id -> MoMo transaction ids matched to a standing debt-book payment."""
     found: dict[str, set[str]] = defaultdict(set)
@@ -543,9 +551,16 @@ def proposed_opening(path: Path, business_id: str, start: date) -> dict[str, Any
 
     position = financial_position.position_as_of(path, business_id, start)
     has_stock = db.one(path, "SELECT 1 FROM inventory_movements WHERE business_id = ? LIMIT 1", (business_id,)) is not None
-    in_debt_book = {
-        row["direction"]
-        for row in db.many(path, "SELECT DISTINCT direction FROM debts WHERE business_id = ? AND voided_at IS NULL AND issued_on < ?", (business_id, start.isoformat()))
+    # What the debt book already says was owed on the start day; only the rest of a receivables or
+    # payables balance is proposed, so debts in the book are not counted twice and others are not lost.
+    outstanding = {
+        row["direction"]: row["amount"] or 0
+        for row in db.many(
+            path,
+            f"SELECT d.direction, SUM(d.amount_minor - COALESCE((SELECT SUM(x.amount_minor) FROM debt_payments x WHERE x.debt_id = d.id AND x.paid_on < ? AND {STANDING_PAYMENT}), 0)) AS amount "
+            "FROM debts d WHERE d.business_id = ? AND d.voided_at IS NULL AND d.issued_on < ? GROUP BY d.direction",
+            (start.isoformat(), business_id, start.isoformat()),
+        )
     }
     from_debt_book = {"receivables": "owed_to_us", "payables": "we_owe"}
     lines, notes = [], []
@@ -554,9 +569,15 @@ def proposed_opening(path: Path, business_id: str, start: date) -> dict[str, Any
             if item["category"] == "inventory" and has_stock:
                 notes.append(f"Stock comes from your stock records, so the '{item['account_name']}' balance is not used.")
                 continue
-            if from_debt_book.get(item["category"]) in in_debt_book:
-                notes.append(f"Debts come from your debt book, so the '{item['account_name']}' balance is not used.")
-                continue
+            direction = from_debt_book.get(item["category"])
+            if direction and outstanding.get(direction):
+                covered = min(outstanding[direction], to_minor(item["amount"]))
+                outstanding[direction] -= covered
+                rest = from_minor(to_minor(item["amount"]) - covered)
+                notes.append(f"{from_minor(covered):,.2f} of '{item['account_name']}' is already in your debt book, so only the rest ({rest:,.2f}) is proposed.")
+                if rest <= 0:
+                    continue
+                item = {**item, "amount": rest}
             key = POSITION_ACCOUNTS[item["category"]]
             if item["category"] == "cash":
                 key = _wallet(item["account_name"].casefold()) or key

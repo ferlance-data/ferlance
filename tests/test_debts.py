@@ -100,6 +100,14 @@ def test_momo_message_settles_a_debt_without_counting_a_second_sale(client):
 
     after, balances, balanced = ledger_lines(client, headers, base)
     assert balanced and balances["receivables"] == 150.0
+    # Leaving the MoMo import out puts its payment on hold: the debt book and the ledger still agree.
+    momo = next(d for d in client.get(f"{base}/datasets", headers=headers).json() if d["extension"] == ".txt")
+    client.patch(f"{base}/datasets/{momo['id']}", headers=headers, json={"included": False})
+    held = client.get(f"{base}/debts", headers=headers).json()
+    assert held["debts"][0]["balance"] == 300.0 and held["debts"][0]["payments"][0]["on_hold"] is True
+    _, balances_held, _ = ledger_lines(client, headers, base)
+    assert balances_held["receivables"] == 300.0
+    client.patch(f"{base}/datasets/{momo['id']}", headers=headers, json={"included": True})
     assert after["profit_and_loss"]["currencies"][0]["total_income"] == 385.5  # the 150 is a debt payment, not a new sale
     assert balances["momo_mtn"] == 150.0
     diff = after["differences"]
@@ -113,7 +121,10 @@ def test_opening_balances_come_from_the_debt_book(client):
     old = debt(client, headers, base, amount=300, issued_on="2026-10-01")
     client.post(f"{base}/debts/{old}/payments", headers=headers, json={"amount": 100, "paid_on": "2026-10-20", "method": "cash"})
     proposal = client.get(f"{base}/books/opening?start=2026-11-01", headers=headers).json()
-    assert [line["account"] for line in proposal["lines"]] == ["cash"] and any("debt book" in note for note in proposal["notes"])
+    # 200 of the notebook's 999 is already in the debt book (300 - 100 paid); only 799 more is proposed.
+    assert {line["account"]: line["amount"] for line in proposal["lines"]} == {"cash": 500, "receivables": 799.0}
+    assert any("debt book" in note for note in proposal["notes"])
+    proposal["lines"] = [line for line in proposal["lines"] if line["account"] == "cash"]  # the owner confirms only the cash
     client.post(f"{base}/books/opening", headers=headers, json={"start_date": "2026-11-01", "lines": proposal["lines"]})
     client.post(f"{base}/debts/{old}/payments", headers=headers, json={"amount": 50, "paid_on": "2026-11-05", "method": "cash"})
     result, balances, balanced = ledger_lines(client, headers, base)
@@ -151,6 +162,10 @@ def test_roles_validation_and_isolation(client):
         assert client.post(f"{base}/debts", headers=headers, json=body).status_code in (400, 422), fields
     early = client.post(f"{base}/debts/{debt_id}/payments", headers=headers, json={"amount": 1, "paid_on": "2026-01-01", "method": "cash"})
     assert early.status_code == 400
+    future = client.post(f"{base}/debts/{debt_id}/payments", headers=headers, json={"amount": 1, "paid_on": "2099-01-01", "method": "cash"})
+    assert future.status_code == 400 and "future" in future.json()["detail"]
+    body = {"direction": "owed_to_us", "party_name": "X", "amount": 10, "issued_on": "2099-01-01", "basis": "new_sale"}
+    assert client.post(f"{base}/debts", headers=headers, json=body).status_code == 400
     assert client.get(f"{base}/debts", headers=headers).json()["pay_to"] == "MTN 0244 000 000 (Ama)"
 
 

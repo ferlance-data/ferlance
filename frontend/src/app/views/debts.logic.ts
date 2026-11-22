@@ -10,6 +10,8 @@ export interface DebtPayment {
   method: string;
   from_momo: boolean;
   voided: boolean;
+  /** Matched to a MoMo message whose import is left out of analysis: not counted until it is included again. */
+  on_hold: boolean;
 }
 
 export interface Debt {
