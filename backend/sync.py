@@ -101,6 +101,8 @@ def post_dataset(path: Path, business_id: str, dataset_id: str, user_id: str) ->
     dataset = dataset_store.get(business_id, dataset_id)
     if not dataset or dataset["status"] == "failed":
         raise InventoryError("Dataset not found.")
+    if dataset.get("review_status") == dataset_store.EXCLUDED:
+        raise InventoryError("Include this file in analysis before posting its sales to stock.")
     records = dataset_store.read_records(dataset)
     link_map = links(path, business_id)
     with db.connection(path) as conn:
@@ -154,9 +156,11 @@ def reverse_dataset(path: Path, business_id: str, dataset_id: str, user_id: str)
         ).fetchone()
         if not state or state["status"] != "posted":
             return False
+        # Net effect of this file on stock now: every posting minus every earlier reversal, so a
+        # post -> reverse -> post -> reverse cycle never adds back more than is currently posted.
         rows = conn.execute(
-            "SELECT product_id, SUM(quantity_delta) AS delta FROM inventory_movements WHERE business_id = ? AND source = ? GROUP BY product_id",
-            (business_id, f"sales:{dataset_id}"),
+            "SELECT product_id, SUM(quantity_delta) AS delta FROM inventory_movements WHERE business_id = ? AND source IN (?, ?) GROUP BY product_id",
+            (business_id, f"sales:{dataset_id}", f"sales-reversal:{dataset_id}"),
         ).fetchall()
         for row in rows:
             if row["delta"]:

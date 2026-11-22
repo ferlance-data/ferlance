@@ -110,3 +110,16 @@ def test_sync_permissions_and_isolation(client):
     # Another business can't link to this business's product or post this business's file.
     assert client.put(f"{other_base}/inventory/links", headers=other_headers, json={"sales_name": "Rice", "product_id": rice["id"]}).status_code == 404
     assert client.post(f"{other_base}/inventory/posts/{dataset['id']}", headers=other_headers).status_code == 404
+
+
+def test_repeated_reversal_and_excluded_files(client):
+    headers, base, rice, oil, dataset = setup(client)
+    client.put(f"{base}/inventory/links", headers=headers, json={"sales_name": "Frytol oil 1L", "product_id": oil["id"]})
+    for _ in range(2):
+        assert client.post(f"{base}/inventory/posts/{dataset['id']}", headers=headers).status_code == 200
+        assert stock(client, headers, base)["Rice 5kg"] == 16
+        client.patch(f"{base}/datasets/{dataset['id']}", headers=headers, json={"included": False})
+        assert stock(client, headers, base) == {"Rice 5kg": 20, "Cooking oil 1L": 3}  # back exactly, every time
+        # A file left out of analysis cannot be posted.
+        assert client.post(f"{base}/inventory/posts/{dataset['id']}", headers=headers).status_code == 400
+        client.patch(f"{base}/datasets/{dataset['id']}", headers=headers, json={"included": True})
