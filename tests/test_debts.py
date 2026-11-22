@@ -50,7 +50,7 @@ def test_credit_sale_part_payment_ageing_and_ledger_match(client):
     assert len(book["parties"]) == 2  # Akosua once, Kofi once
     assert book["totals"]["owed_to_us"]["total"] == 170.0 and book["totals"]["owed_to_us"]["open"] == 2
     assert book["totals"]["owed_to_us"]["buckets"]["31_60"] == 120.0  # due 9 Oct, 44 days late
-    assert book["totals"]["owed_to_us"]["buckets"]["1_30"] == 50.0
+    assert book["totals"]["owed_to_us"]["buckets"]["not_due"] == 50.0  # no pay-by date: late only after 30 days
     assert book["totals"]["we_owe"]["total"] == 700.0
 
     result, balances, balanced = ledger_lines(client, headers, base)

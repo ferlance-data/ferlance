@@ -170,14 +170,16 @@ function Statements({ data }: { data: BooksSummary }) {
           </div>
         </dl>
         {diff.explained.length ? (
-          <ul className="pending-invites card-body">
-            {diff.explained.map((item) => (
-              <li key={item.reason}>
-                <span>{item.reason}</span>
-                <span className="num">{money(item.amount)}</span>
-              </li>
-            ))}
-          </ul>
+          <div className="card-body">
+            <ul className="pending-invites">
+              {diff.explained.map((item) => (
+                <li key={item.reason}>
+                  <span>{item.reason}</span>
+                  <span className="num">{money(item.amount)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
         ) : null}
       </div>
     </>
@@ -469,14 +471,16 @@ function Accountant({
               </div>
             </div>
             {lockHistory.length ? (
-              <ul className="pending-invites card-body" id="books-lock-history">
-                {lockHistory.map((item) => (
-                  <li key={item.created_at}>
-                    <span>{`${item.user_email ?? 'Someone'} ${item.after_date ? `locked up to ${formatDate(item.after_date)}` : 'unlocked the books'}${item.before_date ? ` (was ${formatDate(item.before_date)})` : ''}`}</span>
-                    <small className="muted">{formatDate(item.created_at)}</small>
-                  </li>
-                ))}
-              </ul>
+              <div className="card-body">
+                <ul className="pending-invites" id="books-lock-history">
+                  {lockHistory.map((item) => (
+                    <li key={item.created_at}>
+                      <span>{`${item.user_email ?? 'Someone'} ${item.after_date ? `locked up to ${formatDate(item.after_date)}` : 'unlocked the books'}${item.before_date ? ` (was ${formatDate(item.before_date)})` : ''}`}</span>
+                      <small className="muted">{formatDate(item.created_at)}</small>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             ) : null}
             <div className="card-body form-grid">
               <label className="field">

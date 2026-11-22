@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import re
 import uuid
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -22,6 +22,7 @@ DIRECTIONS = {"owed_to_us": "customer", "we_owe": "supplier"}
 BASES = {"owed_to_us": ("new_sale", "recorded_sale"), "we_owe": ("recorded_purchase", "expense")}
 METHODS = ("cash", "momo_mtn", "momo_telecel", "momo_at", "momo_other", "bank")
 BUCKETS = ("not_due", "1_30", "31_60", "61_90", "over_90")
+DEFAULT_TERM_DAYS = 30
 
 
 class DebtError(ValueError):
@@ -194,7 +195,8 @@ def book(path: Path, business_id: str, today: date | None = None) -> dict[str, A
     rows = []
     for debt in debts:
         balance = 0 if debt["voided_at"] else debt["amount_minor"] - debt["paid_minor"]
-        due = debt["due_on"] or debt["issued_on"]
+        # Without a pay-by date, a debt counts as late 30 days after it started.
+        due = debt["due_on"] or (date.fromisoformat(debt["issued_on"]) + timedelta(days=DEFAULT_TERM_DAYS)).isoformat()
         age = bucket(due, today) if balance > 0 else None
         if balance > 0:
             side = sides[debt["direction"]]
