@@ -52,7 +52,7 @@ Suggestions on the Insights page are calculated without AI. With an AI key confi
 
 ## Deploying
 
-Ferlance deploys as one Docker web service: the `Dockerfile` builds the React frontend, and FastAPI serves it alongside the API. `render.yaml` sets up the service on Render with a persistent disk. See `docs/DEPLOY.md` for the step-by-step guide and the AWS alternative.
+Ferlance deploys as one Docker web service: the `Dockerfile` builds the React frontend, and FastAPI serves it alongside the API. The data folder must live on a lasting disk. `deploy/aws/user-data.sh` sets up a single AWS EC2 server with HTTPS and no domain needed, and `render.yaml` is a paid Render alternative. A restorable backup goes to S3 every night. See `docs/DEPLOY.md`.
 
 ## Books (double-entry ledger)
 

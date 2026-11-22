@@ -44,7 +44,7 @@ def seed(client):
 def test_local_export_writes_partitioned_parquet_snapshot(client, tmp_path, monkeypatch):
     _, _, business_id = seed(client)
     monkeypatch.setattr(config, "EXPORT_DIR", str(tmp_path / "out"))
-    assert exports.run(day=DAY) == {"day": DAY, "exported": 1, "failed": 0, "skipped": 0}
+    assert exports.run(day=DAY) == {"day": DAY, "exported": 1, "failed": 0, "skipped": 0, "backup": "ok"}
 
     folder = tmp_path / "out" / "exports" / f"business_id={business_id}" / f"dt={DAY}"
     assert sorted(p.name for p in folder.iterdir()) == ["datasets.parquet", "inventory_movements.parquet", "inventory_products.parquet", "manifest.json", "sales_records.parquet"]
@@ -91,7 +91,8 @@ def test_failures_are_recorded_retried_and_capped(client):
 
     # An administrator's forced run still goes through, and clears the error.
     assert exports.run(day=DAY, force=True, target=Working())["exported"] == 1
-    assert len(written) == 5 and list(written)[-1].endswith("manifest.json")  # manifest last
+    business_files = [key for key in written if "/_backup/" not in key]
+    assert len(business_files) == 5 and business_files[-1].endswith("manifest.json")  # manifest last
     assert db.one(config.DB_PATH, "SELECT status, error FROM export_runs", ()) == {"status": "ok", "error": None}
 
 
@@ -165,3 +166,32 @@ def test_scheduler_waits_for_the_export_hour(monkeypatch):
     assert not exports.due(datetime(2026, 11, 22, 1, 59, tzinfo=timezone.utc))
     assert exports.due(datetime(2026, 11, 22, 2, 0, tzinfo=timezone.utc))
     assert exports.start() is None  # nothing configured: no thread
+
+
+def test_nightly_backup_can_be_restored(client, tmp_path, monkeypatch):
+    import gzip
+    import sqlite3
+    import tarfile
+
+    seed(client)
+    monkeypatch.setattr(config, "EXPORT_DIR", str(tmp_path / "out"))
+    summary = exports.run(day=DAY)
+    assert summary["backup"] == "ok"
+    folder = tmp_path / "out" / "exports" / "_backup" / f"dt={DAY}"
+    manifest = json.loads((folder / "manifest.json").read_text())
+    assert set(manifest["files"]) == {"ferlance.sqlite3.gz", "files.tar.gz"}
+
+    # Restoring: the database snapshot opens and holds the business; the files archive holds the imports.
+    restored = tmp_path / "restored.sqlite3"
+    restored.write_bytes(gzip.decompress((folder / "ferlance.sqlite3.gz").read_bytes()))
+    with sqlite3.connect(restored) as conn:
+        assert conn.execute("SELECT name FROM businesses").fetchone()[0] == "Ama Retail"
+        assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+    with tarfile.open(folder / "files.tar.gz") as archive:
+        names = archive.getnames()
+    assert any(name.startswith("raw/") for name in names) and any(name.startswith("processed/") for name in names)
+
+    # Once a day: skipped on the next check, redone when an administrator forces it.
+    assert exports.run(day=DAY)["backup"] == "skipped"
+    assert exports.run(day=DAY, force=True)["backup"] == "ok"
+    assert exports.status()["backup"]["status"] == "ok"

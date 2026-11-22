@@ -1,86 +1,123 @@
 # Deploying Ferlance
 
-## The short version
+Ferlance is **one web service**. The React frontend is built into static files, and FastAPI serves those files and the API from the same address. The database is a single SQLite file, and uploads sit next to it in a data folder. **That folder must live on a lasting disk.** On a host with a temporary disk, such as a free Render instance, every deploy or restart starts empty. That is why data kept disappearing.
 
-Ferlance is **one web service**, even though the code has a `frontend/` folder and a `backend/` folder. The React frontend is built into static files (`frontend/dist`), and FastAPI serves those files and the API from the same address. There is nothing to deploy separately, and there's no CORS or cross-site cookie setup to manage.
+## Which host
 
-**Recommendation: stay on Render, using the Docker setup in this repo.**
+| Option | Cost | Keeps data | Notes |
+| --- | --- | --- | --- |
+| **AWS EC2 t3.micro** (this guide) | $0 while your AWS free-plan credits last (6 months at most) | Yes (EBS disk) | You already have the account; HTTPS works without a domain |
+| Google Cloud e2-micro | $0 with no time limit, within its limits | Yes | 1 GB memory, US regions only; the best place to move to when the AWS credits end |
+| Oracle Cloud Always Free | $0 with no time limit | Yes | More memory, but it can reclaim idle servers and often has no capacity |
+| Render Starter with a disk | About US$7–8 a month | Yes | The easiest to run; `render.yaml` sets it up |
 
-| | Render (recommended now) | AWS |
-| --- | --- | --- |
-| What runs | One Docker web service plus a 1 GB persistent disk | One small VM (Lightsail or EC2) running Docker, plus HTTPS you set up |
-| Your work | Connect the repo once; every push to `main` deploys | You patch the OS, set up HTTPS (for example Caddy), restarts and backups |
-| Fits SQLite | Yes: the disk keeps the database and uploads across deploys | Yes on a VM. **No** on App Runner or Lightsail *containers*, which have no lasting disk |
-| Rough cost | Starter instance plus disk, about US$7–8 a month (check current prices on render.com) | Lightsail from about US$5–10 a month, plus your time |
+**About the AWS free plan:** it ends 6 months after you opened the account, or sooner if the credits run out. AWS then **closes the account and deletes everything within 90 days, the S3 bucket included**, unless you upgrade. Set a reminder for month 5 and either move to Google Cloud or upgrade. The nightly backup makes moving one command.
 
-Move to AWS when there's a reason to: more than one server, a managed Postgres database, or data that must stay in a particular region. The Docker image runs unchanged on a VM, so moving later is cheap.
+A t3.micro with a 20 GB disk and a public IP uses roughly US$12–14 of credits a month, which fits within the base US$100 for 6 months. Don't pick a bigger server: on the free plan, the account closes when the credits run out.
 
-> Ferlance's frontend is React and TypeScript, built with Vite. There's no Vue.
+## AWS walkthrough (about 20 minutes of clicking)
 
-## Why the old Render setup doesn't work any more
+Work in the **Europe (Ireland) eu-west-1** region (top right of the console), the same region as `ferlance-bucket`.
 
-The old site was plain HTML, CSS and JS, so Render could serve the files as they were. Now the frontend has to be **built** with Node before Python can serve it. The `Dockerfile` does both steps:
+### 1. Give the server permission to write backups (once)
 
-1. A Node 22 stage runs `npm ci` and `npm run build`, which produces `frontend/dist`.
-2. A Python 3.12 stage installs `requirements.txt`, copies `backend/` and the built `frontend/dist`, and starts `uvicorn` on Render's `$PORT`.
+The server uses an **IAM role** instead of access keys, so no key is ever stored on it.
 
-`render.yaml` describes the service, its disk and its settings, so Render can set it all up from the repo.
+1. Open **IAM → Roles → Create role**.
+2. For **Trusted entity**, choose *AWS service*, then **Use case:** *EC2*. Click **Next**.
+3. Skip the permissions list (click **Next**). Name the role `ferlance-server` and click **Create role**.
+4. Open the role, then choose **Add permissions → Create inline policy → JSON**. Paste this, then name it `ferlance-bucket-access`:
 
-## Walkthrough: Render
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [
+       { "Sid": "WriteExportsAndBackups", "Effect": "Allow", "Action": "s3:PutObject",
+         "Resource": "arn:aws:s3:::ferlance-bucket/exports/*" },
+       { "Sid": "ReadBackupsToRestore", "Effect": "Allow", "Action": "s3:GetObject",
+         "Resource": "arn:aws:s3:::ferlance-bucket/exports/_backup/*" }
+     ]
+   }
+   ```
 
-### 1. Before you start
-- **Free instances lose files.** Without a persistent disk, the SQLite database and uploads are wiped on every deploy or restart, and a free instance also falls asleep, which stops the daily export. The blueprint uses the `starter` plan with a disk for that reason.
-- **Moving old data?** If the old service had a disk with `ferlance.sqlite3` on it, set `FERLANCE_SECRET_KEY` to the **old value** instead of a new one. The key encrypts stored integration keys and signs logins. If the old service had no disk, there's no data to move.
+The server can add exports and backups, and read backups back only to restore them. It can't list or delete anything.
 
-### 2. Create the service from the blueprint
-1. Merge the PR that adds `Dockerfile` and `render.yaml` into `main`.
-2. In the Render dashboard, choose **New → Blueprint** and pick the `ferlance-data/ferlance` repository.
-3. Render reads `render.yaml` and shows one web service, `ferlance`, with a 1 GB disk mounted at `/var/data`.
-4. Render then asks for the values marked `sync: false`:
+### 2. Launch the server
 
-   | Setting | What to put |
-   | --- | --- |
-   | `FERLANCE_ADMIN_EMAILS` | Your own sign-in email (this gives you the Admin page) |
-   | `OPENROUTER_KEY` | The AI key: use a **new** one, since the old one was pasted in chat |
-   | `FERLANCE_EXPORT_BUCKET` | `ferlance-bucket` |
-   | `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` | The `ferlance-export` IAM user's key, never a root key |
+Open **EC2 → Launch instance** and set:
 
-   `FERLANCE_SECRET_KEY` is generated for you, unless you're moving old data (step 1).
-5. Click **Apply**. The first build takes a few minutes; later builds reuse cached layers.
+| Setting | Value |
+| --- | --- |
+| Name | `ferlance` |
+| Application and OS image | **Ubuntu Server 24.04 LTS** (64-bit x86) |
+| Instance type | **t3.micro** (marked *Free tier eligible*) |
+| Key pair | **Proceed without a key pair** (you'll connect from the browser) |
+| Network settings | Tick **Allow SSH traffic**, **Allow HTTPS traffic** and **Allow HTTP traffic** from the internet. HTTP is only used to get the HTTPS certificate. |
+| Configure storage | **20 GiB gp3** |
+| Advanced details → IAM instance profile | `ferlance-server` |
+| Advanced details → User data | The whole of `deploy/aws/user-data.sh`. **First** put your sign-in email between the quotes on the `ADMIN_EMAIL=""` line. |
 
-### 3. Check it
-- Open `https://<your-service>.onrender.com/health`. It should show `{"status":"ok"}`.
-- Open the site, sign up with the email you put in `FERLANCE_ADMIN_EMAILS`, and check that **Admin** appears in the menu.
-- Under **Admin → Data export**, click **Export now** and check that it says *Exported*.
-- If the service doesn't start, open **Logs**. A message about `FERLANCE_SECRET_KEY` means the key is missing or shorter than 32 characters. The app refuses to run in production with a weak key.
+Click **Launch instance**.
 
-### 4. Your domain and the old service
-1. In the new service, go to **Settings → Custom Domains**, add your domain and update its DNS as Render instructs.
-2. When the new service works on your domain, suspend the old one, then delete it.
+### 3. Open your app
+
+1. Wait about 10 minutes: the first build is slow on a small server.
+2. On the instance's page, copy the **Public IPv4 address**, for example `3.250.1.2`.
+3. Your app is at **`https://3-250-1-2.sslip.io`**: the same address with dashes, followed by `.sslip.io`. It resolves to your server, and Caddy gets a real HTTPS certificate for it automatically.
+4. Sign up with the email you put in `ADMIN_EMAIL`. You should see **Admin** in the menu.
+5. Under **Admin → Data export**, click **Export now**. The business should show *Exported*, and you should see *Last restorable backup* with today's date. That confirms the server can write to S3.
+
+**Not loading yet?** On the instance's page, choose **Connect → EC2 Instance Connect → Connect**, which opens a terminal in your browser, and run:
+
+```bash
+sudo tail -n 50 /var/log/ferlance-setup.log
+```
+
+The last line says `Ferlance is starting at https://…` when setup has finished.
+
+### 4. Add the AI key and other settings
+
+The settings live in one file on the server, readable only by the administrator. Connect as in step 3, then run:
+
+```bash
+sudo nano /srv/ferlance/ferlance.env
+```
+
+Set `OPENROUTER_KEY=` to a **new** key (the old one was pasted in chat), and `FERLANCE_ADMIN_EMAILS=` if you left it empty. Save with Ctrl+O, Enter, then exit with Ctrl+X. Then restart the app:
+
+```bash
+sudo ferlance-start
+```
 
 ### 5. Day to day
-- **Deploys:** every push to `main` builds and deploys. A service with a disk restarts during a deploy, so expect a few seconds of downtime.
-- **Settings:** change them under **Environment** in the dashboard; Render restarts the service.
-- **Backups:** the daily S3 export keeps a copy of every business's data. Check whether your Render plan includes disk snapshots and how long they're kept.
-- **Size:** 1 GB is plenty to start. You can grow the disk in the dashboard, but you can't shrink it.
 
-## Walkthrough: AWS (when you need it)
+| Task | Command (run in EC2 Instance Connect) |
+| --- | --- |
+| Update to the latest release on GitHub | `sudo ferlance-update` |
+| Restart after changing settings | `sudo ferlance-start` |
+| See the app's logs | `sudo docker logs --tail 100 ferlance` |
+| Restore a backup (data is replaced; the old copy is kept) | `sudo ferlance-restore 2026-11-22` |
+| See this server's address | `cat /srv/ferlance/address` |
 
-These are the steps for an AWS Lightsail VM. It's more work than Render, so use it only if you need what AWS offers.
+- **Reboot is fine. Don't stop and start the instance:** a stop and start gives the server a new IP and so a new `sslip.io` address. If it does happen, the server points itself at the new address on boot; just use the new one.
+- **Backups:** each day after 02:00 UTC, along with the export, the server uploads a restorable copy to `ferlance-bucket/exports/_backup/dt=<date>/`. Admin → Data export shows the last one. To also guard against the server itself being lost, you can add **EC2 → Lifecycle Manager → snapshot policy** for the disk. Snapshots use a little of your credits.
+- **Credits:** in **Billing and Cost Management → Free Tier**, check the credits left and the end date of your plan.
 
-1. Create a Lightsail **instance** (not a container service): Ubuntu, 1 GB RAM or more, in `eu-west-1`. Attach a static IP.
-2. Install Docker, clone the repo, and build the image:
+### Restore from a backup
 
-   ```bash
-   docker build -t ferlance .
-   ```
+1. Connect to the server (step 3) and run `sudo ferlance-restore <date>`, using a date from `exports/_backup/` in the S3 console.
+2. The server downloads that day's database and files, checks them against their checksums, swaps them in, and restarts. Your previous data stays in `/srv/ferlance/data.before-restore-…`.
 
-3. Run the container with a lasting data folder and your settings in an `--env-file` (keep that file only on the server):
+**Moving to a new server**, for example Google Cloud, works the same way. Set up the new server, give it read access to the backups, and run `ferlance-restore` with the latest date.
 
-   ```bash
-   docker run -d --restart unless-stopped -p 127.0.0.1:8000:8000 -v /srv/ferlance:/var/data --env-file /srv/ferlance.env ferlance
-   ```
+## Render (paid alternative)
 
-4. Put **Caddy** in front of it for HTTPS (`reverse_proxy 127.0.0.1:8000`), and point your domain at the static IP.
-5. Turn on automatic Lightsail snapshots, and keep the daily S3 export running.
-6. For updates, run `git pull`, then `docker build`, then restart the container.
+If you ever want to pay to stop managing a server, `render.yaml` sets up a Render web service with a persistent disk. Choose **New → Blueprint**, pick this repo, and fill in the requested settings. Free Render instances have no lasting disk, so they will lose data.
+
+## How the image is built
+
+`Dockerfile`:
+1. A Node 22 stage runs `npm ci` and `npm run build`, which produces `frontend/dist`.
+2. A Python 3.12 stage installs `requirements.txt`, copies `backend/` and the built frontend, and runs `uvicorn` on `$HOST:$PORT`.
+
+`.dockerignore` keeps `.env`, local data and editor files out of the image.

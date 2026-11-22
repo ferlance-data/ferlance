@@ -7,7 +7,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ## [Unreleased]
 
 ### Added
-- Deployment: a `Dockerfile` (it builds the frontend with Node, then serves it from Python), a `.dockerignore` that keeps `.env` and local data out of the image, a `render.yaml` blueprint (one web service and a 1 GB persistent disk) and `docs/DEPLOY.md`.
+- Deployment: a `Dockerfile` (it builds the frontend with Node, then serves it from Python) and a `.dockerignore` that keeps `.env` and local data out of the image.
+- `deploy/aws/user-data.sh`: a one-paste setup for an EC2 server. It adds swap, installs Docker and Caddy, builds the app, and serves free HTTPS at `<ip>.sslip.io`. It also installs `ferlance-update`, `ferlance-start` and `ferlance-restore`, and uses an instance role instead of stored AWS keys.
+- `render.yaml`: a paid Render alternative with a persistent disk.
+- `docs/DEPLOY.md`: which host to choose and why (including the AWS free-plan time limit), a click-by-click AWS walkthrough, and how to restore.
+- **Nightly restorable backup:** with each daily export, a consistent SQLite snapshot and the uploaded and processed files go to `exports/_backup/dt=<day>/`, with a checksummed manifest written last. Admin → Data export shows the last backup. `ferlance-restore <day>` checks the checksums and swaps the data in, keeping the old copy.
 
 ### Security
 - In production (`FERLANCE_COOKIE_SECURE=true`), the server now refuses to start with the development secret key or one shorter than 32 characters.

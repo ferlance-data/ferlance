@@ -25,4 +25,4 @@ RUN mkdir -p /var/data
 EXPOSE 8000
 # One worker: SQLite lives on one disk, and the daily export scheduler runs in this process.
 # Render (and most hosts) set $PORT; --proxy-headers trusts the host's HTTPS proxy.
-CMD ["sh", "-c", "exec uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips='*'"]
+CMD ["sh", "-c", "exec uvicorn backend.main:app --host ${HOST:-0.0.0.0} --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips='*'"]
