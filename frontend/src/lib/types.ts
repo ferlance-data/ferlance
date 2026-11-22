@@ -9,7 +9,7 @@ export interface User {
 }
 
 export type BusinessRole = 'owner' | 'manager' | 'accountant';
-export type Permission = 'read' | 'write_data' | 'write_balances' | 'use_ai' | 'manage_team' | 'manage_business';
+export type Permission = 'read' | 'write_data' | 'write_balances' | 'use_ai' | 'manage_team' | 'manage_business' | 'manage_books';
 
 export interface Business {
   id: string;

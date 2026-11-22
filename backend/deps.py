@@ -35,9 +35,9 @@ def admin_user(user: dict = Depends(current_user)) -> dict:
 # which is the platform role (admin or not). Every business route declares the permission it
 # needs through business_access(); tests check that no route under /api/businesses skips it.
 ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
-    "owner": frozenset({"read", "write_data", "write_balances", "use_ai", "manage_team", "manage_business"}),
+    "owner": frozenset({"read", "write_data", "write_balances", "use_ai", "manage_team", "manage_business", "manage_books"}),
     "manager": frozenset({"read", "write_data", "write_balances", "use_ai"}),
-    "accountant": frozenset({"read", "write_balances", "use_ai"}),
+    "accountant": frozenset({"read", "write_balances", "use_ai", "manage_books"}),
 }
 PERMISSIONS = frozenset().union(*ROLE_PERMISSIONS.values())
 ROLE_ORDER = "CASE m.role WHEN 'owner' THEN 0 WHEN 'manager' THEN 1 ELSE 2 END"
@@ -90,6 +90,7 @@ balance_writer = business_access("write_balances")
 ai_user = business_access("use_ai")
 team_manager = business_access("manage_team")
 business_manager = business_access("manage_business")
+books_manager = business_access("manage_books")  # manual journals, opening balances, period lock, accounts
 
 
 def spend_ai_call(business_id: str) -> None:
