@@ -72,7 +72,22 @@ Chart colours come from the semantic `--chart-*` tokens. They are picked per the
 | `--chart-cost` | `--viz-orange-600` #c45f12 | `--viz-orange-500` #d9742c |
 
 - **Text never takes a series colour.** Values and labels use the text tokens, with a coloured swatch beside them.
-- **Categorical palette.** A validated palette of up to 6 categories, for donuts, is part of #6 (analytics visuals). A first attempt failed the colour-blind check on blue against violet, so it needs re-stepping before use.
+- **Categorical palette (composition charts).** `--chart-cat-1`…`--chart-cat-5` in fixed order: mint, blue, yellow, magenta, violet, plus a neutral `--chart-other`. Orange is left out because it means cost. The order passes every dataviz check in both themes, including the wrap-around pair a donut creates: worst CVD ΔE 13.2, normal-vision ΔE 19.3, all ≥ 3:1 against the surface.
+
+| Slot | Light | Dark |
+| --- | --- | --- |
+| 1 mint | #2f8a68 | #3fa882 |
+| 2 blue | #2a78d6 | #3987e5 |
+| 3 yellow | #c98500 | #c98500 |
+| 4 magenta | #d55181 | #d55181 |
+| 5 violet | #7a5fd0 | #9085e9 |
+| Other | #8a8a85 | #6b7776 |
+
+- **Chart components** (`src/lib/chart`):
+  - `BarChart` has pointer and touch tooltips, a "Show as table" view, and bars that grow in.
+  - `Donut` shows the top five plus Other with 2 px gaps. Its legend is a real table, and the slice under the pointer is shown in the centre.
+  - `RadialProgress` is a labelled meter whose value is always printed, and which never rounds up to 100%.
+  - Motion uses transform and opacity only, lasts 0.3 s or less, and is switched off under reduced motion.
 
 ## Components
 
@@ -105,5 +120,4 @@ The result is **92.6 KB from our own origin, down from about 152 KB from two Goo
 ## Follow-ups
 
 - **Figma export of the token set (PRD 7.5).** This is optional and was not done.
-- **Categorical chart palette for #6.**
 - **Convert remaining raw spacing values to `--space-*`.** Do this when touching the code, not in bulk.

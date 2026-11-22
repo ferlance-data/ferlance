@@ -127,6 +127,17 @@
   --viz-orange-600: #c45f12;
   --viz-mint-500: #3fa882;
   --viz-orange-500: #d9742c;
+  /* Categorical order for composition charts (donuts). Validated light on #ffffff and dark on
+     --ink-850, including the wrap-around pair: worst CVD ΔE 13.2, normal-vision ΔE 19.3, all ≥ 3:1.
+     Orange is left out on purpose: it means "cost" everywhere. */
+  --viz-blue-600: #2a78d6;
+  --viz-yellow-600: #c98500;
+  --viz-magenta-600: #d55181;
+  --viz-violet-600: #7a5fd0;
+  --viz-blue-500: #3987e5;
+  --viz-violet-400: #9085e9;
+  --viz-other-light: #8a8a85;
+  --viz-other-dark: #6b7776;
 
   /* Semantic (light workspace) */
   --background: #ffffff;
@@ -164,6 +175,13 @@
   --chart-revenue: var(--viz-mint-600);
   --chart-revenue-strong: var(--green-700);
   --chart-cost: var(--viz-orange-600);
+  --chart-cat-1: var(--viz-mint-600);
+  --chart-cat-2: var(--viz-blue-600);
+  --chart-cat-3: var(--viz-yellow-600);
+  --chart-cat-4: var(--viz-magenta-600);
+  --chart-cat-5: var(--viz-violet-600);
+  --chart-other: var(--viz-other-light);
+  --chart-track: var(--muted);
   --chart-grid: #efede8;
   --shadow-xs: 0 1px 2px 0 #00000008;
   --shadow-sm: 0 1px 3px 0 #0000000f, 0 1px 2px -1px #0000000f;
@@ -283,6 +301,13 @@
   --chart-revenue: var(--viz-mint-500);
   --chart-revenue-strong: var(--mint-glow);
   --chart-cost: var(--viz-orange-500);
+  --chart-cat-1: var(--viz-mint-500);
+  --chart-cat-2: var(--viz-blue-500);
+  --chart-cat-3: var(--viz-yellow-600);
+  --chart-cat-4: var(--viz-magenta-600);
+  --chart-cat-5: var(--viz-violet-400);
+  --chart-other: var(--viz-other-dark);
+  --chart-track: var(--ink-700);
   --chart-grid: #1f2a29;
   --shadow-xs: none;
   --shadow-sm: none;

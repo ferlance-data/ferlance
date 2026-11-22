@@ -1,6 +1,7 @@
 // Dependency-free SVG bar chart with an optional overlay line (revenue bars, cost line).
 
 import { useLayoutEffect, useRef, useState } from 'react';
+import '../../styles/charts.css';
 import { money, number } from '../format';
 
 const HEIGHT = 260;
@@ -91,7 +92,8 @@ export function BarChart({
     ? bars.map((bar, index) => [cx(index), line.get(bar.period)] as const).filter((point): point is readonly [number, number] => point[1] !== undefined && point[1] !== null)
     : [];
 
-  const onMove = (event: React.MouseEvent<SVGRectElement>) => {
+  // Pointer events cover mouse, pen and touch, so a tap on a phone shows the tooltip too.
+  const onMove = (event: React.PointerEvent<SVGRectElement>) => {
     const svg = event.currentTarget.ownerSVGElement;
     if (!svg) return;
     const box = svg.getBoundingClientRect();
@@ -143,7 +145,7 @@ export function BarChart({
             {points.length <= 40 ? points.map(([px, value]) => <circle key={px} className="cost-dot" cx={px} cy={y(value)} r={3} />) : null}
           </>
         ) : null}
-        <rect x={PAD.left} y={PAD.top} width={innerWidth} height={innerHeight} fill="transparent" onMouseMove={onMove} onMouseLeave={() => setActive(null)} />
+        <rect x={PAD.left} y={PAD.top} width={innerWidth} height={innerHeight} fill="transparent" onPointerMove={onMove} onPointerDown={onMove} onPointerLeave={(event) => event.pointerType !== 'touch' && setActive(null)} />
       </svg>
       <div
         className="chart-tooltip"
@@ -172,6 +174,33 @@ export function BarChart({
           </>
         ) : null}
       </div>
+      <details className="chart-table">
+        <summary>Show as table</summary>
+        <table className="table">
+          <thead>
+            <tr>
+              <th scope="col">Period</th>
+              <th scope="col" className="num">
+                {barLabel}
+              </th>
+              {line ? (
+                <th scope="col" className="num">
+                  {lineLabel}
+                </th>
+              ) : null}
+            </tr>
+          </thead>
+          <tbody>
+            {bars.map((bar) => (
+              <tr key={bar.period}>
+                <th scope="row">{bar.period}</th>
+                <td className="num">{money(bar.value)}</td>
+                {line ? <td className="num">{line.has(bar.period) ? money(line.get(bar.period)) : '—'}</td> : null}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </details>
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { Donut } from '../../lib/chart/Donut';
 import { useState } from 'react';
 import { Link } from '../../lib/router';
 import { money, number, plainPercent, setCurrency } from '../../lib/format';
@@ -26,8 +27,52 @@ export default function Products() {
   const products = analytics?.products;
   const derived = products?.available ? deriveProducts(products.items, search, filter, sort) : null;
 
+  const mix = products?.available && products.items.length > 1 ? products.items : null;
+  const profitable = mix && products?.profit_available
+    ? [...mix].filter((item) => (item.gross_profit ?? 0) > 0).sort((a, b) => (b.gross_profit ?? 0) - (a.gross_profit ?? 0))
+    : [];
+  const profitTotal = profitable.reduce((sum, item) => sum + (item.gross_profit ?? 0), 0);
+
   return (
     <>
+      {analytics && mix ? (
+        <div className="grid-2" id="products-mix">
+          <div className="card">
+            <div className="card-header">
+              <div>
+                <h2 className="card-title">{analytics.profile?.domain === 'cost' ? 'Where your costs go' : 'Where your revenue comes from'}</h2>
+                <p className="card-subtitle">Top five products, the rest grouped as Other</p>
+              </div>
+            </div>
+            <div className="card-body">
+              <Donut
+                title="Share by product"
+                items={mix.map((item) => ({ label: item.product, value: item.metric_value }))}
+                centerLabel={mix[0]?.metric_label ?? 'Total'}
+                centerValue={money(mix.reduce((sum, item) => sum + Math.max(item.metric_value, 0), 0), { compact: true })}
+              />
+            </div>
+          </div>
+          {profitable.length > 1 ? (
+            <div className="card">
+              <div className="card-header">
+                <div>
+                  <h2 className="card-title">Where your profit comes from</h2>
+                  <p className="card-subtitle">Products that made a profit after item costs</p>
+                </div>
+              </div>
+              <div className="card-body">
+                <Donut
+                  title="Share of profit by product"
+                  items={profitable.map((item) => ({ label: item.product, value: item.gross_profit ?? 0 }))}
+                  centerLabel="Profit"
+                  centerValue={money(profitTotal, { compact: true })}
+                />
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
       <div className="card">
         <div className="toolbar">
           <label className="search">

@@ -139,6 +139,22 @@ def available_period(records: list[dict[str, Any]]) -> dict[str, str | None]:
     return _span(_record_dates(records))
 
 
+def _coverage(records: list[dict[str, Any]]) -> dict[str, Any]:
+    """Share of records (0-100) that carry each optional field: what unlocks profit, units and customer views."""
+    total = len(records)
+
+    def share(test) -> float:
+        return round(sum(1 for record in records if test(record)) / total * 100, 1) if total else 0.0
+
+    return {
+        "records": total,
+        "product": share(lambda r: bool(r.get("product"))),
+        "cost": share(lambda r: "cost" in r),
+        "quantity": share(lambda r: r.get("quantity") is not None),
+        "customer": share(lambda r: bool(r.get("customer"))),
+    }
+
+
 def analyze(records: list[dict[str, Any]], from_date: date | None = None, to_date: date | None = None) -> dict[str, Any]:
     if from_date and to_date and from_date > to_date:
         raise ValueError("The from date must be on or before the to date.")
@@ -200,6 +216,7 @@ def analyze(records: list[dict[str, Any]], from_date: date | None = None, to_dat
         "profit": {"available": True, "revenue": round(total, 2), "cost": round(costs, 2), "gross_profit": round(total - costs, 2)} if costs_complete and profile["domain"] != "cost" else {"available": False, "reason": "Profit requires revenue and cost data for every accepted record in this period." if any("cost" in record for record in filtered) else "Accepted records contain revenue but no cost or expense fields."},
         "inventory": {"available": False, "reason": "No inventory snapshot or stock movement data is present."},
         "kpis": kpi_dict,
+        "coverage": _coverage(filtered),
         "warnings": warnings,
     }
 

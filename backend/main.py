@@ -43,7 +43,7 @@ class _BuildAssets(StaticFiles):
         await super().__call__(scope, receive, send)
 
 
-app = FastAPI(title="Ferlance", version="1.2.0", lifespan=lifespan)
+app = FastAPI(title="Ferlance", version="1.3.0", lifespan=lifespan)
 # The React frontend is a Vite build (frontend/dist). check_dir=False keeps the API
 # importable before the first build; pages then explain how to build instead.
 app.mount("/assets", _BuildAssets(directory=config.FRONTEND_DIST / "assets", check_dir=False), name="assets")

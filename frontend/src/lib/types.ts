@@ -115,6 +115,8 @@ export interface Analytics {
   };
   profit: { available: boolean; reason?: string; gross_profit?: number; cost?: number; margin_pct?: number; [key: string]: unknown };
   inventory: { available: boolean; reason?: string; [key: string]: unknown };
+  /** Share of records (0–100) carrying each optional field. */
+  coverage?: { records: number; product: number; cost: number; quantity: number; customer: number };
   kpis: {
     total_revenue: number;
     total_cost: number;

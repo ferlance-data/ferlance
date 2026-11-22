@@ -1,6 +1,8 @@
 import { useState, type ReactNode } from 'react';
 import { Link } from '../../lib/router';
 import { BarChart, type Bar } from '../../lib/chart/BarChart';
+import { Donut } from '../../lib/chart/Donut';
+import { RadialProgress } from '../../lib/chart/RadialProgress';
 import { money, number, plainPercent, plural, setCurrency } from '../../lib/format';
 import { Icon, IconSlot } from '../../lib/icons';
 import { printFinancialReport } from '../../lib/reports';
@@ -112,6 +114,7 @@ export default function Overview() {
           </div>
         </div>
       </div>
+      {analytics?.coverage?.records ? <Completeness coverage={analytics.coverage} isCost={analytics.profile?.domain === 'cost'} /> : null}
       <details className="data-notes" id="overview-notes" hidden={!analytics?.warnings?.length}>
         <summary>Data notes</summary>
         <ul id="overview-notes-list">
@@ -157,10 +160,10 @@ function SetupGuide() {
         <p className="eyebrow">Setup guide</p>
         <h2>{complete ? 'Keep going — your numbers get sharper with each step.' : `Welcome to Ferlance, ${business.name}.`}</h2>
         <p>Four short steps turn your records into a full picture of the business.</p>
-        <div className="setup-progress" role="progressbar" aria-label="Setup steps complete" aria-valuemin={0} aria-valuemax={steps.length} aria-valuenow={complete}>
-          <i style={{ width: `${(complete / steps.length) * 100}%` }} />
+        <div className="setup-ring">
+          <RadialProgress value={complete} max={steps.length} label="Setup steps complete" display={`${complete}/${steps.length}`} />
+          <p className="footnote">{`${complete} of ${steps.length} steps complete`}</p>
         </div>
-        <p className="footnote" style={{ marginTop: '8px' }}>{`${complete} of ${steps.length} complete`}</p>
         {complete ? (
           <button className="btn btn-ghost btn-sm" type="button" style={{ marginTop: '10px', marginLeft: '-10px' }} onClick={hide}>
             Hide guide
@@ -383,6 +386,18 @@ function Rankings({ analytics }: { analytics: Analytics | undefined }) {
             <IconSlot name="arrow-right" />
           </Link>
         </div>
+        {analytics && products?.available && products.items.length > 1 ? (
+          <div className="card-body">
+            <Donut
+              title={isCost ? 'Share of cost by item' : 'Share of revenue by product'}
+              items={products.items.map((item) => ({ label: item.product, value: item.metric_value }))}
+              total={isCost ? analytics.kpis.total_cost : analytics.kpis.total_revenue}
+              centerLabel={isCost ? 'Total cost' : 'Revenue'}
+              centerValue={money(isCost ? analytics.kpis.total_cost : analytics.kpis.total_revenue, { compact: true })}
+              showLegend={false}
+            />
+          </div>
+        ) : null}
         <div className="card-body flush">
           <ol className="rank-list" id="top-products">
             {!analytics ? (
@@ -421,6 +436,40 @@ function Rankings({ analytics }: { analytics: Analytics | undefined }) {
             )}
           </ol>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Record completeness ---------- */
+function Completeness({ coverage, isCost }: { coverage: NonNullable<Analytics['coverage']>; isCost: boolean }) {
+  const rows: { key: keyof typeof coverage; label: string; unlocks: string }[] = [
+    { key: 'product', label: 'Product', unlocks: 'product rankings and advice' },
+    { key: 'cost', label: 'Cost', unlocks: 'profit, margins and loss alerts' },
+    { key: 'quantity', label: 'Quantity', unlocks: 'units, prices and restock advice' },
+    { key: 'customer', label: isCost ? 'Supplier' : 'Customer', unlocks: 'regular-buyer alerts' },
+  ];
+  return (
+    <div className="card" id="overview-completeness">
+      <div className="card-header">
+        <div>
+          <h2 className="card-title">How complete your records are</h2>
+          <p className="card-subtitle">{`Share of ${plural(coverage.records, 'record')} in this period with each detail`}</p>
+        </div>
+      </div>
+      <div className="card-body completeness">
+        {rows.map((row) => {
+          const value = coverage[row.key];
+          return (
+            <div className="completeness-item" key={row.key}>
+              <RadialProgress value={value} label={`${row.label} recorded`} tone={value >= 95 ? 'good' : value < 50 ? 'warn' : 'default'} size={56} />
+              <div>
+                <strong>{row.label}</strong>
+                <small>{`Unlocks ${row.unlocks}`}</small>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
