@@ -80,7 +80,7 @@ Tapping an item calls `POST /insights/{id}/explain`. The server rebuilds the ite
 ### Ask Lance
 
 1. All included files are read; a currency-aware analytics snapshot is built (mixed currencies are never summed).
-2. `rag.retrieve` pulls the most relevant rows from an FTS5 index, restricted to the included files.
+2. `rag.retrieve` pulls the most relevant rows from an FTS5 index (`rag_records_fts`). The index holds record values only, uses porter stemming, and is restricted to the included files and the question's date scope. Common question words are dropped. The choice is backed by `tools/eval/rag_eval.py`.
 3. `llm.ask_lance` sends the snapshot, evidence and recent history to OpenRouter → Groq → AgentRouter, in order.
 4. The conversation is persisted only after a successful answer.
 
@@ -115,7 +115,7 @@ React 19 + TypeScript (strict) built by Vite. Two entries: the landing page keep
 | `business_integrations` | Fernet-encrypted third-party keys (currently unused; kept for future provider keys) |
 | `insight_explanations` | cached AI explanations of advice items, keyed by the item's evidence |
 | `chat_conversations`, `chat_messages` | saved Ask Lance threads |
-| `rag_documents_fts` | FTS5 index of accepted rows |
+| `rag_records_fts` | FTS5 index of accepted rows: values only, record date for scope filtering, porter stemming |
 
 Runtime data under `data/` is local state and is not tracked in git.
 
