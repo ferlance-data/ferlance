@@ -257,6 +257,15 @@ CREATE TABLE IF NOT EXISTS debt_settings (
     pay_to TEXT NOT NULL DEFAULT '',
     updated_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS backup_runs (
+    day TEXT PRIMARY KEY,
+    status TEXT NOT NULL CHECK(status IN ('running', 'ok', 'failed')),
+    attempts INTEGER NOT NULL DEFAULT 0,
+    bytes INTEGER,
+    error TEXT,
+    started_at TEXT NOT NULL,
+    finished_at TEXT
+);
 CREATE TABLE IF NOT EXISTS business_members (
     business_id TEXT NOT NULL,
     user_id TEXT NOT NULL,

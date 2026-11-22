@@ -1,0 +1,34 @@
+# Render Blueprint for Ferlance: one Docker web service with a persistent disk for SQLite and uploads.
+# New → Blueprint → pick this repository. Secrets marked sync: false are asked for once in the dashboard.
+services:
+  - type: web
+    name: ferlance
+    runtime: docker
+    plan: starter          # always on; a persistent disk needs a paid plan (free services lose files on every deploy)
+    region: frankfurt      # the closest Render region to Ghana
+    branch: main
+    autoDeploy: true
+    healthCheckPath: /health
+    disk:
+      name: ferlance-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: FERLANCE_DATA_DIR
+        value: /var/data
+      - key: FERLANCE_COOKIE_SECURE
+        value: "true"
+      - key: FERLANCE_SECRET_KEY   # signs logins and encrypts stored integration keys; keep it stable
+        generateValue: true
+      - key: FERLANCE_ADMIN_EMAILS
+        sync: false
+      - key: OPENROUTER_KEY
+        sync: false
+      - key: FERLANCE_EXPORT_BUCKET
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_REGION
+        value: eu-west-1

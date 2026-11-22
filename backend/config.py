@@ -73,6 +73,16 @@ AWS_REGION = os.getenv("AWS_REGION", "")
 
 
 
+def require_production_secret() -> None:
+    """Refuse to start a deployment (secure cookies on) with the development secret or a short one.
+
+    The secret signs every login token and encrypts stored integration keys, so a guessable one
+    would let anyone forge a session.
+    """
+    if COOKIE_SECURE and (SECRET_KEY == "development-only-change-me" or len(SECRET_KEY) < 32):
+        raise RuntimeError("Set FERLANCE_SECRET_KEY to at least 32 random characters before running in production.")
+
+
 def ensure_storage() -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     RAW_DIR.mkdir(parents=True, exist_ok=True)

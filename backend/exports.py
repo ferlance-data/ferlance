@@ -29,7 +29,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Protocol
 
-from . import config, dataset_store, db
+from . import backups, config, dataset_store, db
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +61,15 @@ class LocalTarget:
         tmp.write_bytes(body)
         tmp.replace(path)
 
+    def put_file(self, key: str, source: "Path", content_type: str) -> None:
+        import shutil
+
+        path = self.root / key
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        shutil.copyfile(source, tmp)
+        tmp.replace(path)
+
 
 class S3Target:
     def __init__(self, bucket: str, region: str | None) -> None:
@@ -78,6 +87,10 @@ class S3Target:
             ContentType="application/vnd.apache.parquet",
             ServerSideEncryption="AES256",
         )
+
+    def put_file(self, key: str, source: "Path", content_type: str) -> None:
+        """Streamed (multipart for large files), so a big backup never sits in memory."""
+        self._client.upload_file(str(source), self.bucket, key, ExtraArgs={"ContentType": content_type, "ServerSideEncryption": "AES256"})
 
 
 def enabled() -> bool:
@@ -294,6 +307,11 @@ def run(force: bool = False, day: str | None = None, target: Target | None = Non
         except Exception:  # e.g. the database was locked: leave this business for the next check, carry on
             logger.exception("Could not record the data export for business %s.", business_id)
             summary["failed"] += 1
+    try:
+        summary["backup"] = backups.run(target, day, force)
+    except Exception:  # recording the backup failed (e.g. a locked database): retried at the next check
+        logger.exception("Could not run the nightly backup.")
+        summary["backup"] = "failed"
     return summary
 
 
@@ -370,6 +388,7 @@ def status(limit: int = 200) -> dict[str, Any]:
         "hour_utc": config.EXPORT_HOUR_UTC,
         "running": busy(),
         "problem": _setup_error,
+        "backup": backups.latest(),
         "failed": failed["n"],
         "runs": rows,
     }

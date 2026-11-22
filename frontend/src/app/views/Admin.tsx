@@ -61,6 +61,7 @@ interface ExportStatus {
   hour_utc: number;
   running: boolean;
   problem: string | null;
+  backup: { day: string; status: 'running' | 'ok' | 'failed'; bytes: number | null; error: string | null } | null;
   failed: number;
   runs: ExportRun[];
 }
@@ -296,6 +297,15 @@ export default function Admin() {
             </button>
           ) : null}
         </div>
+        {exportStatus.data?.enabled ? (
+          <p className="body-sm muted card-body" id="admin-backup">
+            {exportStatus.data.backup
+              ? exportStatus.data.backup.status === 'ok'
+                ? `Last restorable backup: ${formatDate(exportStatus.data.backup.day)} (${number(Math.round((exportStatus.data.backup.bytes ?? 0) / 1024))} KB)`
+                : `Backup ${exportStatus.data.backup.status} on ${formatDate(exportStatus.data.backup.day)}${exportStatus.data.backup.error ? `: ${exportStatus.data.backup.error}` : ''}`
+              : 'No restorable backup yet. One is made with each daily export.'}
+          </p>
+        ) : null}
         {exportStatus.data?.runs.length ? (
           <div className="table-wrap">
             <DataTable columns={exportColumns} rows={exportStatus.data.runs} rowKey={(item) => item.business_id} />
