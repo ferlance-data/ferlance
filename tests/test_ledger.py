@@ -83,6 +83,9 @@ def test_database_refuses_unbalanced_or_changed_entries(client):
         with pytest.raises(sqlite3.IntegrityError):
             with db.connection(config.DB_PATH) as conn:
                 conn.execute(statement, params)
+    with pytest.raises(sqlite3.IntegrityError, match="start as drafts"):
+        with db.connection(config.DB_PATH) as conn:
+            conn.execute("INSERT INTO journal_entries (id, business_id, entry_date, memo, source_key, kind, status, created_at) VALUES ('p', ?, '2026-10-01', 't', 't', 'manual', 'posted', 'now')", (business_id,))
     assert ledger.to_minor(0.1 + 0.2) == 30 and ledger.to_minor("1,0".replace(",", ".")) == 100 and ledger.to_minor(2.675) == 268
 
 
@@ -162,13 +165,19 @@ def test_stock_movements_and_no_double_counted_cost(client):
     assert not any("Sugar" in issue for issue in result["issues"])
 
     # A sales file posted to stock: cost of goods sold comes from the stock movement only.
-    dataset = upload(client, headers, base, "transaction_date,product,quantity,amount,cost\n2026-10-01,Rice 5kg,2,190,140\n")
+    # Sardines is not a stock product, so its cost still comes from the file.
+    dataset = upload(client, headers, base, "transaction_date,product,quantity,amount,cost\n2026-10-01,Rice 5kg,2,190,140\n2026-10-01,Sardines,1,28,20\n")
     assert client.post(f"{base}/inventory/posts/{dataset['id']}", headers=headers).status_code == 200
     result = books(client, headers, base, "from=2026-01-01&to=2099-12-31")
     pnl = result["profit_and_loss"]["currencies"][0]
-    assert lines_of(pnl, "expenses") == {"cogs": 140.0}  # not 280
+    assert lines_of(pnl, "expenses") == {"cogs": 160.0}  # 140 from the stock movement + 20 Sardines, not 300
     assert any("come from stock" in issue for issue in result["issues"])
     assert result["balance_sheet"]["currencies"][0]["balanced"] is True
+    # Leaving the file out reverses cost of goods sold, not a stock "loss".
+    client.patch(f"{base}/datasets/{dataset['id']}", headers=headers, json={"included": False})
+    result = books(client, headers, base, "from=2026-01-01&to=2099-12-31")
+    assert result["profit_and_loss"]["currencies"] == [] or "shrinkage" not in lines_of(result["profit_and_loss"]["currencies"][0], "expenses")
+    assert lines_of(result["balance_sheet"]["currencies"][0], "assets")["inventory"] == 1130.0
 
 
 # ---------------------------------------------------------------- opening balances and the books start
@@ -211,6 +220,10 @@ def test_manual_journal_lock_roles_and_isolation(client):
     unbalanced = {**entry, "lines": [{"account_id": accounts["drawings"], "debit": 50}, {"account_id": accounts["cash"], "credit": 40}]}
     assert client.post(f"{base}/books/journal", headers=headers, json=unbalanced).status_code == 400
     assert client.post(f"{base}/books/journal", headers=headers, json=entry).status_code == 200
+    sale = {"entry_date": "2026-10-21", "memo": "Cash sale not in any file", "lines": [{"account_id": accounts["cash"], "debit": 30}, {"account_id": accounts["sales"], "credit": 30}]}
+    assert client.post(f"{base}/books/journal", headers=headers, json=sale).status_code == 200
+    diff = books(client, headers, base)["differences"]
+    assert diff["unexplained"] == 0 and {"reason": "Manual journal entries", "amount": -30.0} in diff["explained"]
 
     # Roles: accountant may post journals; a manager may read the books but not post.
     for role, expected in (("accountant", 200), ("manager", 403)):
@@ -232,8 +245,12 @@ def test_manual_journal_lock_roles_and_isolation(client):
     october = books(client, headers, base, "from=2026-10-01&to=2026-10-31")["profit_and_loss"]["currencies"][0]["total_income"]
     client.patch(f"{base}/datasets/{dataset['id']}", headers=headers, json={"included": False})
     assert books(client, headers, base, "from=2026-10-01&to=2026-10-31")["profit_and_loss"]["currencies"][0]["total_income"] == october
-    november = books(client, headers, base, "from=2026-11-01&to=2026-11-30")["profit_and_loss"]["currencies"][0]
-    assert november["total_income"] == -336.0
+    november_books = books(client, headers, base, "from=2026-11-01&to=2026-11-30")
+    assert november_books["profit_and_loss"]["currencies"][0]["total_income"] == -336.0
+    assert november_books["differences"]["unexplained"] == 0
+    assert any("locked period" in item["reason"] for item in november_books["differences"]["explained"])
+    history = books(client, headers, base)["lock_history"]
+    assert history[0]["after_date"] == "2026-10-31" and history[0]["user_email"] == "ama@example.com"
     assert client.put(f"{base}/books/lock", headers=headers, json={"lock_date": "2999-01-01"}).status_code == 400
 
     trial = client.get(f"{base}/books/trial-balance?as_of=2026-12-31", headers=headers).json()
@@ -255,6 +272,10 @@ def test_journal_export_and_accounts(client):
     upload(client, headers, base, "transaction_date,category,cost\n2026-10-02,Shop rent,500\n2026-10-03,Fuel,60\n", "expenses.csv")
     pnl = books(client, headers, base)["profit_and_loss"]["currencies"][0]
     assert lines_of(pnl, "expenses") == {"rent": 500.0, "transport": 60.0} and pnl["net_profit"] == -550.0
+    # A cost-only line inside a sales file is spending, not cost of goods sold.
+    upload(client, headers, base, "transaction_date,product,amount,cost\n2026-10-04,Milo,50,30\n2026-10-05,Shop rent,,400\n", "mixed.csv")
+    pnl = books(client, headers, base)["profit_and_loss"]["currencies"][0]
+    assert lines_of(pnl, "expenses") == {"rent": 900.0, "transport": 60.0, "cogs": 30.0}
     journal = client.get(f"{base}/books/journal", headers=headers).json()
     assert journal and all(sum(l["debit"] for l in e["lines"]) == sum(l["credit"] for l in e["lines"]) for e in journal)
 

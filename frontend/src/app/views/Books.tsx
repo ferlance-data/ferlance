@@ -265,7 +265,17 @@ function OpeningStep({ onDone }: { onDone: () => Promise<void> }) {
   );
 }
 
-function Accountant({ accounts, lockDate, onChanged }: { accounts: Account[]; lockDate: string | null; onChanged: () => Promise<void> }) {
+function Accountant({
+  accounts,
+  lockDate,
+  lockHistory,
+  onChanged,
+}: {
+  accounts: Account[];
+  lockDate: string | null;
+  lockHistory: BooksSummary['lock_history'];
+  onChanged: () => Promise<void>;
+}) {
   const { business, businessPath, can } = useWorkspace();
   const editable = can('manage_books');
   const [offset, setOffset] = useState(0);
@@ -458,6 +468,16 @@ function Accountant({ accounts, lockDate, onChanged }: { accounts: Account[]; lo
                 <p className="card-subtitle">Nothing can be posted on or before the lock date. Late changes land on the first open day.</p>
               </div>
             </div>
+            {lockHistory.length ? (
+              <ul className="pending-invites card-body" id="books-lock-history">
+                {lockHistory.map((item) => (
+                  <li key={item.created_at}>
+                    <span>{`${item.user_email ?? 'Someone'} ${item.after_date ? `locked up to ${formatDate(item.after_date)}` : 'unlocked the books'}${item.before_date ? ` (was ${formatDate(item.before_date)})` : ''}`}</span>
+                    <small className="muted">{formatDate(item.created_at)}</small>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
             <div className="card-body form-grid">
               <label className="field">
                 Locked up to
@@ -554,8 +574,10 @@ export default function Books() {
   });
   const refresh = () => queryClient.invalidateQueries({ queryKey: keys.business(business.id) });
   const data = summary.data;
-  const sheet = data?.balance_sheet.currencies[0];
-  const pnl = data?.profit_and_loss.currencies[0];
+  // The tiles show the business's own currency; other currencies appear in the statements below.
+  const sheet = data?.balance_sheet.currencies.find((block) => block.currency === data.currency);
+  const pnl = data?.profit_and_loss.currencies.find((block) => block.currency === data.currency);
+  const code = data?.currency;
 
   return (
     <>
@@ -589,10 +611,10 @@ export default function Books() {
       <div className="kpi-grid" id="books-kpis">
         {data ? (
           <>
-            <Kpi label="Sales" icon="coins" value={money(pnl?.total_income ?? 0)} />
-            <Kpi label="Profit" icon="scale" value={money(pnl?.net_profit ?? 0)} />
-            <Kpi label="Cash, MoMo and bank" icon="receipt" value={money(sheet ? cashOnHand(sheet) : 0)} foot={sheet ? `On ${formatDate(data.balance_sheet.as_of)}` : null} />
-            <Kpi label="Sales not yet placed" icon="alert" value={money(sheet ? salesToPlace(sheet) : 0)} foot="Cash, MoMo or bank not known" />
+            <Kpi label="Sales" icon="coins" value={money(pnl?.total_income ?? 0, { code })} />
+            <Kpi label="Profit" icon="scale" value={money(pnl?.net_profit ?? 0, { code })} />
+            <Kpi label="Cash, MoMo and bank" icon="receipt" value={money(sheet ? cashOnHand(sheet) : 0, { code })} foot={sheet ? `On ${formatDate(data.balance_sheet.as_of)}` : null} />
+            <Kpi label="Sales not yet placed" icon="alert" value={money(sheet ? salesToPlace(sheet) : 0, { code })} foot="Cash, MoMo or bank not known" />
           </>
         ) : (
           <SkeletonRows count={2} />
@@ -610,7 +632,7 @@ export default function Books() {
         </Notice>
       ) : null}
 
-      {data ? tab === 'statements' ? <Statements data={data} /> : accounts.data ? <Accountant accounts={accounts.data} lockDate={data.settings.lock_date} onChanged={refresh} /> : <SkeletonRows count={4} /> : <SkeletonRows count={6} />}
+      {data ? tab === 'statements' ? <Statements data={data} /> : accounts.data ? <Accountant accounts={accounts.data} lockDate={data.settings.lock_date} lockHistory={data.lock_history} onChanged={refresh} /> : <SkeletonRows count={4} /> : <SkeletonRows count={6} />}
     </>
   );
 }

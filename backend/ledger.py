@@ -283,6 +283,36 @@ def _record_day(record: dict[str, Any], fallback: str) -> tuple[str, bool]:
         return fallback, False
 
 
+def _minor_of(record: dict[str, Any], field: str) -> int:
+    value = record.get(field)
+    return to_minor(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else 0
+
+
+def record_rule(record: dict[str, Any], domain: str) -> str:
+    """Which posting rule a line follows: 'momo_expense', 'expense' or 'sale'. Shared with the differences check."""
+    if record.get("category") == "momo_expense_paid":
+        return "momo_expense"
+    if domain == "cost" or (not _minor_of(record, "amount") and _minor_of(record, "cost") > 0):
+        return "expense"  # cost-only files, and cost-only lines inside a sales file (e.g. rent)
+    return "sale"
+
+
+def _stock_posted_lines(conn, business_id: str) -> Any:
+    """A test for 'this line became a stock movement when its file was posted' (mirrors sync.post_dataset)."""
+    from . import sync
+
+    link_map = {row["sales_name_norm"]: row["product_id"] for row in conn.execute("SELECT sales_name_norm, product_id FROM product_links WHERE business_id = ?", (business_id,))}
+    by_name = {sync._norm(row["name"]): dict(row) for row in conn.execute("SELECT id, name FROM inventory_products WHERE business_id = ?", (business_id,))}
+
+    def posted(record: dict[str, Any]) -> bool:
+        name = str(record.get("product") or "").strip()
+        if not name or float(record.get("amount") or 0) <= 0 or record.get("quantity") is None:
+            return False
+        return sync.resolve(name, link_map, by_name) is not None
+
+    return posted
+
+
 def dataset_postings(conn, business_id: str, dataset: dict[str, Any], accounts: dict[str, str], books_start: str | None) -> tuple[list[Posting], list[str]]:
     if dataset["status"] == "failed" or dataset.get("review_status") == dataset_store.EXCLUDED:
         return [], []
@@ -291,7 +321,7 @@ def dataset_postings(conn, business_id: str, dataset: dict[str, Any], accounts: 
     except dataset_store.RecordsUnavailableError as error:
         return [], [str(error)]
     stocked = conn.execute("SELECT status FROM dataset_stock_posts WHERE dataset_id = ?", (dataset["id"],)).fetchone()
-    stocked = bool(stocked and stocked["status"] == "posted")
+    in_stock = _stock_posted_lines(conn, business_id) if stocked and stocked["status"] == "posted" else None
     profile = analytics._data_profile(analytics._present([dict(r) for r in records]))
     default_currency = _currency(conn, business_id)
     imported_day = str(dataset["created_at"])[:10]
@@ -306,22 +336,22 @@ def dataset_postings(conn, business_id: str, dataset: dict[str, Any], accounts: 
             before_start += 1
             continue
         currency = str(record.get("currency") or default_currency).upper()
-        amount = to_minor(record["amount"]) if isinstance(record.get("amount"), (int, float)) else 0
-        cost = to_minor(record["cost"]) if isinstance(record.get("cost"), (int, float)) else 0
+        amount, cost = _minor_of(record, "amount"), _minor_of(record, "cost")
         label = str(record.get("product") or record.get("customer") or name)[:120]
         lines = by_day[day]
-        if record.get("category") == "momo_expense_paid":
+        rule = record_rule(record, profile["domain"])
+        if rule == "momo_expense":
             wallet = accounts[receipt_account(record)]
             lines += [(accounts["uncategorised"], currency, amount, label), (wallet, currency, -amount, label)]
             continue
-        if profile["domain"] == "cost":
+        if rule == "expense":
             expense = accounts[expense_account(record)]
             lines += [(expense, currency, cost, label), (accounts["payments_clearing"], currency, -cost, label)]
             continue
         receipt = accounts[receipt_account(record)]
         lines += [(receipt, currency, amount, label), (accounts["sales"], currency, -amount, label)]
         if cost:
-            if stocked:
+            if in_stock and in_stock(record):  # its cost is booked by the stock movement instead
                 cost_from_stock += 1
             else:
                 lines += [(accounts["cogs"], currency, cost, label), (accounts["payments_clearing"], currency, -cost, label)]
@@ -331,7 +361,7 @@ def dataset_postings(conn, business_id: str, dataset: dict[str, Any], accounts: 
     if before_start:
         issues.append(f"{before_start} line(s) in {name} are before your books start and are in analytics only.")
     if cost_from_stock:
-        issues.append(f"Costs in {name} come from stock, because its sales were posted to stock.")
+        issues.append(f"Costs of {cost_from_stock} line(s) in {name} come from stock, because those sales were posted to stock.")
     postings = [(day, f"Sales and costs from {name}", lines) for day, lines in sorted(by_day.items())]
     return postings, issues
 
@@ -356,8 +386,8 @@ def movement_postings(conn, business_id: str, movement: dict[str, Any], accounts
         counter = accounts["opening_equity"]
     elif kind == "purchase":
         counter = accounts["payments_clearing"]
-    elif kind == "sale":
-        counter = accounts["cogs"]
+    elif kind == "sale" or str(movement["source"]).startswith("sales-reversal:"):
+        counter = accounts["cogs"]  # a file's stock sales, and their reversal when the file is left out
     else:  # adjustment, stocktake
         counter = accounts["shrinkage"]
     signed = value if quantity > 0 else -value
@@ -493,12 +523,30 @@ def manual_journal(path: Path, business_id: str, day: date, memo: str, lines: li
         return entry_id
 
 
-def set_lock(path: Path, business_id: str, lock_date: date | None) -> None:
+def set_lock(path: Path, business_id: str, lock_date: date | None, user_id: str) -> None:
+    """Move or clear the period lock. Every change is logged with who made it (reopening a period is visible)."""
     with db.connection(path) as conn:
         conn.execute("BEGIN IMMEDIATE")
         if lock_date and lock_date > date.today():
             raise LedgerError("You can only lock days that have passed.")
-        _set_setting(conn, business_id, lock_date=lock_date.isoformat() if lock_date else None)
+        before = settings(conn, business_id)["lock_date"]
+        after = lock_date.isoformat() if lock_date else None
+        if before == after:
+            return
+        _set_setting(conn, business_id, lock_date=after)
+        conn.execute(
+            "INSERT INTO ledger_lock_log (id, business_id, user_id, before_date, after_date, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (str(uuid.uuid4()), business_id, user_id, before, after, db.now()),
+        )
+
+
+def lock_history(path: Path, business_id: str, limit: int = 10) -> list[dict[str, Any]]:
+    return db.many(
+        path,
+        "SELECT g.before_date, g.after_date, g.created_at, u.email AS user_email FROM ledger_lock_log g LEFT JOIN users u ON u.id = g.user_id "
+        "WHERE g.business_id = ? ORDER BY g.created_at DESC LIMIT ?",
+        (business_id, limit),
+    )
 
 
 def add_account(path: Path, business_id: str, code: str, name: str, kind: str) -> dict[str, Any]:
@@ -714,45 +762,92 @@ def issues(path: Path, business_id: str) -> list[str]:
     return [issue for row in rows for issue in json.loads(row["issues"])]
 
 
+_differences_cache: dict[tuple, dict[str, Any]] = {}
+
+
 def differences(path: Path, business_id: str, start: date, end: date) -> dict[str, Any]:
     """Ledger sales against the analytics revenue for the same period, with every difference named.
 
-    Analytics sums the ``amount`` of every included record; the ledger books MoMo payments made as
-    expenses, and leaves records before the books start out. Anything left over is 'unexplained'.
+    Analytics sums the ``amount`` of every included, dated record in the period. The ledger books
+    MoMo payments made and expense lines as spending, leaves out lines before the books start,
+    books undated lines on the import day, and may hold corrections moved past a locked period and
+    manual journals. Anything left over is 'unexplained' and should be zero.
+
+    Cached until the ledger changes (any re-sync or new entry), so a Books visit does not re-read
+    every import file.
     """
     with db.connection(path) as conn:
         books_start = settings(conn, business_id)["books_start"]
-    analytics_total = ledger_total = 0
-    explained: dict[str, int] = defaultdict(int)
+        stamp = conn.execute(
+            "SELECT (SELECT MAX(synced_at) FROM ledger_sources WHERE business_id = ?) AS synced, "
+            "(SELECT MAX(created_at) FROM journal_entries WHERE business_id = ?) AS posted",
+            (business_id, business_id),
+        ).fetchone()
+    key = (str(path), business_id, start, end, books_start, stamp["synced"], stamp["posted"])
+    if key in _differences_cache:
+        return _differences_cache[key]
+    first, last = start.isoformat(), end.isoformat()
+    analytics_total = 0
+    explained: dict[str, int] = defaultdict(int)  # each amount is (analytics minus ledger) for that reason
+    expected: dict[str, int] = defaultdict(int)  # ledger sales each import should produce in the period
     for dataset in dataset_store.analysable(business_id):
         try:
             records = dataset_store.read_records(dataset)
         except dataset_store.RecordsUnavailableError:
             continue
         imported_day = str(dataset["created_at"])[:10]
-        profile = analytics._data_profile(analytics._present([dict(r) for r in records]))
+        domain = analytics._data_profile(analytics._present([dict(r) for r in records]))["domain"]
         for record in records:
-            day = str(record.get("transaction_date") or "")[:10]
-            if not day or not (start.isoformat() <= day <= end.isoformat()):
-                if not day and start.isoformat() <= imported_day <= end.isoformat() and isinstance(record.get("amount"), (int, float)) and profile["domain"] != "cost" and record.get("category") != "momo_expense_paid":
-                    explained["Undated lines, booked by the ledger on the import day"] -= to_minor(record["amount"])
+            amount = _minor_of(record, "amount")
+            day, dated = _record_day(record, imported_day)
+            booked = record_rule(record, domain) == "sale" and first <= day <= last and not (books_start and day < books_start)
+            if booked:
+                expected[f"dataset:{dataset['id']}"] += amount
+            if not dated:
+                if booked:
+                    explained["Undated lines, booked by the books on the import day"] -= amount
                 continue
-            amount = to_minor(record["amount"]) if isinstance(record.get("amount"), (int, float)) else 0
+            if not first <= day <= last:
+                continue
             analytics_total += amount
-            if record.get("category") == "momo_expense_paid":
-                explained["MoMo payments made (analytics counts them as revenue; the books treat them as spending)"] += amount
-            elif books_start and day < books_start:
-                explained["Lines before your books start (in analytics only)"] += amount
-            elif profile["domain"] == "cost":
-                explained["Amounts in expense-only files"] += amount
-    rows = _balances(path, business_id, start.isoformat(), end.isoformat())
-    ledger_total = sum(-row["amount"] for row in rows if row["system_key"] == "sales")
+            if booked:
+                continue
+            rule = record_rule(record, domain)
+            if rule == "momo_expense":
+                explained["MoMo payments made (dashboards count them as revenue; the books treat them as spending)"] += amount
+            elif rule == "expense":
+                explained["Amounts on expense lines"] += amount
+            else:
+                explained["Lines before your books start (on the dashboards only)"] += amount
+    rows = db.many(
+        path,
+        "SELECT e.source_key, SUM(-l.amount_minor) AS amount FROM journal_lines l JOIN journal_entries e ON e.id = l.entry_id "
+        "JOIN ledger_accounts a ON a.id = l.account_id WHERE e.business_id = ? AND e.status = 'posted' AND a.system_key = 'sales' "
+        "AND e.entry_date BETWEEN ? AND ? GROUP BY e.source_key",
+        (business_id, first, last),
+    )
+    ledger_total = 0
+    for row in rows:
+        ledger_total += row["amount"]
+        source = row["source_key"]
+        if source.startswith("manual:"):
+            explained["Manual journal entries"] -= row["amount"]
+        elif source.startswith("dataset:"):
+            explained["Corrections dated after a locked period"] -= row["amount"] - expected.pop(source, 0)
+        else:
+            explained["Other entries"] -= row["amount"]
+    for missing in expected.values():  # an import expected in the books has no sales there in this period
+        explained["Corrections dated after a locked period"] += missing
     unexplained = analytics_total - ledger_total - sum(explained.values())
-    return {
-        "from": start.isoformat(),
-        "to": end.isoformat(),
+    result = {
+        "from": first,
+        "to": last,
         "analytics_revenue": from_minor(analytics_total),
         "ledger_sales": from_minor(ledger_total),
         "explained": [{"reason": reason, "amount": from_minor(amount)} for reason, amount in explained.items() if amount],
         "unexplained": from_minor(unexplained),
     }
+    if len(_differences_cache) > 64:
+        _differences_cache.clear()
+    _differences_cache[key] = result
+    return result

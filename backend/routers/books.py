@@ -39,6 +39,8 @@ def books_summary(
         books_settings = ledger.settings(conn, business["id"])
     return {
         "settings": books_settings,
+        "currency": business.get("currency") or "GHS",
+        "lock_history": ledger.lock_history(config.DB_PATH, business["id"]),
         "profit_and_loss": ledger.profit_and_loss(config.DB_PATH, business["id"], start, end),
         "balance_sheet": ledger.balance_sheet(config.DB_PATH, business["id"], end),
         "cash_flow": ledger.cash_flow(config.DB_PATH, business["id"], start, end),
@@ -153,9 +155,9 @@ class LockRequest(BaseModel):
 
 
 @router.put("/lock")
-def set_lock(payload: LockRequest, business: dict = Depends(books_manager)) -> dict:
+def set_lock(payload: LockRequest, business: dict = Depends(books_manager), user: dict = Depends(current_user)) -> dict:
     try:
-        ledger.set_lock(config.DB_PATH, business["id"], payload.lock_date)
+        ledger.set_lock(config.DB_PATH, business["id"], payload.lock_date, user["id"])
     except ledger.LedgerError as error:
         raise HTTPException(400, str(error)) from error
     return {"lock_date": payload.lock_date.isoformat() if payload.lock_date else None}

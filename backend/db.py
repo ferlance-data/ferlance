@@ -165,6 +165,9 @@ WHEN OLD.status = 'draft' AND NEW.status = 'posted' AND (
     OR EXISTS (SELECT 1 FROM journal_lines WHERE entry_id = NEW.id GROUP BY currency HAVING SUM(amount_minor) != 0)
 )
 BEGIN SELECT RAISE(ABORT, 'journal entry does not balance'); END;
+CREATE TRIGGER IF NOT EXISTS journal_insert_as_draft BEFORE INSERT ON journal_entries
+WHEN NEW.status IS NOT 'draft'
+BEGIN SELECT RAISE(ABORT, 'journal entries start as drafts'); END;
 CREATE TRIGGER IF NOT EXISTS journal_posted_immutable BEFORE UPDATE ON journal_entries
 WHEN OLD.status = 'posted'
 BEGIN SELECT RAISE(ABORT, 'posted journal entries cannot change'); END;
@@ -187,6 +190,14 @@ CREATE TABLE IF NOT EXISTS ledger_sources (
     issues TEXT NOT NULL DEFAULT '[]',
     synced_at TEXT NOT NULL,
     PRIMARY KEY(business_id, source_key)
+);
+CREATE TABLE IF NOT EXISTS ledger_lock_log (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    before_date TEXT,
+    after_date TEXT,
+    created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS ledger_settings (
     business_id TEXT PRIMARY KEY,

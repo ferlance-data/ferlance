@@ -19,6 +19,8 @@ export interface BalanceBlock {
 
 export interface BooksSummary {
   settings: { books_start: string | null; lock_date: string | null };
+  currency: string;
+  lock_history: { before_date: string | null; after_date: string | null; created_at: string; user_email: string | null }[];
   profit_and_loss: {
     from: string;
     to: string;
