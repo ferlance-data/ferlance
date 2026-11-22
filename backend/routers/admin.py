@@ -171,15 +171,12 @@ def admin_exports(user: dict = Depends(admin_user)) -> dict:
     return exports.status()
 
 
-@router.post("/exports/run")
+@router.post("/exports/run", status_code=202)
 def admin_run_exports(user: dict = Depends(admin_user)) -> dict:
-    """Export every business now, replacing today's files. Recorded in the audit log."""
+    """Start exporting every business now, replacing today's files. Runs in the background; poll GET /exports."""
     if not exports.enabled():
         raise HTTPException(400, "Data export is not set up. Set FERLANCE_EXPORT_BUCKET (or FERLANCE_EXPORT_DIR) first.")
-    try:
-        summary = exports.run(force=True)
-    except Exception as error:
-        _audit(user, "export_run", None, error=error.__class__.__name__)
-        raise HTTPException(502, "The export destination could not be reached. Check the server log.") from error
-    _audit(user, "export_run", None, **summary)
-    return {**summary, **exports.status()}
+    if not exports.run_in_background():
+        raise HTTPException(409, "An export is already running.")
+    _audit(user, "export_run", None)
+    return exports.status()

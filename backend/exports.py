@@ -14,7 +14,9 @@ lists or deletes. A re-run on the same day overwrites that day's files. Credenti
 standard AWS environment variables (loaded from .env by ``config``); they are never logged.
 
 Each run is recorded in ``export_runs`` so administrators see failures. A business that fails is
-retried on the next check, up to MAX_ATTEMPTS a day.
+retried on the next check, up to MAX_ATTEMPTS a day. ``manifest.json`` is written last in each
+day's folder, with the run id and every file's size: a folder whose manifest is missing, or does
+not match its files, holds an interrupted run.
 """
 
 from __future__ import annotations
@@ -112,12 +114,22 @@ def _number(value: Any) -> float | None:
         return None
 
 
-def tables(business_id: str) -> dict[str, list[dict[str, Any]]]:
-    """Every table in a business's snapshot, as rows with a fixed set of columns."""
+def tables(business_id: str, unavailable: list[str] | None = None) -> dict[str, list[dict[str, Any]]]:
+    """Every table in a business's snapshot, as rows with a fixed set of columns.
+
+    A file whose processed records cannot be read is left out of ``sales_records`` (and named in
+    ``unavailable``) rather than failing the whole business's export.
+    """
     datasets = dataset_store.list_all(business_id)
     sales: list[dict[str, Any]] = []
     for dataset in dataset_store.analysable(business_id):
-        for record in dataset_store.read_records(dataset):
+        try:
+            records = dataset_store.read_records(dataset)
+        except dataset_store.RecordsUnavailableError:
+            if unavailable is not None:
+                unavailable.append(dataset["filename"])
+            continue
+        for record in records:
             row: dict[str, Any] = {"dataset_id": dataset["id"], "filename": dataset["filename"]}
             row.update({field: _text(record.get(field)) for field in TEXT_FIELDS})
             row.update({field: _number(record.get(field)) for field in NUMBER_FIELDS})
@@ -225,50 +237,89 @@ def _error_text(error: Exception) -> str:
     return f"{error.__class__.__name__}: {error}"[:500]
 
 
-def export_business(business_id: str, target: Target, day: str) -> dict[str, int]:
+def export_business(business_id: str, target: Target, day: str) -> dict[str, Any]:
     prefix = f"{config.EXPORT_PREFIX}/business_id={business_id}/dt={day}"
-    rows = objects = size = 0
-    for name, table_rows in tables(business_id).items():
+    unavailable: list[str] = []
+    files: dict[str, dict[str, int]] = {}
+    for name, table_rows in tables(business_id, unavailable).items():
         body = to_parquet(name, table_rows)
         target.put(f"{prefix}/{name}.parquet", body)
-        rows += len(table_rows)
-        objects += 1
-        size += len(body)
-    return {"rows": rows, "objects": objects, "bytes": size}
+        files[f"{name}.parquet"] = {"rows": len(table_rows), "bytes": len(body)}
+    manifest = {"run_id": str(uuid.uuid4()), "business_id": business_id, "day": day, "exported_at": db.now(), "files": files, "unavailable_files": unavailable}
+    target.put(f"{prefix}/manifest.json", json.dumps(manifest, indent=2).encode())
+    note = f"Left out {len(unavailable)} file(s) whose records are unavailable: {', '.join(unavailable)}"[:500] if unavailable else None
+    return {
+        "rows": sum(f["rows"] for f in files.values()),
+        "objects": len(files) + 1,
+        "bytes": sum(f["bytes"] for f in files.values()),
+        "note": note,
+    }
 
 
 def run(force: bool = False, day: str | None = None, target: Target | None = None) -> dict[str, Any]:
     """Export every business that is due today. Returns counts; failures are recorded, not raised."""
     day = day or _today()
     summary = {"day": day, "exported": 0, "failed": 0, "skipped": 0}
+    global _setup_error
     try:
         target = target or make_target()
-    except Exception as error:  # e.g. boto3 missing or a bad region; record it so admins see it
-        logger.error("Data export could not start: %s", _error_text(error))
+    except Exception as error:  # e.g. boto3 missing or a bad region: shown on the Admin page
+        _setup_error = _error_text(error)
+        logger.error("Data export could not start: %s", _setup_error)
         raise
+    _setup_error = None
     for business in db.many(config.DB_PATH, "SELECT id FROM businesses ORDER BY created_at"):
         business_id = business["id"]
-        if not _claim(business_id, day, force):
-            summary["skipped"] += 1
-            continue
         try:
-            result = export_business(business_id, target, day)
-        except Exception as error:
-            logger.warning("Data export failed for business %s: %s", business_id, _error_text(error))
+            if not _claim(business_id, day, force):
+                summary["skipped"] += 1
+                continue
+            try:
+                result = export_business(business_id, target, day)
+            except Exception as error:
+                logger.warning("Data export failed for business %s: %s", business_id, _error_text(error))
+                db.insert(
+                    config.DB_PATH,
+                    "UPDATE export_runs SET status = 'failed', error = ?, finished_at = ? WHERE business_id = ? AND day = ?",
+                    (_error_text(error), db.now(), business_id, day),
+                )
+                summary["failed"] += 1
+                continue
             db.insert(
                 config.DB_PATH,
-                "UPDATE export_runs SET status = 'failed', error = ?, finished_at = ? WHERE business_id = ? AND day = ?",
-                (_error_text(error), db.now(), business_id, day),
+                "UPDATE export_runs SET status = 'ok', row_count = ?, objects = ?, bytes = ?, error = ?, finished_at = ? WHERE business_id = ? AND day = ?",
+                (result["rows"], result["objects"], result["bytes"], result["note"], db.now(), business_id, day),
             )
+            summary["exported"] += 1
+        except Exception:  # e.g. the database was locked: leave this business for the next check, carry on
+            logger.exception("Could not record the data export for business %s.", business_id)
             summary["failed"] += 1
-            continue
-        db.insert(
-            config.DB_PATH,
-            "UPDATE export_runs SET status = 'ok', row_count = ?, objects = ?, bytes = ?, error = NULL, finished_at = ? WHERE business_id = ? AND day = ?",
-            (result["rows"], result["objects"], result["bytes"], db.now(), business_id, day),
-        )
-        summary["exported"] += 1
     return summary
+
+
+_setup_error: str | None = None
+_manual = threading.Lock()
+
+
+def run_in_background() -> bool:
+    """Start a forced export of every business on its own thread. False if one is already running."""
+    if not _manual.acquire(blocking=False):
+        return False
+
+    def work() -> None:
+        try:
+            run(force=True)
+        except Exception as error:
+            logger.error("Manual data export failed: %s", _error_text(error))
+        finally:
+            _manual.release()
+
+    threading.Thread(target=work, name="ferlance-export-now", daemon=True).start()
+    return True
+
+
+def busy() -> bool:
+    return _manual.locked()
 
 
 def due(now: datetime | None = None) -> bool:
@@ -296,7 +347,7 @@ def start() -> tuple[threading.Thread, threading.Event] | None:
     return thread, stop
 
 
-def status(limit: int = 50) -> dict[str, Any]:
+def status(limit: int = 200) -> dict[str, Any]:
     """What administrators see: where exports go and each business's latest run (counts only, no records)."""
     rows = db.many(
         config.DB_PATH,
@@ -309,10 +360,16 @@ def status(limit: int = 50) -> dict[str, Any]:
         """,
         (limit,),
     )
+    failed = db.one(
+        config.DB_PATH,
+        "SELECT COUNT(*) AS n FROM export_runs r WHERE r.status = 'failed' AND r.day = (SELECT MAX(day) FROM export_runs x WHERE x.business_id = r.business_id)",
+    ) or {"n": 0}
     return {
         "enabled": enabled(),
         "destination": destination(),
         "hour_utc": config.EXPORT_HOUR_UTC,
-        "failed": sum(1 for row in rows if row["status"] == "failed"),
+        "running": busy(),
+        "problem": _setup_error,
+        "failed": failed["n"],
         "runs": rows,
     }

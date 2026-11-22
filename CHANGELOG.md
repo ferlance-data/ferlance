@@ -13,7 +13,9 @@ Daily data export to AWS S3 (PRD #3).
 ### Added
 - **Daily per-business export.** Each business's sales records, imports, products and stock ledger go to S3 as Parquet once a day, under `exports/business_id=<id>/dt=<date>/`, which Athena and Glue can query directly. It is off until `FERLANCE_EXPORT_BUCKET` (or `FERLANCE_EXPORT_DIR` for a local folder) is set.
 - The exporter only needs `s3:PutObject` on the export prefix. Objects are SSE-S3 encrypted, and credentials come from the standard AWS environment variables.
-- **Admin → Data export** shows where exports go and each business's latest run, with errors. "Export now" re-runs today's export and is recorded in the admin log.
+- `manifest.json` is written last in each day's folder, with the run id and every file's row count and size. A folder with no manifest, or one that doesn't match its files, holds an interrupted run.
+- **Admin → Data export** shows where exports go and each business's latest run, with errors and any setup problem. "Export now" starts a background re-run of today's export (only one at a time) and is recorded in the admin log.
+- A file whose processed records can't be read is left out of that day's sales export and named, instead of failing the business's whole export.
 - `export_runs` records every run. A failed business is retried at the next check (every 15 minutes), up to 3 times a day.
 
 ### Changed

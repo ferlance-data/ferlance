@@ -67,6 +67,8 @@ EXPORT_BUCKET = os.getenv("FERLANCE_EXPORT_BUCKET", "")
 EXPORT_DIR = os.getenv("FERLANCE_EXPORT_DIR", "")
 EXPORT_PREFIX = os.getenv("FERLANCE_EXPORT_PREFIX", "exports").strip("/") or "exports"
 EXPORT_HOUR_UTC = int(os.getenv("FERLANCE_EXPORT_HOUR_UTC", "2"))
+if not 0 <= EXPORT_HOUR_UTC <= 23:
+    raise ValueError("FERLANCE_EXPORT_HOUR_UTC must be an hour from 0 to 23 (UTC).")
 AWS_REGION = os.getenv("AWS_REGION", "")
 
 

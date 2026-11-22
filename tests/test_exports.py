@@ -1,3 +1,6 @@
+import json
+import time
+
 import pyarrow.parquet as pq
 import pytest
 from botocore.stub import Stubber
@@ -44,7 +47,9 @@ def test_local_export_writes_partitioned_parquet_snapshot(client, tmp_path, monk
     assert exports.run(day=DAY) == {"day": DAY, "exported": 1, "failed": 0, "skipped": 0}
 
     folder = tmp_path / "out" / "exports" / f"business_id={business_id}" / f"dt={DAY}"
-    assert sorted(p.name for p in folder.iterdir()) == ["datasets.parquet", "inventory_movements.parquet", "inventory_products.parquet", "sales_records.parquet"]
+    assert sorted(p.name for p in folder.iterdir()) == ["datasets.parquet", "inventory_movements.parquet", "inventory_products.parquet", "manifest.json", "sales_records.parquet"]
+    manifest = json.loads((folder / "manifest.json").read_text())
+    assert manifest["files"]["sales_records.parquet"] == {"rows": 2, "bytes": (folder / "sales_records.parquet").stat().st_size}
     sales = pq.read_table(folder / "sales_records.parquet").to_pylist()
     # Only the records that count in analysis: the excluded file is left out.
     assert [(r["product"], r["quantity"], r["amount"], r["filename"]) for r in sales] == [("Rice 5kg", 4.0, 380.0, "kept.csv"), ("Oil", None, 96.0, "kept.csv")]
@@ -58,7 +63,7 @@ def test_local_export_writes_partitioned_parquet_snapshot(client, tmp_path, monk
     assert exports.run(day=DAY)["skipped"] == 1
     assert exports.run(day=DAY, force=True)["exported"] == 1
     run = db.one(config.DB_PATH, "SELECT status, attempts, row_count, objects FROM export_runs", ())
-    assert run["status"] == "ok" and run["attempts"] == 2 and run["objects"] == 4 and run["row_count"] >= 5
+    assert run["status"] == "ok" and run["attempts"] == 2 and run["objects"] == 5 and run["row_count"] >= 5
 
 
 def test_failures_are_recorded_retried_and_capped(client):
@@ -86,8 +91,21 @@ def test_failures_are_recorded_retried_and_capped(client):
 
     # An administrator's forced run still goes through, and clears the error.
     assert exports.run(day=DAY, force=True, target=Working())["exported"] == 1
-    assert len(written) == 4
+    assert len(written) == 5 and list(written)[-1].endswith("manifest.json")  # manifest last
     assert db.one(config.DB_PATH, "SELECT status, error FROM export_runs", ()) == {"status": "ok", "error": None}
+
+
+def test_unreadable_file_is_left_out_not_fatal(client, tmp_path, monkeypatch):
+    headers, base, business_id = seed(client)
+    kept = next(d for d in client.get(f"{base}/datasets", headers=headers).json() if d["filename"] == "kept.csv")
+    processed = db.one(config.DB_PATH, "SELECT processed_path FROM datasets WHERE id = ?", (kept["id"],))["processed_path"]
+    __import__("pathlib").Path(processed).unlink()
+    monkeypatch.setattr(config, "EXPORT_DIR", str(tmp_path / "out"))
+    assert exports.run(day=DAY)["exported"] == 1
+    run = db.one(config.DB_PATH, "SELECT status, error FROM export_runs", ())
+    assert run["status"] == "ok" and "kept.csv" in run["error"]
+    manifest = json.loads((tmp_path / "out" / "exports" / f"business_id={business_id}" / f"dt={DAY}" / "manifest.json").read_text())
+    assert manifest["unavailable_files"] == ["kept.csv"] and manifest["files"]["sales_records.parquet"]["rows"] == 0
 
 
 def test_s3_target_writes_encrypted_objects_only(monkeypatch):
@@ -120,12 +138,24 @@ def test_admin_export_status_and_run(client, tmp_path, monkeypatch):
     assert client.post("/api/admin/exports/run", headers=root).status_code == 400
 
     monkeypatch.setattr(config, "EXPORT_DIR", str(tmp_path / "out"))
-    result = client.post("/api/admin/exports/run", headers=root).json()
-    assert result["exported"] == 2 and result["failed"] == 0 and result["enabled"] is True
-    assert {run["business_name"] for run in result["runs"]} == {"Ama Retail", "Root Co"}
+    assert client.post("/api/admin/exports/run", headers=root).status_code == 202
+    for _ in range(100):
+        if not exports.busy():
+            break
+        time.sleep(0.05)
+    result = client.get("/api/admin/exports", headers=root).json()
+    assert result["failed"] == 0 and result["enabled"] is True and result["running"] is False and result["problem"] is None
+    assert {(run["business_name"], run["status"]) for run in result["runs"]} == {("Ama Retail", "ok"), ("Root Co", "ok")}
     assert all("records" not in run for run in result["runs"])
     audit = client.get("/api/admin/audit", headers=root).json()
-    assert audit[0]["action"] == "export_run" and audit[0]["detail"]["exported"] == 2
+    assert audit[0]["action"] == "export_run"
+
+    # A second click while one is running is refused rather than starting a parallel export.
+    assert exports._manual.acquire()
+    try:
+        assert client.post("/api/admin/exports/run", headers=root).status_code == 409
+    finally:
+        exports._manual.release()
 
 
 def test_scheduler_waits_for_the_export_hour(monkeypatch):

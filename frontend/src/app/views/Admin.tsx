@@ -59,6 +59,8 @@ interface ExportStatus {
   enabled: boolean;
   destination: string | null;
   hour_utc: number;
+  running: boolean;
+  problem: string | null;
   failed: number;
   runs: ExportRun[];
 }
@@ -72,7 +74,7 @@ function auditText(entry: AuditEntry): string {
   if (entry.action === 'role') return `changed ${who} from ${entry.detail.before} to ${entry.detail.after}`;
   if (entry.action === 'disable') return `disabled ${who}`;
   if (entry.action === 'enable') return `re-enabled ${who}`;
-  if (entry.action === 'export_run') return entry.detail.error ? 'ran the data export, which could not reach its destination' : `ran the data export (${entry.detail.exported ?? 0} exported, ${entry.detail.failed ?? 0} failed)`;
+  if (entry.action === 'export_run') return 'started a data export';
   return `${entry.action} ${who}`;
 }
 
@@ -106,8 +108,14 @@ export default function Admin() {
   });
   const funnel = useQuery({ queryKey: ['admin', 'onboarding'], queryFn: ({ signal }) => request<Funnel>('/api/admin/onboarding', { signal }), enabled: isAdmin });
   const audit = useQuery({ queryKey: ['admin', 'audit'], queryFn: ({ signal }) => request<AuditEntry[]>('/api/admin/audit', { signal }), enabled: isAdmin });
-  const exportStatus = useQuery({ queryKey: ['admin', 'exports'], queryFn: ({ signal }) => request<ExportStatus>('/api/admin/exports', { signal }), enabled: isAdmin });
+  const exportStatus = useQuery({
+    queryKey: ['admin', 'exports'],
+    queryFn: ({ signal }) => request<ExportStatus>('/api/admin/exports', { signal }),
+    enabled: isAdmin,
+    refetchInterval: (query) => (query.state.data?.running ? 2000 : false),
+  });
   const [exporting, setExporting] = useState(false);
+  const exportRunning = exporting || Boolean(exportStatus.data?.running);
 
   if (!isAdmin) return <EmptyState title="Administrators only" message="This page is for Ferlance platform administrators." />;
 
@@ -180,8 +188,8 @@ export default function Admin() {
   async function exportNow() {
     setExporting(true);
     try {
-      const result = await request<{ exported: number; failed: number }>('/api/admin/exports/run', { method: 'POST' });
-      toast(result.failed ? `${number(result.failed)} business(es) failed to export.` : `${number(result.exported)} business(es) exported.`, { error: result.failed > 0 });
+      await request('/api/admin/exports/run', { method: 'POST' });
+      toast('Export started. Results appear here as each business finishes.');
     } catch (error) {
       toast((error as Error).message, { error: true });
     } finally {
@@ -276,13 +284,15 @@ export default function Admin() {
             <h2 className="card-title">Data export</h2>
             <p className="card-subtitle">
               {exportStatus.data?.enabled
-                ? `Daily after ${String(exportStatus.data.hour_utc).padStart(2, '0')}:00 UTC to ${exportStatus.data.destination}${exportStatus.data.failed ? ` · ${number(exportStatus.data.failed)} failed` : ''}`
+                ? exportStatus.data.problem
+                  ? `Could not start: ${exportStatus.data.problem}`
+                  : `Daily after ${String(exportStatus.data.hour_utc).padStart(2, '0')}:00 UTC to ${exportStatus.data.destination}${exportStatus.data.failed ? ` · ${number(exportStatus.data.failed)} failed` : ''}`
                 : 'Off. Set FERLANCE_EXPORT_BUCKET on the server to export each business to S3 daily.'}
             </p>
           </div>
           {exportStatus.data?.enabled ? (
-            <button className="btn btn-ghost btn-sm" type="button" disabled={exporting} onClick={() => void exportNow()}>
-              {exporting ? 'Exporting…' : 'Export now'}
+            <button className="btn btn-ghost btn-sm" type="button" disabled={exportRunning} onClick={() => void exportNow()}>
+              {exportRunning ? 'Exporting…' : 'Export now'}
             </button>
           ) : null}
         </div>
