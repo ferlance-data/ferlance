@@ -289,7 +289,7 @@ The global tools assume someone types clean transactions in. **Ferlance becomes 
 | 1.10.0 | The quiet ledger, shown **beside** the existing reports (additive, hence MINOR) | G1 |
 | 2.0.0 | Switch-over: the ledger becomes the source of truth for money reports, after an accountant signs off the chart of accounts and posting rules (a change to report semantics, hence MAJOR) | G1 |
 | later | Expo app with offline capture in mind (§5.8). **Deferred by the owner, 2026-11-22.** | #9 |
-| 2.1.0 | Debt book: customer and supplier credit | G2 |
+| 1.11.0 | Debt book: customer and supplier credit (additive, so a minor; phase 2 features ship as 1.x minors until the 2.0.0 switch-over) | G2 |
 | 2.2.0 | Invoices, quotes and receipts, shareable on WhatsApp | G3 |
 | 2.3.0 | Read paper books: exercise-book pages to drafts | G4 |
 | 2.4.0 | MoMo and bank reconciliation | G5 |
@@ -321,7 +321,7 @@ The global tools assume someone types clean transactions in. **Ferlance becomes 
 
 **Risk:** It changes what every money number means. **Mitigation:** run old and new side by side for one release, with a visible "differences" check on the demo data.
 
-#### G2: Debt book (v2.1.0)
+#### G2: Debt book (v1.11.0)
 
 | ID | Requirement | Acceptance |
 | --- | --- | --- |
