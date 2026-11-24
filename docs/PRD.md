@@ -292,7 +292,7 @@ The global tools assume someone types clean transactions in. **Ferlance becomes 
 | 1.11.0 | Debt book: customer and supplier credit (additive, so a minor; phase 2 features ship as 1.x minors until the 2.0.0 switch-over) | G2 |
 | 1.14.0 | Invoices, quotes and receipts, shareable on WhatsApp (1.12.0 was deployment and backups; 1.13.0 the admin suite and dark theme). Done. | G3 |
 | 1.15.0 | Read paper books: exercise-book pages to drafts. Done. | G4 |
-| 2.4.0 | MoMo and bank reconciliation | G5 |
+| 1.16.0 | MoMo and bank reconciliation. Done. | G5 |
 | 2.5.0 | Ghana tax and payroll basics | G6 |
 | 2.6.0 | Credit-readiness report | G7 |
 | 2.7.0 | WhatsApp channel and local languages | G8 |
@@ -348,7 +348,7 @@ The global tools assume someone types clean transactions in. **Ferlance becomes 
 
 **Risk:** Handwriting accuracy and cost per page. Mitigation: confidence flags, the typed-list fallback, and cost per page stated in the PR.
 
-#### G5: MoMo and bank reconciliation (v2.4.0)
+#### G5: MoMo and bank reconciliation (v1.16.0)
 
 | ID | Requirement | Acceptance |
 | --- | --- | --- |

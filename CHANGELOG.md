@@ -6,6 +6,35 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.16.0] - 2026-11-24
+
+MoMo and bank reconciliation (PRD §9, G5).
+
+### Added
+- **Reconcile page.** Import a statement as CSV or XLSX for MTN Mobile Money, Telecel Cash, AT Money or the bank:
+  - Title rows above the column names are skipped.
+  - Columns are recognised by common names (transaction ID, fees, balance before and after, money in and out). Otherwise you choose which column is which.
+  - Dates are read day/month first, as written in Ghana, unless the file is clearly month/day.
+  - The file is checked against itself: each balance must follow from the one before, so a missing page or reversed order is flagged.
+  - Re-importing an overlapping month adds nothing.
+- **Importing never adds to the books by itself.** Each line is matched against what the books already hold: SMS imports and sales by payment method, debt payments and receipts, manual journals, and other statements' bookings. It matches by transaction ID, then by exact amount within ±2 days, one to one, and only suggests when several fit. Matching is worked out on every visit, so leaving an import out later simply unmatches its lines.
+- **Add the rest to the books** from a fixed list:
+  - a sale already imported whose payment method was unknown (clears "Sales receipts to allocate")
+  - a payment already recorded
+  - a new sale, spending by kind, or other income
+  - owner money in or out
+  - a transfer between your own accounts (it matches across two statements)
+  - a debt payment, which goes into the debt book
+
+  Fees and levies are booked as MoMo and bank charges when you say so. Every booking can be undone.
+- **Every cedi explained:** statement closing balance against the books on the same day. The difference is broken down into the opening gap, lines not in the books, fees not booked, and book entries with no statement line. "Unexplained" is 0 in tests.
+- **Permissions:** importing and booking need `manage_books` (owner and accountant); everyone can view.
+
+### Not yet
+- Real MTN, Telecel, AT and bank export layouts haven't been seen; the tests use clearly labelled synthetic files, and the column-mapping step covers what isn't recognised. A redacted real export of each would let us confirm them.
+- PDF statements aren't supported yet (CSV or XLSX only).
+- E-Levy and other levies aren't calculated; they're booked as they appear on the statement.
+
 ## [1.15.0] - 2026-11-24
 
 Notebook pages (PRD §9, G4): the exercise book, read into the records.

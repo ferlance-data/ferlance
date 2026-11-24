@@ -70,6 +70,10 @@ Photograph or type a page of the shop's exercise book: a day's sales, the debtor
 
 The Invoices page makes invoices, quotes and receipts with gapless numbers and shares them as small PDFs (`backend/invoices.py`). An invoice becomes a debt-book entry, so payments, reminders and the books follow it. A receipt is a sale paid on the spot, and a quote posts nothing until it's converted.
 
+## Reconcile
+
+The Reconcile page imports MoMo and bank statements (CSV or XLSX), matches each line to what the books already hold, and lets the owner or accountant add the rest from a fixed list of kinds (`backend/statements.py`). Statements check the books; they never add to them on their own. The page explains every cedi between the statement balance and the books.
+
 ## Debt book
 
 The Debt book page records who owes the business and whom it owes: credit sales, supplier credit, part-payments and voids, aged by how late they are (`backend/debts.py`). Reminders open the owner's own WhatsApp or SMS with the message filled in, and MoMo messages that may pay a debt are suggested for the owner to confirm. Every debt and payment is posted to the ledger, so the debt book's totals equal the books' receivables and payables.

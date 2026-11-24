@@ -324,6 +324,41 @@ CREATE TABLE IF NOT EXISTS page_captures (
     confirmed_at TEXT,
     FOREIGN KEY(business_id) REFERENCES businesses(id)
 );
+CREATE TABLE IF NOT EXISTS statement_imports (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    account TEXT NOT NULL,
+    filename TEXT NOT NULL,
+    new_lines INTEGER NOT NULL,
+    duplicate_lines INTEGER NOT NULL,
+    checks TEXT NOT NULL DEFAULT '[]',
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(business_id) REFERENCES businesses(id)
+);
+CREATE TABLE IF NOT EXISTS statement_lines (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    import_id TEXT NOT NULL,
+    account TEXT NOT NULL,
+    line_key TEXT NOT NULL,
+    position INTEGER NOT NULL,
+    txn_date TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    reference TEXT NOT NULL DEFAULT '',
+    amount_minor INTEGER NOT NULL,
+    fee_minor INTEGER NOT NULL DEFAULT 0,
+    balance_after_minor INTEGER,
+    booking TEXT,
+    booking_detail TEXT,
+    fee_booked INTEGER NOT NULL DEFAULT 0,
+    match_ref TEXT,
+    updated_by TEXT,
+    updated_at TEXT,
+    UNIQUE(business_id, account, line_key),
+    FOREIGN KEY(business_id) REFERENCES businesses(id)
+);
+CREATE INDEX IF NOT EXISTS statement_lines_account ON statement_lines(business_id, account, txn_date);
 CREATE TABLE IF NOT EXISTS business_members (
     business_id TEXT NOT NULL,
     user_id TEXT NOT NULL,
