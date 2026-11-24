@@ -6,6 +6,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.21.0] - 2026-11-25
+
+Guides: short videos of the real app showing when, why and how to use each feature.
+
+### Added
+- **Help & guides** (`/app/help`, in the menu above Settings). There are seven guides: your first minute, selling on credit, invoices and receipts, from your exercise book, keeping stock right, your books and MoMo statements, and getting ready for a loan. Each has a short silent video of the real app, when to use the feature, why it helps, the steps, and a link to the page.
+- **Welcome tour.** On the first visit to the workspace a modal plays the "first minute" video, with links to all the guides or "Not now". It shows once per browser and is skipped if storage is blocked.
+- **How it works** on the landing page. Scenario tabs show each video in a phone frame next to its when, why and steps. The section has a link in the menu and the footer, and a "Watch how it works" button in the hero.
+- `tools/demo/record.mjs` re-records the videos from a seeded local server: a Playwright script with captions, a Chrome screencast and VP9 WebM output, about 5.8 MB for all seven. See `tools/demo/README.md`.
+
 ## [1.20.0] - 2026-11-25
 
 Create in a modal, a grouped menu, and dashboards that agree with the books.

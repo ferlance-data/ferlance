@@ -2196,3 +2196,29 @@ svg.icon {
   flex-wrap: wrap;
   gap: 8px;
 }
+
+/* Help & guides */
+.guide-card {
+  display: grid;
+  gap: var(--space-4, 16px);
+  padding: var(--space-4, 16px);
+}
+.guide-video {
+  display: block;
+  width: 100%;
+  max-width: 240px;
+  aspect-ratio: 390 / 844;
+  margin-inline: auto;
+  border-radius: 14px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  object-fit: contain;
+}
+.guide-text { display: grid; gap: 8px; align-content: start; }
+.guide-text p { margin: 0; }
+.guide-steps { margin: 0; padding-left: 1.25rem; display: grid; gap: 6px; }
+.guide-text .btn { justify-self: start; margin-top: 4px; }
+@media (min-width: 760px) {
+  .guide-card { grid-template-columns: 260px 1fr; align-items: start; }
+}
+.modal .guide-video { max-height: 60vh; width: auto; }

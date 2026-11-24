@@ -1,0 +1,8 @@
+{
+  "name": "ferlance-demo-recorder",
+  "private": true,
+  "type": "module",
+  "description": "Records the in-app guide videos (frontend/public/demo) from a seeded local server.",
+  "scripts": { "record": "node record.mjs" },
+  "devDependencies": { "playwright": "1.58.2" }
+}
