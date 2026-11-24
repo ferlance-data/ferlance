@@ -10,7 +10,7 @@ import { RANGE_OPTIONS, analysableDatasets, type RangePreset } from '../lib/scop
 import { PageErrorBoundary } from './components/PageErrorBoundary';
 import { SkeletonRows } from './components/ui';
 import { ActionsSlotContext } from './page';
-import { PAGES, pagePath, resolvePageName, type PageDef } from './routes';
+import { NAV_ORDER, PAGES, pagePath, resolvePageName, type PageDef } from './routes';
 import { ROLE_LABEL, useScope, useWorkspace } from './workspace';
 
 function BrandMark() {
@@ -42,7 +42,7 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { user, business, businesses, datasets, role, switchBusiness } = useWorkspace();
   const name = business.name || 'Workspace';
   const pending = datasets.filter((item) => item.status === 'partial' || item.status === 'failed').length;
-  const group = (key: PageDef['nav']['group']) => PAGES.filter((page) => page.nav.group === key);
+  const group = (key: PageDef['nav']['group']) => PAGES.filter((page) => page.nav.group === key).sort((a, b) => NAV_ORDER.indexOf(a.name) - NAV_ORDER.indexOf(b.name));
   return (
     <>
       <aside className="sidebar" id="sidebar" aria-label="Workspace navigation">
@@ -84,9 +84,13 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
           {group('analyse').map((page) => (
             <NavItem key={page.name} page={page} onNavigate={onClose} />
           ))}
-          <p className="nav-label">Operate</p>
-          {group('operate').map((page) => (
+          <p className="nav-label">Selling and stock</p>
+          {group('sell').map((page) => (
             <NavItem key={page.name} page={page} pendingCount={pending} onNavigate={onClose} />
+          ))}
+          <p className="nav-label">Money and books</p>
+          {group('money').map((page) => (
+            <NavItem key={page.name} page={page} onNavigate={onClose} />
           ))}
         </nav>
         <div className="sidebar-bottom">

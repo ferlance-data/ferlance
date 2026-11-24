@@ -155,10 +155,18 @@ def _coverage(records: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def _as_spending(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """A MoMo payment the business made is money out: count it as a cost, never as revenue."""
+    return [
+        {**record, "cost": record.get("amount"), "amount": 0.0} if record.get("category") == "momo_expense_paid" else record
+        for record in records
+    ]
+
+
 def analyze(records: list[dict[str, Any]], from_date: date | None = None, to_date: date | None = None) -> dict[str, Any]:
     if from_date and to_date and from_date > to_date:
         raise ValueError("The from date must be on or before the to date.")
-    records = _present(records)
+    records = _present(_as_spending(records))
     available_dates = _record_dates(records)
     profile = _data_profile(records)
     start = from_date or (min(available_dates) if available_dates else None)

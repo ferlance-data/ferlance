@@ -1,12 +1,12 @@
 // Notebook pages: photograph (or type) a page of the exercise book: a day's sales, the debtors
 // page, or what the shop spent. Every line is checked before anything is added.
 
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
 import { request } from '../../lib/api';
-import { isoDate, money } from '../../lib/format';
+import { formatDate, isoDate, money } from '../../lib/format';
 import { toast } from '../../lib/toast';
-import { Notice, Pill, ReadOnlyNotice, Segmented, StatusText } from '../components/ui';
+import { EmptyState, ListHeader, Modal, Notice, Pill, ReadOnlyNotice, Segmented, SkeletonRows, StatusText } from '../components/ui';
 import { keys, useWorkspace } from '../workspace';
 import { shrink } from './ScanInvoice';
 
@@ -43,8 +43,8 @@ const WHERE: Record<PageType, string> = {
   expenses: 'Added as spending: the books sort it into rent, transport, airtime and so on.',
 };
 
-export default function Notebook() {
-  const { business, businessPath, can } = useWorkspace();
+function PageCapture({ onDone }: { onDone: () => Promise<void> }) {
+  const { business, businessPath } = useWorkspace();
   const queryClient = useQueryClient();
   const [mode, setMode] = useState<'photo' | 'text'>('photo');
   const [file, setFile] = useState<File | null>(null);
@@ -56,8 +56,6 @@ export default function Notebook() {
   const [lines, setLines] = useState<PageLine[]>([]);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<{ message: string; error: boolean } | null>(null);
-
-  if (!can('write_data')) return <ReadOnlyNotice role={business.role ?? 'accountant'} what="notebook pages" />;
 
   async function read(event: FormEvent) {
     event.preventDefault();
@@ -86,7 +84,8 @@ export default function Notebook() {
     }
   }
 
-  const update = (index: number, patch: Partial<PageLine>) => setLines((current) => current.map((line, i) => (i === index ? { ...line, ...patch } : line)));
+  const update = (index: number, patch: Partial<PageLine>) =>
+    setLines((current) => current.map((line, i) => (i === index ? { ...line, ...patch } : line)));
   const total = lines.filter((line) => line.include).reduce((sum, line) => sum + (line.amount ?? 0), 0);
 
   async function confirm() {
@@ -95,7 +94,18 @@ export default function Notebook() {
     try {
       const result = await request<{ total: number }>(businessPath(`/pages/${draft.id}/confirm`), {
         method: 'POST',
-        json: { page_type: pageType, page_date: pageDate, lines: lines.map(({ include, date, description, customer, quantity, amount }) => ({ include, date, description, customer, quantity, amount })) },
+        json: {
+          page_type: pageType,
+          page_date: pageDate,
+          lines: lines.map(({ include, date, description, customer, quantity, amount }) => ({
+            include,
+            date,
+            description,
+            customer,
+            quantity,
+            amount,
+          })),
+        },
       });
       toast(`Added ${money(result.total)} from the page.`);
       setDraft(null);
@@ -103,6 +113,7 @@ export default function Notebook() {
       setText('');
       await queryClient.invalidateQueries({ queryKey: keys.business(business.id) });
       await queryClient.invalidateQueries({ queryKey: keys.datasets(business.id) });
+      await onDone();
     } catch (error) {
       setStatus({ message: (error as Error).message, error: true });
     } finally {
@@ -122,7 +133,9 @@ export default function Notebook() {
         <div className="card-header">
           <div>
             <h2 className="card-title">Check the page</h2>
-            <p className="card-subtitle">Untick anything that should not be added, and fix any number that was read wrongly. Nothing is added until you press Add.</p>
+            <p className="card-subtitle">
+              Untick anything that should not be added, and fix any number that was read wrongly. Nothing is added until you press Add.
+            </p>
           </div>
         </div>
         <div className="card-body form-grid">
@@ -139,7 +152,14 @@ export default function Notebook() {
           </label>
           <label className="field">
             Page date
-            <input className="input" type="date" required max={isoDate(new Date())} value={pageDate} onChange={(event) => setPageDate(event.target.value)} />
+            <input
+              className="input"
+              type="date"
+              required
+              max={isoDate(new Date())}
+              value={pageDate}
+              onChange={(event) => setPageDate(event.target.value)}
+            />
           </label>
           <ol className="invoice-lines">
             {lines.map((line, index) => (
@@ -151,22 +171,42 @@ export default function Notebook() {
                 {pageType === 'debts' ? (
                   <label className="field">
                     Customer
-                    <input className="input" maxLength={120} value={line.customer ?? ''} onChange={(event) => update(index, { customer: event.target.value })} />
+                    <input
+                      className="input"
+                      maxLength={120}
+                      value={line.customer ?? ''}
+                      onChange={(event) => update(index, { customer: event.target.value })}
+                    />
                   </label>
                 ) : null}
                 <label className="field">
                   {pageType === 'expenses' ? 'What for' : 'Item'}
-                  <input className="input" maxLength={200} value={line.description} onChange={(event) => update(index, { description: event.target.value })} />
+                  <input
+                    className="input"
+                    maxLength={200}
+                    value={line.description}
+                    onChange={(event) => update(index, { description: event.target.value })}
+                  />
                 </label>
                 {pageType === 'sales' ? (
                   <label className="field">
                     Qty
-                    <input className="input" inputMode="decimal" value={line.quantity ?? ''} onChange={(event) => update(index, { quantity: event.target.value === '' ? null : Number(event.target.value) })} />
+                    <input
+                      className="input"
+                      inputMode="decimal"
+                      value={line.quantity ?? ''}
+                      onChange={(event) => update(index, { quantity: event.target.value === '' ? null : Number(event.target.value) })}
+                    />
                   </label>
                 ) : null}
                 <label className="field">
                   Amount
-                  <input className="input" inputMode="decimal" value={line.amount ?? ''} onChange={(event) => update(index, { amount: event.target.value === '' ? null : Number(event.target.value) })} />
+                  <input
+                    className="input"
+                    inputMode="decimal"
+                    value={line.amount ?? ''}
+                    onChange={(event) => update(index, { amount: event.target.value === '' ? null : Number(event.target.value) })}
+                  />
                 </label>
                 {line.confidence < 0.6 ? <Pill tone="warning">Check this line</Pill> : null}
                 {line.notes.map((note) => (
@@ -214,10 +254,18 @@ export default function Notebook() {
           <>
             <label className="field">
               Photo of the page
-              <input className="input" id="page-file" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
+              <input
+                className="input"
+                id="page-file"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                capture="environment"
+                onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+              />
             </label>
             <Notice tone="info" icon="info">
-              Lay the book flat in good light. The photo is made smaller on your phone (which also removes its location), sent to your AI provider to read, and not stored.
+              Lay the book flat in good light. The photo is made smaller on your phone (which also removes its location), sent to your AI
+              provider to read, and not stored.
             </Notice>
           </>
         ) : (
@@ -234,8 +282,17 @@ export default function Notebook() {
             </label>
             <label className="field">
               One line per row: the amount last
-              <textarea className="textarea" id="page-text" rows={6} placeholder={EXAMPLES[typedType]} value={text} onChange={(event) => setText(event.target.value)} />
-              <span className="field-hint">{typedType === 'debts' ? 'Start each line with the customer, then a dash. ' : ''}Read on our server without any AI. Free.</span>
+              <textarea
+                className="textarea"
+                id="page-text"
+                rows={6}
+                placeholder={EXAMPLES[typedType]}
+                value={text}
+                onChange={(event) => setText(event.target.value)}
+              />
+              <span className="field-hint">
+                {typedType === 'debts' ? 'Start each line with the customer, then a dash. ' : ''}Read on our server without any AI. Free.
+              </span>
             </label>
           </>
         )}
@@ -247,5 +304,75 @@ export default function Notebook() {
         </div>
       </div>
     </form>
+  );
+}
+
+interface RecentPage {
+  id: string;
+  type: PageType;
+  page_date: string | null;
+  status: 'draft' | 'confirmed';
+  source: 'vision' | 'text';
+  created_at: string;
+  outcome: { total?: number; lines?: number; debts?: number } | null;
+}
+
+export default function Notebook() {
+  const { business, businessPath, can } = useWorkspace();
+  const queryClient = useQueryClient();
+  const editable = can('write_data');
+  const [open, setOpen] = useState(false);
+  const recent = useQuery({
+    queryKey: keys.business(business.id, 'pages'),
+    queryFn: ({ signal }) => request<RecentPage[]>(businessPath('/pages'), { signal }),
+  });
+  return (
+    <>
+      <ListHeader
+        title="Pages you have added"
+        subtitle="Sales, debtors and spending pages from your exercise book"
+        action={editable ? 'Add a page' : undefined}
+        onAction={() => setOpen(true)}
+      />
+      {!editable ? <ReadOnlyNotice role={business.role ?? 'accountant'} what="notebook pages" /> : null}
+      {open ? (
+        <Modal label="Add a page from your book" onClose={() => setOpen(false)} wide>
+          <PageCapture
+            onDone={async () => {
+              setOpen(false);
+              await queryClient.invalidateQueries({ queryKey: keys.business(business.id, 'pages') });
+            }}
+          />
+        </Modal>
+      ) : null}
+      <div className="card" id="page-list">
+        {recent.data ? (
+          recent.data.length ? (
+            <ul className="debt-list">
+              {recent.data.map((page) => (
+                <li className="debt-card" key={page.id}>
+                  <div className="debt-head">
+                    <div className="file-cell">
+                      <strong>{`${TYPE_LABEL[page.type]}${page.page_date ? ` · ${formatDate(page.page_date)}` : ''}`}</strong>
+                      <small>{`${page.source === 'vision' ? 'From a photo' : 'Typed'} · added ${formatDate(page.created_at)}`}</small>
+                    </div>
+                    <div className="debt-amount">
+                      {page.outcome?.total != null ? <span className="num">{money(page.outcome.total)}</span> : null}
+                      <Pill tone={page.status === 'confirmed' ? 'success' : 'warning'}>
+                        {page.status === 'confirmed' ? 'Added' : 'Not checked yet'}
+                      </Pill>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <EmptyState title="No pages yet" message="Photograph a page of your book, or type it in." />
+          )
+        ) : (
+          <SkeletonRows count={3} />
+        )}
+      </div>
+    </>
   );
 }

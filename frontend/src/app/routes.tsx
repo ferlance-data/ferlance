@@ -13,7 +13,7 @@ export interface PageDef {
   scoped: boolean;
   /** Extra class on the page's <section class="view"> wrapper. */
   sectionClass?: string;
-  nav: { label: string; icon: IconName; group: 'analyse' | 'operate' | 'bottom' };
+  nav: { label: string; icon: IconName; group: 'analyse' | 'sell' | 'money' | 'bottom' };
   Component: LazyExoticComponent<ComponentType>;
 }
 
@@ -56,7 +56,7 @@ export const PAGES: PageDef[] = [
     title: 'Inventory',
     description: 'Track stock with an auditable ledger. Sales imports never change stock — only the movements you record here do.',
     scoped: false,
-    nav: { label: 'Inventory', icon: 'inventory', group: 'operate' },
+    nav: { label: 'Inventory', icon: 'inventory', group: 'sell' },
     Component: lazy(() => import('./views/Inventory')),
   },
   {
@@ -64,7 +64,7 @@ export const PAGES: PageDef[] = [
     title: 'Notebook pages',
     description: 'Photograph or type a page of your exercise book (sales, debtors or spending) and check every line before it is added.',
     scoped: false,
-    nav: { label: 'Notebook pages', icon: 'file', group: 'operate' },
+    nav: { label: 'Notebook pages', icon: 'file', group: 'sell' },
     Component: lazy(() => import('./views/Notebook')),
   },
   {
@@ -72,7 +72,7 @@ export const PAGES: PageDef[] = [
     title: 'Invoices',
     description: 'Invoices, quotes and receipts in cedis, shared on WhatsApp as a PDF. Payments are tracked in the debt book.',
     scoped: false,
-    nav: { label: 'Invoices', icon: 'receipt', group: 'operate' },
+    nav: { label: 'Invoices', icon: 'receipt', group: 'sell' },
     Component: lazy(() => import('./views/Invoices')),
   },
   {
@@ -80,7 +80,7 @@ export const PAGES: PageDef[] = [
     title: 'Debt book',
     description: 'Who owes you and whom you owe: credit sales, supplier credit, part-payments and friendly reminders.',
     scoped: false,
-    nav: { label: 'Debt book', icon: 'users', group: 'operate' },
+    nav: { label: 'Debt book', icon: 'users', group: 'sell' },
     Component: lazy(() => import('./views/Debts')),
   },
   {
@@ -88,7 +88,7 @@ export const PAGES: PageDef[] = [
     title: 'Reconcile',
     description: 'Import a MoMo or bank statement, see what the books already have, add the rest, and check every cedi.',
     scoped: false,
-    nav: { label: 'Reconcile', icon: 'check', group: 'operate' },
+    nav: { label: 'Reconcile', icon: 'check', group: 'money' },
     Component: lazy(() => import('./views/Reconcile')),
   },
   {
@@ -96,7 +96,7 @@ export const PAGES: PageDef[] = [
     title: 'Tax & payroll',
     description: 'The GRA and SSNIT rates Ferlance uses, what is owed for a period, and a small monthly payroll with payslips.',
     scoped: false,
-    nav: { label: 'Tax & payroll', icon: 'scale', group: 'operate' },
+    nav: { label: 'Tax & payroll', icon: 'scale', group: 'money' },
     Component: lazy(() => import('./views/TaxPayroll')),
   },
   {
@@ -112,7 +112,7 @@ export const PAGES: PageDef[] = [
     title: 'Planning',
     description: 'Regular payments you confirm each month, budgets against what happened, and downloads for your accountant.',
     scoped: false,
-    nav: { label: 'Planning', icon: 'calendar', group: 'operate' },
+    nav: { label: 'Planning', icon: 'calendar', group: 'money' },
     Component: lazy(() => import('./views/Planning')),
   },
   {
@@ -120,7 +120,7 @@ export const PAGES: PageDef[] = [
     title: 'Books',
     description: 'Profit and loss, what you own and owe, and money in and out, kept automatically from your imports, MoMo and stock.',
     scoped: false,
-    nav: { label: 'Books', icon: 'receipt', group: 'operate' },
+    nav: { label: 'Books', icon: 'receipt', group: 'money' },
     Component: lazy(() => import('./views/Books')),
   },
   {
@@ -128,7 +128,7 @@ export const PAGES: PageDef[] = [
     title: 'Financial position',
     description: 'What the business owns and owes on any date, built from the balances you record.',
     scoped: false,
-    nav: { label: 'Financial position', icon: 'scale', group: 'operate' },
+    nav: { label: 'Financial position', icon: 'scale', group: 'money' },
     Component: lazy(() => import('./views/Position')),
   },
   {
@@ -136,7 +136,7 @@ export const PAGES: PageDef[] = [
     title: 'Data imports',
     description: 'Bring in sales, cost and Mobile Money records. Every file is checked row by row, and nothing is dropped without a reason.',
     scoped: false,
-    nav: { label: 'Data imports', icon: 'database', group: 'operate' },
+    nav: { label: 'Data imports', icon: 'database', group: 'sell' },
     Component: lazy(() => import('./views/Data')),
   },
   {
@@ -148,6 +148,9 @@ export const PAGES: PageDef[] = [
     Component: lazy(() => import('./views/Settings')),
   },
 ];
+
+/** Menu order inside each group (most-used first). */
+export const NAV_ORDER: PageName[] = ['overview', 'insights', 'products', 'lance', 'credit', 'invoices', 'debts', 'inventory', 'notebook', 'data', 'books', 'reconcile', 'tax', 'planning', 'position', 'settings'];
 
 /** Old page names (and old hash links) that still resolve. */
 export const LEGACY_ROUTES: Record<string, PageName> = {

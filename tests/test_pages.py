@@ -78,6 +78,8 @@ def test_photo_of_a_sales_page_becomes_an_import_after_review(client, monkeypatc
     assert done.json()["lines"] == 2 and done.json()["total"] == 237.5
     assert client.post(f"{base}/pages/{draft['id']}/confirm", headers=headers, json={"page_type": "sales", "page_date": "2026-11-02", "lines": lines}).status_code == 400
 
+    listed = client.get(f"{base}/pages", headers=headers).json()
+    assert listed[0]["status"] == "confirmed" and listed[0]["type"] == "sales" and listed[0]["outcome"]["total"] == 237.5
     datasets = client.get(f"{base}/datasets", headers=headers).json()
     assert datasets[0]["filename"] == "Notebook page: sales, 2026-11-02" and datasets[0]["accepted_rows"] == 2
     pnl = client.get(f"{base}/books?from=2026-11-01&to=2026-11-30", headers=headers).json()["profit_and_loss"]["currencies"][0]

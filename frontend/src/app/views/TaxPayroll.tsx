@@ -7,7 +7,18 @@ import { request } from '../../lib/api';
 import { formatDate, isoDate, money, safeHref } from '../../lib/format';
 import { Icon } from '../../lib/icons';
 import { toast } from '../../lib/toast';
-import { DataTable, EmptyState, Notice, Pill, ReadOnlyNotice, Segmented, SkeletonRows, StatusText } from '../components/ui';
+import {
+  DataTable,
+  EmptyState,
+  ListHeader,
+  Modal,
+  Notice,
+  Pill,
+  ReadOnlyNotice,
+  Segmented,
+  SkeletonRows,
+  StatusText,
+} from '../components/ui';
 import { PageActions } from '../page';
 import { keys, useWorkspace } from '../workspace';
 import { METHOD_LABEL } from './debts.logic';
@@ -16,7 +27,10 @@ import { RULE_KEY_LABEL, type Employee, type PayrollRun, type RunDetail, type Ta
 function Rules({ editable }: { editable: boolean }) {
   const { business, businessPath } = useWorkspace();
   const queryClient = useQueryClient();
-  const rules = useQuery({ queryKey: keys.business(business.id, 'tax-rules'), queryFn: ({ signal }) => request<TaxRule[]>(businessPath('/tax/rules'), { signal }) });
+  const rules = useQuery({
+    queryKey: keys.business(business.id, 'tax-rules'),
+    queryFn: ({ signal }) => request<TaxRule[]>(businessPath('/tax/rules'), { signal }),
+  });
   async function toggle(rule: TaxRule) {
     try {
       await request(businessPath(`/tax/rules/${rule.id}/check`), { method: 'PUT', json: { checked: !rule.checked } });
@@ -32,9 +46,17 @@ function Rules({ editable }: { editable: boolean }) {
       <div className="card-header">
         <div>
           <h2 className="card-title">The rates Ferlance uses</h2>
-          <p className="card-subtitle">Taken from GRA and SSNIT pages in November 2026. Each one dates when it applies and where it came from.</p>
+          <p className="card-subtitle">
+            Taken from GRA and SSNIT pages in November 2026. Each one dates when it applies and where it came from.
+          </p>
         </div>
-        {open ? <Pill tone="warning" icon="alert">{`${open} need your accountant's check`}</Pill> : <Pill tone="success" icon="check">All checked</Pill>}
+        {open ? (
+          <Pill tone="warning" icon="alert">{`${open} need your accountant's check`}</Pill>
+        ) : (
+          <Pill tone="success" icon="check">
+            All checked
+          </Pill>
+        )}
       </div>
       <ul className="debt-list">
         {rules.data.map((rule) => (
@@ -44,7 +66,11 @@ function Rules({ editable }: { editable: boolean }) {
                 <strong>{rule.label}</strong>
                 <small>{`${RULE_KEY_LABEL[rule.key] ?? rule.key} · from ${formatDate(rule.from)}${rule.to ? ` to ${formatDate(rule.to)}` : ''}`}</small>
               </div>
-              {rule.checked ? <Pill tone="success">{`Checked by ${rule.checked.checked_by ?? 'someone'}`}</Pill> : <Pill tone="warning">Needs accountant check</Pill>}
+              {rule.checked ? (
+                <Pill tone="success">{`Checked by ${rule.checked.checked_by ?? 'someone'}`}</Pill>
+              ) : (
+                <Pill tone="warning">Needs accountant check</Pill>
+              )}
             </div>
             <small className="muted">{rule.notes}</small>
             <div className="button-row">
@@ -98,7 +124,10 @@ function Summary() {
       {data ? (
         <div className="card-body form-grid">
           {data.unchecked_rules.length ? (
-            <Notice tone="warning" icon="alert">{`These figures use rates your accountant has not checked yet: ${data.unchecked_rules.join(', ')}.`}</Notice>
+            <Notice
+              tone="warning"
+              icon="alert"
+            >{`These figures use rates your accountant has not checked yet: ${data.unchecked_rules.join(', ')}.`}</Notice>
           ) : null}
           <ul className="pending-invites">
             {data.vat.map((item) => (
@@ -120,7 +149,9 @@ function Summary() {
               </li>
             ))}
           </ul>
-          {!data.vat.length && !data.wht.length && !data.payroll.length ? <p className="body-sm muted">Nothing owed to GRA or SSNIT in this period.</p> : null}
+          {!data.vat.length && !data.wht.length && !data.payroll.length ? (
+            <p className="body-sm muted">Nothing owed to GRA or SSNIT in this period.</p>
+          ) : null}
           <p className="footnote">{data.note}</p>
         </div>
       ) : (
@@ -133,8 +164,14 @@ function Summary() {
 function Payroll() {
   const { business, businessPath } = useWorkspace();
   const queryClient = useQueryClient();
-  const staff = useQuery({ queryKey: keys.business(business.id, 'employees'), queryFn: ({ signal }) => request<Employee[]>(businessPath('/payroll/employees'), { signal }) });
-  const runs = useQuery({ queryKey: keys.business(business.id, 'payroll-runs'), queryFn: ({ signal }) => request<PayrollRun[]>(businessPath('/payroll/runs'), { signal }) });
+  const staff = useQuery({
+    queryKey: keys.business(business.id, 'employees'),
+    queryFn: ({ signal }) => request<Employee[]>(businessPath('/payroll/employees'), { signal }),
+  });
+  const runs = useQuery({
+    queryKey: keys.business(business.id, 'payroll-runs'),
+    queryFn: ({ signal }) => request<PayrollRun[]>(businessPath('/payroll/runs'), { signal }),
+  });
   const [openRun, setOpenRun] = useState<string | null>(null);
   const detail = useQuery({
     queryKey: keys.business(business.id, 'payroll-run', openRun ?? ''),
@@ -142,20 +179,23 @@ function Payroll() {
     enabled: Boolean(openRun),
   });
   const [form, setForm] = useState({ name: '', basic: '', allowances: '', ssnit_number: '', tin: '' });
+  const [adding, setAdding] = useState(false);
   const [month, setMonth] = useState(isoDate(new Date()).slice(0, 7));
   const [paidFrom, setPaidFrom] = useState('bank');
   const [paidOn, setPaidOn] = useState(isoDate(new Date()));
   const [status, setStatus] = useState<{ message: string; error: boolean } | null>(null);
   const refresh = () => queryClient.invalidateQueries({ queryKey: keys.business(business.id) });
 
-  async function act(work: () => Promise<unknown>, done: string) {
+  async function act(work: () => Promise<unknown>, done: string): Promise<boolean> {
     try {
       await work();
       toast(done);
       setStatus(null);
       await refresh();
+      return true;
     } catch (error) {
       setStatus({ message: (error as Error).message, error: true });
+      return false;
     }
   }
 
@@ -174,23 +214,13 @@ function Payroll() {
 
   return (
     <>
-      <form
-        className="card"
-        id="payroll-staff"
-        onSubmit={(event: FormEvent) => {
-          event.preventDefault();
-          void act(
-            () => request(businessPath('/payroll/employees'), { method: 'POST', json: { ...form, basic: Number(form.basic), allowances: Number(form.allowances || 0) } }),
-            `${form.name} added.`,
-          ).then(() => setForm({ name: '', basic: '', allowances: '', ssnit_number: '', tin: '' }));
-        }}
-      >
-        <div className="card-header">
-          <div>
-            <h2 className="card-title">Staff</h2>
-            <p className="card-subtitle">Monthly basic salary and cash allowances. Only owners and accountants can see this.</p>
-          </div>
-        </div>
+      <ListHeader
+        title="Staff"
+        subtitle="Monthly basic salary and cash allowances. Only owners and accountants can see this."
+        action="Add staff"
+        onAction={() => setAdding(true)}
+      />
+      <div className="card" id="payroll-staff">
         <div className="table-wrap">
           <DataTable
             columns={[
@@ -203,36 +233,89 @@ function Payroll() {
             empty="No staff yet."
           />
         </div>
-        <div className="card-body form-grid">
-          <label className="field">
-            Name
-            <input className="input" required maxLength={120} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
-          </label>
-          <label className="field">
-            Basic salary (monthly)
-            <input className="input" required inputMode="decimal" value={form.basic} onChange={(event) => setForm({ ...form, basic: event.target.value })} />
-          </label>
-          <label className="field">
-            Allowances (monthly)
-            <input className="input" inputMode="decimal" value={form.allowances} onChange={(event) => setForm({ ...form, allowances: event.target.value })} />
-          </label>
-          <label className="field">
-            SSNIT number (optional)
-            <input className="input" maxLength={30} value={form.ssnit_number} onChange={(event) => setForm({ ...form, ssnit_number: event.target.value })} />
-          </label>
-          <div className="button-row">
-            <button className="btn btn-secondary" type="submit">
-              Add staff
-            </button>
-          </div>
-        </div>
-      </form>
+      </div>
+      {adding ? (
+        <Modal label="Add staff" onClose={() => setAdding(false)}>
+          <form
+            className="card"
+            onSubmit={(event: FormEvent) => {
+              event.preventDefault();
+              void act(
+                () =>
+                  request(businessPath('/payroll/employees'), {
+                    method: 'POST',
+                    json: { ...form, basic: Number(form.basic), allowances: Number(form.allowances || 0) },
+                  }),
+                `${form.name} added.`,
+              ).then((ok) => {
+                if (!ok) return;
+                setForm({ name: '', basic: '', allowances: '', ssnit_number: '', tin: '' });
+                setAdding(false);
+              });
+            }}
+          >
+            <div className="card-header">
+              <div>
+                <h2 className="card-title">Add staff</h2>
+              </div>
+            </div>
+            <div className="card-body form-grid">
+              <label className="field">
+                Name
+                <input
+                  className="input"
+                  required
+                  maxLength={120}
+                  value={form.name}
+                  onChange={(event) => setForm({ ...form, name: event.target.value })}
+                />
+              </label>
+              <label className="field">
+                Basic salary (monthly)
+                <input
+                  className="input"
+                  required
+                  inputMode="decimal"
+                  value={form.basic}
+                  onChange={(event) => setForm({ ...form, basic: event.target.value })}
+                />
+              </label>
+              <label className="field">
+                Allowances (monthly)
+                <input
+                  className="input"
+                  inputMode="decimal"
+                  value={form.allowances}
+                  onChange={(event) => setForm({ ...form, allowances: event.target.value })}
+                />
+              </label>
+              <label className="field">
+                SSNIT number (optional)
+                <input
+                  className="input"
+                  maxLength={30}
+                  value={form.ssnit_number}
+                  onChange={(event) => setForm({ ...form, ssnit_number: event.target.value })}
+                />
+              </label>
+              <div className="button-row">
+                <button className="btn btn-secondary" type="submit">
+                  Add staff
+                </button>
+              </div>
+            </div>
+          </form>
+        </Modal>
+      ) : null}
 
       <div className="card" id="payroll-runs">
         <div className="card-header">
           <div>
             <h2 className="card-title">Monthly payroll</h2>
-            <p className="card-subtitle">A draft until you post it. Posting books wages, pays the net out of the account you choose, and records what is owed to GRA and SSNIT.</p>
+            <p className="card-subtitle">
+              A draft until you post it. Posting books wages, pays the net out of the account you choose, and records what is owed to GRA
+              and SSNIT.
+            </p>
           </div>
         </div>
         <div className="card-body form-grid">
@@ -241,7 +324,16 @@ function Payroll() {
             <input className="input" type="month" value={month} onChange={(event) => setMonth(event.target.value)} />
           </label>
           <div className="button-row">
-            <button className="btn btn-primary" type="button" onClick={() => void act(() => request(businessPath('/payroll/runs'), { method: 'POST', json: { month } }), `Payroll for ${month} worked out.`)}>
+            <button
+              className="btn btn-primary"
+              type="button"
+              onClick={() =>
+                void act(
+                  () => request(businessPath('/payroll/runs'), { method: 'POST', json: { month } }),
+                  `Payroll for ${month} worked out.`,
+                )
+              }
+            >
               Work out payroll
             </button>
             <StatusText message={status?.message} error={status?.error} />
@@ -258,22 +350,41 @@ function Payroll() {
                   </div>
                   <div className="debt-amount">
                     <span className="num">{money(run.gross)}</span>
-                    <Pill tone={run.status === 'posted' ? 'success' : run.status === 'void' ? '' : 'info'}>{run.status === 'posted' ? 'Posted' : run.status === 'void' ? 'Void' : 'Draft'}</Pill>
+                    <Pill tone={run.status === 'posted' ? 'success' : run.status === 'void' ? '' : 'info'}>
+                      {run.status === 'posted' ? 'Posted' : run.status === 'void' ? 'Void' : 'Draft'}
+                    </Pill>
                   </div>
                 </div>
                 <div className="button-row">
-                  <button className="btn btn-ghost btn-sm" type="button" aria-expanded={openRun === run.id} onClick={() => setOpenRun(openRun === run.id ? null : run.id)}>
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    type="button"
+                    aria-expanded={openRun === run.id}
+                    onClick={() => setOpenRun(openRun === run.id ? null : run.id)}
+                  >
                     {openRun === run.id ? 'Hide' : 'Details and payslips'}
                   </button>
                   {run.status !== 'void' ? (
-                    <button className="btn btn-ghost btn-sm" type="button" onClick={() => window.confirm(`Void the ${run.month} payroll? Its entries are reversed.`) && void act(() => request(businessPath(`/payroll/runs/${run.id}/void`), { method: 'POST' }), 'Payroll voided.')}>
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      type="button"
+                      onClick={() =>
+                        window.confirm(`Void the ${run.month} payroll? Its entries are reversed.`) &&
+                        void act(() => request(businessPath(`/payroll/runs/${run.id}/void`), { method: 'POST' }), 'Payroll voided.')
+                      }
+                    >
                       Void
                     </button>
                   ) : null}
                 </div>
                 {openRun === run.id && detail.data ? (
                   <div className="form-grid">
-                    {detail.data.unchecked_rules.length ? <Notice tone="warning" icon="alert">{`Uses rates not yet checked by your accountant: ${detail.data.unchecked_rules.join(', ')}.`}</Notice> : null}
+                    {detail.data.unchecked_rules.length ? (
+                      <Notice
+                        tone="warning"
+                        icon="alert"
+                      >{`Uses rates not yet checked by your accountant: ${detail.data.unchecked_rules.join(', ')}.`}</Notice>
+                    ) : null}
                     <div className="table-wrap">
                       <DataTable
                         columns={[
@@ -310,10 +421,29 @@ function Payroll() {
                         </label>
                         <label className="field">
                           Paid on
-                          <input className="input" type="date" max={isoDate(new Date())} value={paidOn} onChange={(event) => setPaidOn(event.target.value)} />
+                          <input
+                            className="input"
+                            type="date"
+                            max={isoDate(new Date())}
+                            value={paidOn}
+                            onChange={(event) => setPaidOn(event.target.value)}
+                          />
                         </label>
                         <div className="button-row">
-                          <button className="btn btn-primary btn-sm" type="button" onClick={() => void act(() => request(businessPath(`/payroll/runs/${run.id}/post`), { method: 'POST', json: { paid_from: paidFrom, paid_on: paidOn } }), 'Payroll posted to the books.')}>
+                          <button
+                            className="btn btn-primary btn-sm"
+                            type="button"
+                            onClick={() =>
+                              void act(
+                                () =>
+                                  request(businessPath(`/payroll/runs/${run.id}/post`), {
+                                    method: 'POST',
+                                    json: { paid_from: paidFrom, paid_on: paidOn },
+                                  }),
+                                'Payroll posted to the books.',
+                              )
+                            }
+                          >
                             Post to the books
                           </button>
                         </div>

@@ -8,12 +8,22 @@ import { formatDate, isoDate, money } from '../../lib/format';
 import { Icon } from '../../lib/icons';
 import { toast } from '../../lib/toast';
 import type { InventoryResponse } from '../../lib/types';
-import { EmptyState, Pill, ReadOnlyNotice, Segmented, SkeletonRows, StatusText } from '../components/ui';
+import { EmptyState, ListHeader, Modal, Pill, ReadOnlyNotice, Segmented, SkeletonRows, StatusText } from '../components/ui';
 import { PageActions } from '../page';
 import { keys, useWorkspace } from '../workspace';
 import type { DebtBook } from './debts.logic';
 import { METHOD_LABEL } from './debts.logic';
-import { draftTotal, emptyLine, KIND_LABEL, lineMinor, shareText, STATUS, type DocKind, type DocSummary, type DraftLine } from './invoices.logic';
+import {
+  draftTotal,
+  emptyLine,
+  KIND_LABEL,
+  lineMinor,
+  shareText,
+  STATUS,
+  type DocKind,
+  type DocSummary,
+  type DraftLine,
+} from './invoices.logic';
 
 interface InvoiceSettings {
   tin: string;
@@ -38,13 +48,20 @@ function NewDocument({ kind, onDone }: { kind: DocKind; onDone: (created: { id: 
   const [lines, setLines] = useState<DraftLine[]>([emptyLine()]);
   const [status, setStatus] = useState<{ message: string; error: boolean } | null>(null);
   const [saving, setSaving] = useState(false);
-  const stock = useQuery({ queryKey: keys.inventory(business.id), queryFn: ({ signal }) => request<InventoryResponse>(businessPath('/inventory'), { signal }) });
-  const book = useQuery({ queryKey: keys.business(business.id, 'debts'), queryFn: ({ signal }) => request<DebtBook>(businessPath('/debts'), { signal }) });
+  const stock = useQuery({
+    queryKey: keys.inventory(business.id),
+    queryFn: ({ signal }) => request<InventoryResponse>(businessPath('/inventory'), { signal }),
+  });
+  const book = useQuery({
+    queryKey: keys.business(business.id, 'debts'),
+    queryFn: ({ signal }) => request<DebtBook>(businessPath('/debts'), { signal }),
+  });
   const products = (stock.data?.items ?? []).filter((item) => item.active);
   const customers = (book.data?.parties ?? []).filter((party) => party.kind === 'customer');
   const total = draftTotal(lines);
 
-  const update = (index: number, patch: Partial<DraftLine>) => setLines((current) => current.map((line, i) => (i === index ? { ...line, ...patch } : line)));
+  const update = (index: number, patch: Partial<DraftLine>) =>
+    setLines((current) => current.map((line, i) => (i === index ? { ...line, ...patch } : line)));
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -63,7 +80,12 @@ function NewDocument({ kind, onDone }: { kind: DocKind; onDone: (created: { id: 
           charge_vat: chargeVat,
           lines: lines
             .filter((line) => line.product_id || line.description.trim())
-            .map((line) => ({ product_id: line.product_id || null, description: line.description, quantity: Number(line.quantity), unit_price: Number(line.unit_price || 0) })),
+            .map((line) => ({
+              product_id: line.product_id || null,
+              description: line.description,
+              quantity: Number(line.quantity),
+              unit_price: Number(line.unit_price || 0),
+            })),
         },
       });
       setCustomer('');
@@ -86,7 +108,11 @@ function NewDocument({ kind, onDone }: { kind: DocKind; onDone: (created: { id: 
         <div>
           <h2 className="card-title">{`New ${KIND_LABEL[kind].toLowerCase()}`}</h2>
           <p className="card-subtitle">
-            {kind === 'quote' ? 'A price offer. Nothing is recorded until you turn it into an invoice.' : kind === 'receipt' ? 'Paid now. It goes into your sales and your cash, MoMo or bank.' : 'Goes into the debt book until it is paid. Stock items leave stock.'}
+            {kind === 'quote'
+              ? 'A price offer. Nothing is recorded until you turn it into an invoice.'
+              : kind === 'receipt'
+                ? 'Paid now. It goes into your sales and your cash, MoMo or bank.'
+                : 'Goes into the debt book until it is paid. Stock items leave stock.'}
           </p>
         </div>
       </div>
@@ -113,7 +139,14 @@ function NewDocument({ kind, onDone }: { kind: DocKind; onDone: (created: { id: 
         </label>
         <label className="field">
           Phone (optional)
-          <input className="input" type="tel" inputMode="tel" maxLength={30} value={phone} onChange={(event) => setPhone(event.target.value)} />
+          <input
+            className="input"
+            type="tel"
+            inputMode="tel"
+            maxLength={30}
+            value={phone}
+            onChange={(event) => setPhone(event.target.value)}
+          />
         </label>
         <label className="field">
           Date
@@ -144,7 +177,9 @@ function NewDocument({ kind, onDone }: { kind: DocKind; onDone: (created: { id: 
                 <select
                   className="select"
                   value={line.product_id}
-                  onChange={(event) => update(index, { product_id: event.target.value, description: event.target.value ? '' : line.description })}
+                  onChange={(event) =>
+                    update(index, { product_id: event.target.value, description: event.target.value ? '' : line.description })
+                  }
                 >
                   <option value="">Not a stock item (type below)</option>
                   {products.map((item) => (
@@ -157,21 +192,44 @@ function NewDocument({ kind, onDone }: { kind: DocKind; onDone: (created: { id: 
               {!line.product_id ? (
                 <label className="field">
                   Description
-                  <input className="input" maxLength={200} placeholder="e.g. Delivery" value={line.description} onChange={(event) => update(index, { description: event.target.value })} />
+                  <input
+                    className="input"
+                    maxLength={200}
+                    placeholder="e.g. Delivery"
+                    value={line.description}
+                    onChange={(event) => update(index, { description: event.target.value })}
+                  />
                 </label>
               ) : null}
               <label className="field">
                 Qty
-                <input className="input" required inputMode="decimal" value={line.quantity} onChange={(event) => update(index, { quantity: event.target.value })} />
+                <input
+                  className="input"
+                  required
+                  inputMode="decimal"
+                  value={line.quantity}
+                  onChange={(event) => update(index, { quantity: event.target.value })}
+                />
               </label>
               <label className="field">
                 Price each
-                <input className="input" required inputMode="decimal" value={line.unit_price} onChange={(event) => update(index, { unit_price: event.target.value })} />
+                <input
+                  className="input"
+                  required
+                  inputMode="decimal"
+                  value={line.unit_price}
+                  onChange={(event) => update(index, { unit_price: event.target.value })}
+                />
               </label>
               <div className="invoice-line-total">
                 <span className="num">{money(lineMinor(line) / 100)}</span>
                 {lines.length > 1 ? (
-                  <button className="btn btn-ghost btn-sm" type="button" aria-label={`Remove line ${index + 1}`} onClick={() => setLines(lines.filter((_, i) => i !== index))}>
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    type="button"
+                    aria-label={`Remove line ${index + 1}`}
+                    onClick={() => setLines(lines.filter((_, i) => i !== index))}
+                  >
                     Remove
                   </button>
                 ) : null}
@@ -185,14 +243,22 @@ function NewDocument({ kind, onDone }: { kind: DocKind; onDone: (created: { id: 
         </button>
         <label className="field">
           Note (optional)
-          <input className="input" maxLength={500} placeholder="e.g. Delivery on Friday" value={notes} onChange={(event) => setNotes(event.target.value)} />
+          <input
+            className="input"
+            maxLength={500}
+            placeholder="e.g. Delivery on Friday"
+            value={notes}
+            onChange={(event) => setNotes(event.target.value)}
+          />
         </label>
         <label className="field field-inline">
           <input type="checkbox" checked={chargeVat} onChange={(event) => setChargeVat(event.target.checked)} />
           Charge VAT and levies (for VAT-registered businesses): 20% on top from 2026
         </label>
         <div className="button-row">
-          <strong className="invoice-total num">{chargeVat ? `${money(total)} + tax ≈ ${money(total * 1.2)}` : `Total ${money(total)}`}</strong>
+          <strong className="invoice-total num">
+            {chargeVat ? `${money(total)} + tax ≈ ${money(total * 1.2)}` : `Total ${money(total)}`}
+          </strong>
           <button className="btn btn-primary" type="submit" disabled={saving || total <= 0}>
             {`Create ${KIND_LABEL[kind].toLowerCase()}`}
           </button>
@@ -203,7 +269,17 @@ function NewDocument({ kind, onDone }: { kind: DocKind; onDone: (created: { id: 
   );
 }
 
-function DocCard({ doc, editable, settings, onDone }: { doc: DocSummary; editable: boolean; settings: InvoiceSettings | undefined; onDone: () => Promise<void> }) {
+function DocCard({
+  doc,
+  editable,
+  settings,
+  onDone,
+}: {
+  doc: DocSummary;
+  editable: boolean;
+  settings: InvoiceSettings | undefined;
+  onDone: () => Promise<void>;
+}) {
   const { business, businessPath } = useWorkspace();
   const [paying, setPaying] = useState(false);
   const [amount, setAmount] = useState('');
@@ -245,7 +321,10 @@ function DocCard({ doc, editable, settings, onDone }: { doc: DocSummary; editabl
   async function pay(event: FormEvent) {
     event.preventDefault();
     try {
-      await request(businessPath(`/debts/${doc.debt_id}/payments`), { method: 'POST', json: { amount: Number(amount), method, paid_on: paidOn } });
+      await request(businessPath(`/debts/${doc.debt_id}/payments`), {
+        method: 'POST',
+        json: { amount: Number(amount), method, paid_on: paidOn },
+      });
       setPaying(false);
       toast(`Payment recorded on ${doc.number}.`);
       await onDone();
@@ -266,7 +345,9 @@ function DocCard({ doc, editable, settings, onDone }: { doc: DocSummary; editabl
           <Pill tone={tone}>{label}</Pill>
         </div>
       </div>
-      {doc.kind === 'invoice' && doc.paid > 0 && !doc.voided ? <small className="muted">{`${money(doc.paid, { code: doc.currency })} paid · ${money(doc.balance, { code: doc.currency })} to go`}</small> : null}
+      {doc.kind === 'invoice' && doc.paid > 0 && !doc.voided ? (
+        <small className="muted">{`${money(doc.paid, { code: doc.currency })} paid · ${money(doc.balance, { code: doc.currency })} to go`}</small>
+      ) : null}
       <div className="button-row">
         <button className="btn btn-secondary btn-sm" type="button" onClick={() => void share()}>
           <Icon name="send" />
@@ -287,7 +368,11 @@ function DocCard({ doc, editable, settings, onDone }: { doc: DocSummary; editabl
           </button>
         ) : null}
         {editable && doc.status === 'quote' ? (
-          <button className="btn btn-ghost btn-sm" type="button" onClick={() => void act(`/invoices/${doc.id}/convert`, { issued_on: isoDate(new Date()), due_on: null })}>
+          <button
+            className="btn btn-ghost btn-sm"
+            type="button"
+            onClick={() => void act(`/invoices/${doc.id}/convert`, { issued_on: isoDate(new Date()), due_on: null })}
+          >
             Make invoice
           </button>
         ) : null}
@@ -296,7 +381,8 @@ function DocCard({ doc, editable, settings, onDone }: { doc: DocSummary; editabl
             className="btn btn-ghost btn-sm"
             type="button"
             onClick={() => {
-              if (window.confirm(`Void ${doc.number}? It keeps its number, payments are voided and stock comes back.`)) void act(`/invoices/${doc.id}/void`);
+              if (window.confirm(`Void ${doc.number}? It keeps its number, payments are voided and stock comes back.`))
+                void act(`/invoices/${doc.id}/void`);
             }}
           >
             Void
@@ -321,7 +407,14 @@ function DocCard({ doc, editable, settings, onDone }: { doc: DocSummary; editabl
           </label>
           <label className="field">
             Date
-            <input className="input" type="date" required min={doc.issued_on} value={paidOn} onChange={(event) => setPaidOn(event.target.value)} />
+            <input
+              className="input"
+              type="date"
+              required
+              min={doc.issued_on}
+              value={paidOn}
+              onChange={(event) => setPaidOn(event.target.value)}
+            />
           </label>
           <div className="button-row">
             <button className="btn btn-primary btn-sm" type="submit">
@@ -360,7 +453,11 @@ function Letterhead({ settings, onDone }: { settings: InvoiceSettings; onDone: (
       <div className="card-header">
         <div>
           <h2 className="card-title">Your details on documents</h2>
-          <p className="card-subtitle">{settings.pay_to ? `Pay-to line: ${settings.pay_to} (change it in the Debt book)` : 'Add your MoMo pay-to details in the Debt book so invoices show where to pay.'}</p>
+          <p className="card-subtitle">
+            {settings.pay_to
+              ? `Pay-to line: ${settings.pay_to} (change it in the Debt book)`
+              : 'Add your MoMo pay-to details in the Debt book so invoices show where to pay.'}
+          </p>
         </div>
       </div>
       <div className="card-body form-grid">
@@ -383,9 +480,16 @@ export default function Invoices() {
   const queryClient = useQueryClient();
   const editable = can('write_data');
   const [kind, setKind] = useState<DocKind>('invoice');
-  const docs = useQuery({ queryKey: keys.business(business.id, 'invoices', kind), queryFn: ({ signal }) => request<DocSummary[]>(businessPath(`/invoices?kind=${kind}`), { signal }) });
-  const settings = useQuery({ queryKey: keys.business(business.id, 'invoice-settings'), queryFn: ({ signal }) => request<InvoiceSettings>(businessPath('/invoices/settings'), { signal }) });
+  const docs = useQuery({
+    queryKey: keys.business(business.id, 'invoices', kind),
+    queryFn: ({ signal }) => request<DocSummary[]>(businessPath(`/invoices?kind=${kind}`), { signal }),
+  });
+  const settings = useQuery({
+    queryKey: keys.business(business.id, 'invoice-settings'),
+    queryFn: ({ signal }) => request<InvoiceSettings>(businessPath('/invoices/settings'), { signal }),
+  });
   const refresh = () => queryClient.invalidateQueries({ queryKey: keys.business(business.id) });
+  const [modal, setModal] = useState<'new' | 'details' | null>(null);
 
   return (
     <>
@@ -404,26 +508,46 @@ export default function Invoices() {
         />
       </PageActions>
 
-      {editable ? (
-        <NewDocument
-          key={kind}
-          kind={kind}
-          onDone={async (created) => {
-            toast(`${created.number} created. Use "Share PDF" to send it.`);
-            await refresh();
-          }}
-        />
-      ) : (
-        <ReadOnlyNotice role={business.role ?? 'accountant'} what="invoices" />
-      )}
+      <ListHeader
+        title={`${KIND_LABEL[kind]}s`}
+        subtitle="Numbers never repeat or skip; a voided document keeps its number."
+        action={editable ? `New ${KIND_LABEL[kind].toLowerCase()}` : undefined}
+        onAction={() => setModal('new')}
+      >
+        {editable && settings.data ? (
+          <button className="btn btn-ghost" type="button" onClick={() => setModal('details')}>
+            Your details
+          </button>
+        ) : null}
+      </ListHeader>
+      {!editable ? <ReadOnlyNotice role={business.role ?? 'accountant'} what="invoices" /> : null}
+      {modal === 'new' ? (
+        <Modal label={`New ${KIND_LABEL[kind].toLowerCase()}`} onClose={() => setModal(null)} wide>
+          <NewDocument
+            key={kind}
+            kind={kind}
+            onDone={async (created) => {
+              toast(`${created.number} created. Use "Share PDF" to send it.`);
+              setModal(null);
+              await refresh();
+            }}
+          />
+        </Modal>
+      ) : null}
+      {modal === 'details' && settings.data ? (
+        <Modal label="Your details on documents" onClose={() => setModal(null)}>
+          <Letterhead
+            key={JSON.stringify(settings.data)}
+            settings={settings.data}
+            onDone={async () => {
+              setModal(null);
+              await refresh();
+            }}
+          />
+        </Modal>
+      ) : null}
 
       <div className="card" id="invoice-list">
-        <div className="card-header">
-          <div>
-            <h2 className="card-title">{`${KIND_LABEL[kind]}s`}</h2>
-            <p className="card-subtitle">Numbers never repeat or skip; a voided document keeps its number.</p>
-          </div>
-        </div>
         {docs.data ? (
           docs.data.length ? (
             <ul className="debt-list">
@@ -438,8 +562,6 @@ export default function Invoices() {
           <SkeletonRows count={3} />
         )}
       </div>
-
-      {editable && settings.data ? <Letterhead key={JSON.stringify(settings.data)} settings={settings.data} onDone={refresh} /> : null}
     </>
   );
 }

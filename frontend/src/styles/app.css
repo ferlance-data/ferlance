@@ -2121,3 +2121,78 @@ svg.icon {
 .recurring-amount {
   width: 120px;
 }
+
+/* ---------- Create-new modal and list headers ---------- */
+.modal {
+  width: 100%;
+  max-width: 600px;
+  max-height: 92vh;
+  margin: auto auto 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background: var(--surface);
+  color: var(--foreground);
+  box-shadow: var(--shadow-lg);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.modal-wide {
+  max-width: 860px;
+}
+
+.modal::backdrop {
+  background: var(--dialog-backdrop);
+}
+
+@media (min-width: 768px) {
+  .modal {
+    margin: auto;
+    border-radius: var(--radius-lg);
+  }
+}
+
+.modal-body {
+  position: relative;
+  padding: 4px 0 12px;
+}
+
+.modal-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1;
+}
+
+/* A form card shown inside a modal loses its own frame: the modal is the frame. */
+.modal-body > .card,
+.modal-body > form.card,
+.modal-body > .stack > .card {
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.modal-body .card-header {
+  padding-right: 52px;
+}
+
+.list-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin: 4px 0 -4px;
+}
+
+.list-title {
+  font-size: var(--text-lg);
+}
+
+.list-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

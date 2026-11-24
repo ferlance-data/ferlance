@@ -6,6 +6,28 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.20.0] - 2026-11-25
+
+Create in a modal, a grouped menu, and dashboards that agree with the books.
+
+### Changed
+- **Create in a modal.** Each page now shows what already exists first; a **New…** button opens the form in a modal (a bottom sheet on phones). Escape closes it, and a modal closes only when saving succeeds. This applies to:
+  - invoices, quotes and receipts, and "Your details"
+  - debt-book credit, and where customers pay
+  - notebook pages, which now also list the pages already added
+  - inventory (add product, stock in or out, scan invoice, stocktake)
+  - financial-position balances
+  - data imports (the modal stays open to show the result)
+  - statement imports
+  - staff
+  - regular payments and budgets
+  - manual journals and the chart of accounts
+- **The menu is grouped:** Analyse; Selling and stock; Money and books. Within each group the most-used pages come first.
+- **Dashboards count MoMo payments you make as costs, not revenue,** matching the books. The "Books and dashboards compared" card no longer needs to explain the difference.
+
+### Added
+- `GET /pages`: the notebook pages added, newest first.
+
 ## [1.19.0] - 2026-11-24
 
 Planning extras (PRD §9, G9).

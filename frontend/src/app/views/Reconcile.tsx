@@ -6,11 +6,22 @@ import { useState, type FormEvent } from 'react';
 import { request } from '../../lib/api';
 import { formatDate, money } from '../../lib/format';
 import { toast } from '../../lib/toast';
-import { EmptyState, Notice, Pill, ReadOnlyNotice, Segmented, SkeletonRows, StatusText } from '../components/ui';
+import { EmptyState, ListHeader, Modal, Notice, Pill, ReadOnlyNotice, Segmented, SkeletonRows, StatusText } from '../components/ui';
 import { PageActions } from '../page';
 import { keys, useWorkspace } from '../workspace';
 import type { DebtBook } from './debts.logic';
-import { BOOKING_LABEL, EXPENSE_KINDS, FIELD_LABEL, OTHER_ACCOUNTS, categoriesFor, type Field, type Overview, type Preview, type Reconciliation, type StatementLine } from './reconcile.logic';
+import {
+  BOOKING_LABEL,
+  EXPENSE_KINDS,
+  FIELD_LABEL,
+  OTHER_ACCOUNTS,
+  categoriesFor,
+  type Field,
+  type Overview,
+  type Preview,
+  type Reconciliation,
+  type StatementLine,
+} from './reconcile.logic';
 
 function ImportStatement({ choices, onDone }: { choices: Record<string, string>; onDone: (account: string) => Promise<void> }) {
   const { businessPath } = useWorkspace();
@@ -47,7 +58,10 @@ function ImportStatement({ choices, onDone }: { choices: Record<string, string>;
       body.append('account', account);
       body.append('header_row', String(preview.header_row));
       body.append('mapping', JSON.stringify(mapping));
-      const result = await request<{ new_lines: number; duplicates: number; checks: string[] }>(businessPath('/statements'), { method: 'POST', body });
+      const result = await request<{ new_lines: number; duplicates: number; checks: string[] }>(businessPath('/statements'), {
+        method: 'POST',
+        body,
+      });
       toast(`${result.new_lines} new line(s)${result.duplicates ? `, ${result.duplicates} already imported` : ''}.`);
       setStatus(result.checks.length ? { message: result.checks.join(' '), error: true } : null);
       setPreview(null);
@@ -81,7 +95,12 @@ function ImportStatement({ choices, onDone }: { choices: Record<string, string>;
         </label>
         <label className="field">
           Statement file
-          <input className="input" type="file" accept=".csv,.xlsx,.txt" onChange={(event) => event.target.files?.[0] && void look(event.target.files[0])} />
+          <input
+            className="input"
+            type="file"
+            accept=".csv,.xlsx,.txt"
+            onChange={(event) => event.target.files?.[0] && void look(event.target.files[0])}
+          />
         </label>
         {preview && mapping ? (
           <fieldset className="mapping-grid">
@@ -119,7 +138,17 @@ function ImportStatement({ choices, onDone }: { choices: Record<string, string>;
   );
 }
 
-function LineRow({ line, editable, openDebts, onDone }: { line: StatementLine; editable: boolean; openDebts: DebtBook['debts']; onDone: () => Promise<void> }) {
+function LineRow({
+  line,
+  editable,
+  openDebts,
+  onDone,
+}: {
+  line: StatementLine;
+  editable: boolean;
+  openDebts: DebtBook['debts'];
+  onDone: () => Promise<void>;
+}) {
   const { businessPath } = useWorkspace();
   const inflow = line.amount > 0;
   const [category, setCategory] = useState('');
@@ -138,7 +167,14 @@ function LineRow({ line, editable, openDebts, onDone }: { line: StatementLine; e
     }
   }
 
-  const detail = category === 'expense' ? { expense } : category === 'transfer' ? { other_account: other } : category === 'debt_payment' ? { debt_id: debtId } : {};
+  const detail =
+    category === 'expense'
+      ? { expense }
+      : category === 'transfer'
+        ? { other_account: other }
+        : category === 'debt_payment'
+          ? { debt_id: debtId }
+          : {};
   return (
     <li className="debt-card">
       <div className="debt-head">
@@ -148,14 +184,22 @@ function LineRow({ line, editable, openDebts, onDone }: { line: StatementLine; e
         </div>
         <div className="debt-amount">
           <span className="num">{`${inflow ? '+' : '−'}${money(Math.abs(line.amount))}`}</span>
-          <Pill tone={tone[line.status]}>{line.booking ? BOOKING_LABEL[line.booking] ?? label.booked : label[line.status]}</Pill>
+          <Pill tone={tone[line.status]}>{line.booking ? (BOOKING_LABEL[line.booking] ?? label.booked) : label[line.status]}</Pill>
         </div>
       </div>
-      {line.matched_to ? <small className="muted">{`Matches: ${line.matched_to.label} (${formatDate(line.matched_to.date)})`}</small> : null}
+      {line.matched_to ? (
+        <small className="muted">{`Matches: ${line.matched_to.label} (${formatDate(line.matched_to.date)})`}</small>
+      ) : null}
       {editable && line.status === 'suggested' ? (
         <label className="field">
           This is the same as
-          <select className="select" defaultValue="" onChange={(event) => event.target.value && void call(`/statements/lines/${line.id}/match`, 'PUT', { candidate_id: event.target.value })}>
+          <select
+            className="select"
+            defaultValue=""
+            onChange={(event) =>
+              event.target.value && void call(`/statements/lines/${line.id}/match`, 'PUT', { candidate_id: event.target.value })
+            }
+          >
             <option value="">Choose…</option>
             {line.suggestions.map((candidate) => (
               <option key={candidate.id} value={candidate.id}>
@@ -244,15 +288,23 @@ export default function Reconcile() {
   const { business, businessPath, can } = useWorkspace();
   const queryClient = useQueryClient();
   const editable = can('manage_books');
-  const overview = useQuery({ queryKey: keys.business(business.id, 'statements'), queryFn: ({ signal }) => request<Overview>(businessPath('/statements'), { signal }) });
+  const overview = useQuery({
+    queryKey: keys.business(business.id, 'statements'),
+    queryFn: ({ signal }) => request<Overview>(businessPath('/statements'), { signal }),
+  });
   const [chosen, setChosen] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
   const account = chosen ?? overview.data?.accounts[0]?.account ?? null;
   const recon = useQuery({
     queryKey: keys.business(business.id, 'reconcile', account ?? ''),
     queryFn: ({ signal }) => request<Reconciliation>(businessPath(`/statements/${account}`), { signal }),
     enabled: Boolean(account),
   });
-  const book = useQuery({ queryKey: keys.business(business.id, 'debts'), queryFn: ({ signal }) => request<DebtBook>(businessPath('/debts'), { signal }), enabled: editable });
+  const book = useQuery({
+    queryKey: keys.business(business.id, 'debts'),
+    queryFn: ({ signal }) => request<DebtBook>(businessPath('/debts'), { signal }),
+    enabled: editable,
+  });
   const refresh = () => queryClient.invalidateQueries({ queryKey: keys.business(business.id) });
   const summary = recon.data?.summary;
   const unbookedFees = (recon.data?.lines ?? []).filter((line) => line.fee > 0 && !line.fee_booked).length;
@@ -272,14 +324,23 @@ export default function Reconcile() {
         </PageActions>
       ) : null}
 
-      {editable && overview.data ? (
-        <ImportStatement
-          choices={overview.data.choices}
-          onDone={async (imported) => {
-            setChosen(imported);
-            await refresh();
-          }}
-        />
+      <ListHeader
+        title="Statements"
+        subtitle="MoMo and bank statements, matched against your books"
+        action={editable ? 'Import a statement' : undefined}
+        onAction={() => setImporting(true)}
+      />
+      {editable && overview.data && importing ? (
+        <Modal label="Import a statement" onClose={() => setImporting(false)} wide>
+          <ImportStatement
+            choices={overview.data.choices}
+            onDone={async (imported) => {
+              setChosen(imported);
+              setImporting(false);
+              await refresh();
+            }}
+          />
+        </Modal>
       ) : null}
       {!editable ? <ReadOnlyNotice role={business.role ?? 'manager'} what="reconciliation" /> : null}
 
@@ -292,7 +353,13 @@ export default function Reconcile() {
                   <h2 className="card-title">{`${recon.data.label}: statement and books`}</h2>
                   <p className="card-subtitle">{`${formatDate(summary.first)} to ${formatDate(summary.last)}`}</p>
                 </div>
-                {summary.unexplained === 0 ? <Pill tone="success" icon="check">Every cedi explained</Pill> : summary.unexplained != null ? <Pill tone="warning" icon="alert">{`${money(summary.unexplained)} unexplained`}</Pill> : null}
+                {summary.unexplained === 0 ? (
+                  <Pill tone="success" icon="check">
+                    Every cedi explained
+                  </Pill>
+                ) : summary.unexplained != null ? (
+                  <Pill tone="warning" icon="alert">{`${money(summary.unexplained)} unexplained`}</Pill>
+                ) : null}
               </div>
               <dl className="books-totals card-body">
                 <div>
@@ -322,7 +389,11 @@ export default function Reconcile() {
               ) : null}
               {editable && unbookedFees ? (
                 <div className="button-row card-body">
-                  <button className="btn btn-secondary btn-sm" type="button" onClick={() => void request(businessPath(`/statements/${account}/fees`), { method: 'POST' }).then(refresh)}>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    type="button"
+                    onClick={() => void request(businessPath(`/statements/${account}/fees`), { method: 'POST' }).then(refresh)}
+                  >
                     {`Book ${unbookedFees} fee(s) as MoMo and bank charges`}
                   </button>
                 </div>
@@ -334,13 +405,25 @@ export default function Reconcile() {
             <div className="card-header">
               <div>
                 <h2 className="card-title">Statement lines</h2>
-                <p className="card-subtitle">{summary ? `${summary.unmatched_lines} not in the books yet` : recon.data.books_start ? 'Only lines from your books start are shown.' : ''}</p>
+                <p className="card-subtitle">
+                  {summary
+                    ? `${summary.unmatched_lines} not in the books yet`
+                    : recon.data.books_start
+                      ? 'Only lines from your books start are shown.'
+                      : ''}
+                </p>
               </div>
             </div>
             {recon.data.lines.length ? (
               <ul className="debt-list">
                 {recon.data.lines.map((line) => (
-                  <LineRow key={line.id} line={line} editable={editable} openDebts={(book.data?.debts ?? []).filter((debt) => debt.status === 'open')} onDone={refresh} />
+                  <LineRow
+                    key={line.id}
+                    line={line}
+                    editable={editable}
+                    openDebts={(book.data?.debts ?? []).filter((debt) => debt.status === 'open')}
+                    onDone={refresh}
+                  />
                 ))}
               </ul>
             ) : (
@@ -353,7 +436,9 @@ export default function Reconcile() {
               <div className="card-header">
                 <div>
                   <h2 className="card-title">In the books but not on the statement</h2>
-                  <p className="card-subtitle">Check these: a wrong payment method on an import, or a payment the statement doesn't show.</p>
+                  <p className="card-subtitle">
+                    Check these: a wrong payment method on an import, or a payment the statement doesn't show.
+                  </p>
                 </div>
               </div>
               <div className="card-body">

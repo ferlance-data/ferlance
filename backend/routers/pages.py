@@ -13,6 +13,11 @@ router = APIRouter(prefix="/api/businesses/{business_id}/pages", tags=["notebook
 PageType = Literal["sales", "debts", "expenses"]
 
 
+@router.get("")
+def recent_pages(business: dict = Depends(read_business)) -> list[dict]:
+    return pages.recent(config.DB_PATH, business["id"])
+
+
 @router.post("")
 def read_page(file: UploadFile = File(...), business: dict = Depends(data_writer), user: dict = Depends(current_user)) -> dict:
     """Read a page photo into a draft with the AI reader. The photo itself is not stored."""
