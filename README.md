@@ -70,6 +70,10 @@ Photograph or type a page of the shop's exercise book: a day's sales, the debtor
 
 The Invoices page makes invoices, quotes and receipts with gapless numbers and shares them as small PDFs (`backend/invoices.py`). An invoice becomes a debt-book entry, so payments, reminders and the books follow it. A receipt is a sale paid on the spot, and a quote posts nothing until it's converted.
 
+## Planning
+
+Recurring payments are confirmed month by month and never post on their own. Budgets are compared with the books' actuals. The year-end pack (CSV zip for the accountant) and "download all my data" are on the Planning page (`backend/planning.py`).
+
 ## Credit report
 
 The Credit report page summarises the last 12 months from the books for a lender, with how well each cedi of sales is evidenced (statement-matched, MoMo SMS, or self-reported) and a readiness score whose every point is explained (`backend/credit.py`). The owner can share a frozen copy through an expiring, revocable link. The lender's page (`/r/<token>`) is plain HTML with no scripts, and every view is logged.

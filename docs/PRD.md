@@ -296,7 +296,7 @@ The global tools assume someone types clean transactions in. **Ferlance becomes 
 | 1.17.0 | Ghana tax and payroll basics (rates from GRA/SSNIT pages, pending accountant checks). Done. | G6 |
 | 1.18.0 | Credit-readiness report. Done. | G7 |
 | 2.7.0 | WhatsApp channel and local languages | G8 |
-| 2.x patches | Recurring expenses, budgets, branches, year-end pack | G9 |
+| 1.19.0 | Recurring expenses, budgets, year-end pack, data download. Done; branches still to come. | G9 |
 
 **Order:**
 - G1 comes first because every other feature posts to it.
