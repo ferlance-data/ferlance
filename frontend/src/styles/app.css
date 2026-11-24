@@ -2061,3 +2061,26 @@ svg.icon {
     grid-column: 1 / -1;
   }
 }
+
+/* ---------- Notebook pages ---------- */
+.page-line {
+  grid-template-columns: auto minmax(0, 2fr) minmax(0, 0.7fr) minmax(0, 1fr);
+}
+
+.page-include {
+  align-self: center;
+}
+
+@media (max-width: 560px) {
+  .page-line {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .page-line .field:not(.page-include) {
+    grid-column: auto;
+  }
+
+  .page-line .page-include {
+    grid-column: 1 / -1;
+  }
+}
