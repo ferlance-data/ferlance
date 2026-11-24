@@ -3,7 +3,7 @@
 import { lazy, type ComponentType, type LazyExoticComponent } from 'react';
 import type { IconName } from '../lib/icons';
 
-export type PageName = 'overview' | 'products' | 'insights' | 'lance' | 'inventory' | 'notebook' | 'invoices' | 'debts' | 'books' | 'position' | 'data' | 'settings';
+export type PageName = 'overview' | 'products' | 'insights' | 'lance' | 'inventory' | 'notebook' | 'invoices' | 'debts' | 'reconcile' | 'books' | 'position' | 'data' | 'settings';
 
 export interface PageDef {
   name: PageName;
@@ -82,6 +82,14 @@ export const PAGES: PageDef[] = [
     scoped: false,
     nav: { label: 'Debt book', icon: 'users', group: 'operate' },
     Component: lazy(() => import('./views/Debts')),
+  },
+  {
+    name: 'reconcile',
+    title: 'Reconcile',
+    description: 'Import a MoMo or bank statement, see what the books already have, add the rest, and check every cedi.',
+    scoped: false,
+    nav: { label: 'Reconcile', icon: 'check', group: 'operate' },
+    Component: lazy(() => import('./views/Reconcile')),
   },
   {
     name: 'books',
