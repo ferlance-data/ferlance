@@ -478,6 +478,25 @@ def catch_up(path: Path, business_id: str, user_id: str | None = None) -> int:
                 continue
             changed += _sync(conn, business_id, key, fingerprint, postings, issues, user_id)
         changed += _catch_up_debts(conn, business_id, accounts, start, known, user_id)
+        changed += _catch_up_statements(conn, business_id, accounts, start, known, user_id)
+    return changed
+
+
+def _catch_up_statements(conn, business_id: str, accounts: dict[str, str], start: str | None, known: dict[str, str], user_id: str | None) -> int:
+    """Statement lines the owner booked (or whose fee they booked). Unbooked lines post nothing."""
+    from . import statements
+
+    changed = 0
+    currency = _currency(conn, business_id)
+    for row in conn.execute("SELECT * FROM statement_lines WHERE business_id = ?", (business_id,)).fetchall():
+        line = dict(row)
+        key = f"stmt:{line['id']}"
+        fingerprint = statements.fingerprint(line, start)
+        if known.get(key) == fingerprint or (key not in known and not line["booking"] and not line["fee_booked"]):
+            continue
+        before_start = bool(start and line["txn_date"] < start)
+        postings = [] if before_start else statements.postings(line, accounts, currency)
+        changed += _sync(conn, business_id, key, fingerprint, postings, [], user_id)
     return changed
 
 
