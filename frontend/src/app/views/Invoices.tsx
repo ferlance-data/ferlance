@@ -33,6 +33,7 @@ function NewDocument({ kind, onDone }: { kind: DocKind; onDone: (created: { id: 
   const [issued, setIssued] = useState(today);
   const [due, setDue] = useState('');
   const [paidBy, setPaidBy] = useState('cash');
+  const [chargeVat, setChargeVat] = useState(false);
   const [notes, setNotes] = useState('');
   const [lines, setLines] = useState<DraftLine[]>([emptyLine()]);
   const [status, setStatus] = useState<{ message: string; error: boolean } | null>(null);
@@ -59,6 +60,7 @@ function NewDocument({ kind, onDone }: { kind: DocKind; onDone: (created: { id: 
           due_on: due || null,
           notes,
           paid_by: kind === 'receipt' ? paidBy : null,
+          charge_vat: chargeVat,
           lines: lines
             .filter((line) => line.product_id || line.description.trim())
             .map((line) => ({ product_id: line.product_id || null, description: line.description, quantity: Number(line.quantity), unit_price: Number(line.unit_price || 0) })),
@@ -185,8 +187,12 @@ function NewDocument({ kind, onDone }: { kind: DocKind; onDone: (created: { id: 
           Note (optional)
           <input className="input" maxLength={500} placeholder="e.g. Delivery on Friday" value={notes} onChange={(event) => setNotes(event.target.value)} />
         </label>
+        <label className="field field-inline">
+          <input type="checkbox" checked={chargeVat} onChange={(event) => setChargeVat(event.target.checked)} />
+          Charge VAT and levies (for VAT-registered businesses): 20% on top from 2026
+        </label>
         <div className="button-row">
-          <strong className="invoice-total num">{`Total ${money(total)}`}</strong>
+          <strong className="invoice-total num">{chargeVat ? `${money(total)} + tax ≈ ${money(total * 1.2)}` : `Total ${money(total)}`}</strong>
           <button className="btn btn-primary" type="submit" disabled={saving || total <= 0}>
             {`Create ${KIND_LABEL[kind].toLowerCase()}`}
           </button>

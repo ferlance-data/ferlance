@@ -38,6 +38,7 @@ class InvoiceRequest(BaseModel):
     lines: list[Line] = Field(min_length=1, max_length=100)
     notes: str = Field(default="", max_length=500)
     paid_by: Literal["cash", "momo_mtn", "momo_telecel", "momo_at", "momo_other", "bank"] | None = None
+    charge_vat: bool = False
 
 
 @router.get("")

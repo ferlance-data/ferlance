@@ -70,6 +70,10 @@ Photograph or type a page of the shop's exercise book: a day's sales, the debtor
 
 The Invoices page makes invoices, quotes and receipts with gapless numbers and shares them as small PDFs (`backend/invoices.py`). An invoice becomes a debt-book entry, so payments, reminders and the books follow it. A receipt is a sale paid on the spot, and a quote posts nothing until it's converted.
 
+## Tax & payroll
+
+Tax rates are dated data with sources (`backend/tax.py`): VAT and levies, monthly PAYE, SSNIT and withholding tax, taken from GRA and SSNIT pages and each marked "needs accountant check" until a business's owner or accountant confirms it. VAT invoices book the tax to "VAT and levies payable", supplier payments can withhold tax, and a small payroll (`backend/payroll.py`) produces payslips and posts wages, PAYE and SSNIT to the books. Ferlance does not file with GRA or SSNIT.
+
 ## Reconcile
 
 The Reconcile page imports MoMo and bank statements (CSV or XLSX), matches each line to what the books already hold, and lets the owner or accountant add the rest from a fixed list of kinds (`backend/statements.py`). Statements check the books; they never add to them on their own. The page explains every cedi between the statement balance and the books.

@@ -6,6 +6,33 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.17.0] - 2026-11-24
+
+Ghana tax and payroll basics (PRD §9, G6). **Every rate needs an accountant's check.**
+
+### Added
+- **Dated tax rules (`backend/tax.py`), taken from GRA and SSNIT pages in November 2026.** Each rule records its start and end dates, its sources and its notes, and every figure Ferlance calculates names the rule it used:
+  - **VAT:** from 1 January 2026, VAT 15%, NHIL 2.5% and GETFund 2.5% on the same price (20% in total, COVID-19 levy repealed). Before 2026, the old compound regime (about 21.9%).
+  - **PAYE** for residents: the monthly bands from 1 September 2026 (first GH₵588 free, up to 35% above GH₵50,000), and the earlier bands, partly from secondary sources.
+  - **SSNIT:** employee 5.5% and employer 13% of basic salary, capped at GH₵69,000 a month. The Tier 1 and Tier 2 split is unconfirmed, so the total is booked to one account.
+  - **Withholding tax** for residents: goods 3%, works 5%, services 7.5%; non-residents 20%.
+- **Accountant checks:** each business sees "Needs accountant check" on every rule until its owner or accountant confirms it (stored with who and when). Summaries and payrolls warn when they use unchecked rules.
+- **VAT invoices:** a "Charge VAT and levies" option. The tax is added on top of the lines, booked to "VAT and levies payable" rather than to sales, and printed on a "TAX INVOICE" PDF with the subtotal and each levy.
+- **Withholding tax on supplier payments:** the supplier's debt goes down by the full amount, the supplier receives the rest, and the tax kept back is owed to GRA.
+- **Payroll for small teams:**
+  - Staff with a monthly basic salary and allowances.
+  - Monthly runs calculate SSNIT, then PAYE on gross pay minus the employee's SSNIT, then net pay.
+  - A run stays a draft until you post it from your chosen account. Wages and employer SSNIT become costs, and PAYE and both SSNIT shares are owed. You can void a run and run the month again.
+  - A PDF payslip per employee.
+  - Salaries are visible to owners and accountants only.
+- **What's owed for a period:** VAT and levies charged, withholding tax kept back, and PAYE and SSNIT by month, to help you file. Ferlance does not file with GRA or SSNIT.
+
+### Not yet
+- Input VAT on purchases isn't captured, so VAT is output only.
+- GRA E-VAT isn't integrated.
+- Non-resident PAYE, benefits in kind, bonuses and reliefs aren't handled.
+- The SSNIT tier split needs confirming.
+
 ## [1.16.0] - 2026-11-24
 
 MoMo and bank reconciliation (PRD §9, G5).

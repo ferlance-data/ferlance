@@ -68,6 +68,9 @@ DEFAULT_ACCOUNTS: tuple[tuple[str, str, str, str], ...] = (
     ("payables", "2000", "You owe suppliers (payables)", "liability"),
     ("payments_clearing", "2090", "Payments to allocate", "liability"),
     ("tax_payable", "2100", "VAT and levies payable", "liability"),
+    ("paye_payable", "2110", "PAYE payable", "liability"),
+    ("ssnit_payable", "2120", "SSNIT payable", "liability"),
+    ("wht_payable", "2130", "Withholding tax payable", "liability"),
     ("loans", "2200", "Loans", "liability"),
     ("other_liabilities", "2900", "Other liabilities", "liability"),
     ("owner_capital", "3000", "Owner capital", "equity"),
@@ -84,6 +87,7 @@ DEFAULT_ACCOUNTS: tuple[tuple[str, str, str, str], ...] = (
     ("airtime", "6020", "Data and airtime", "expense"),
     ("utilities", "6030", "Electricity and water", "expense"),
     ("wages", "6040", "Wages", "expense"),
+    ("ssnit_employer", "6045", "Employer SSNIT", "expense"),
     ("charges", "6050", "MoMo and bank charges", "expense"),
     ("uncategorised", "6900", "Expenses to categorise", "expense"),
 )
@@ -479,6 +483,36 @@ def catch_up(path: Path, business_id: str, user_id: str | None = None) -> int:
             changed += _sync(conn, business_id, key, fingerprint, postings, issues, user_id)
         changed += _catch_up_debts(conn, business_id, accounts, start, known, user_id)
         changed += _catch_up_statements(conn, business_id, accounts, start, known, user_id)
+        changed += _catch_up_payroll(conn, business_id, accounts, start, known, user_id)
+    return changed
+
+
+def _catch_up_payroll(conn, business_id: str, accounts: dict[str, str], start: str | None, known: dict[str, str], user_id: str | None) -> int:
+    """A posted payroll run: wages and employer SSNIT as costs; net pay out of the chosen account;
+    PAYE and both SSNIT shares owed until paid to GRA and SSNIT."""
+    changed = 0
+    currency = _currency(conn, business_id)
+    for run in conn.execute("SELECT * FROM payroll_runs WHERE business_id = ? AND status != 'draft'", (business_id,)).fetchall():
+        key = f"payroll:{run['id']}"
+        fingerprint = f"{RULES_VERSION}:{start}:{run['status']}:{run['paid_from']}:{run['paid_on']}"
+        if known.get(key) == fingerprint:
+            continue
+        postings: list[Posting] = []
+        if run["status"] == "posted" and not (start and run["paid_on"] < start):
+            totals = conn.execute(
+                "SELECT SUM(gross_minor) AS gross, SUM(ssnit_employee_minor) AS emp, SUM(ssnit_employer_minor) AS er, SUM(paye_minor) AS paye, SUM(net_minor) AS net "
+                "FROM payroll_lines WHERE run_id = ?", (run["id"],),
+            ).fetchone()
+            label = f"Payroll {run['month']}"
+            lines = [
+                (accounts["wages"], currency, totals["gross"], label),
+                (accounts["ssnit_employer"], currency, totals["er"], label),
+                (accounts[run["paid_from"]], currency, -totals["net"], label),
+                (accounts["paye_payable"], currency, -totals["paye"], label),
+                (accounts["ssnit_payable"], currency, -(totals["emp"] + totals["er"]), label),
+            ]
+            postings = [(run["paid_on"], label, [line for line in lines if line[2]])]
+        changed += _sync(conn, business_id, key, fingerprint, postings, [], user_id)
     return changed
 
 
@@ -530,7 +564,11 @@ def _catch_up_debts(conn, business_id: str, accounts: dict[str, str], start: str
             before = bool(start and day < start)
             if debt["direction"] == "owed_to_us":
                 counter = "opening_equity" if before else "sales" if debt["basis"] == "new_sale" else "receipts_clearing"
-                postings = [(day, f"Credit: {label}", [(accounts["receivables"], debt["currency"], amount, label), (accounts[counter], debt["currency"], -amount, label)])]
+                tax = 0 if before else int(debt.get("tax_minor") or 0)  # VAT and levies on a VAT invoice are owed to GRA, not sales
+                lines = [(accounts["receivables"], debt["currency"], amount, label), (accounts[counter], debt["currency"], -(amount - tax), label)]
+                if tax:
+                    lines.append((accounts["tax_payable"], debt["currency"], -tax, f"VAT and levies: {label}"))
+                postings = [(day, f"Credit: {label}", lines)]
             else:
                 counter = "opening_equity" if before else "payments_clearing" if debt["basis"] == "recorded_purchase" else expense_account({"product": debt["description"]})
                 postings = [(day, f"Owed to supplier: {label}", [(accounts[counter], debt["currency"], amount, label), (accounts["payables"], debt["currency"], -amount, label)])]
@@ -543,7 +581,7 @@ def _catch_up_debts(conn, business_id: str, accounts: dict[str, str], start: str
     for row in payments:
         payment = dict(row)
         void = bool(payment["voided_at"] or payment["debt_voided"])
-        fingerprint = f"{RULES_VERSION}:{start}:{void}:{payment['method']}"
+        fingerprint = f"{RULES_VERSION}:{start}:{void}:{payment['method']}:{payment.get('wht_minor') or 0}"
         key = f"debtpay:{payment['id']}"
         if known.get(key) == fingerprint:
             continue
@@ -552,10 +590,14 @@ def _catch_up_debts(conn, business_id: str, accounts: dict[str, str], start: str
             day, amount, cur = payment["paid_on"], payment["amount_minor"], payment["currency"] or currency
             money_account = accounts["opening_equity" if start and day < start else payment["method"]]
             label = f"{payment['party_name']} payment"
+            withheld = int(payment.get("wht_minor") or 0)
             if payment["direction"] == "owed_to_us":
                 lines = [(money_account, cur, amount, label), (accounts["receivables"], cur, -amount, label)]
             else:
-                lines = [(accounts["payables"], cur, amount, label), (money_account, cur, -amount, label)]
+                # The supplier's debt goes down by the full amount; withholding tax is kept back for GRA.
+                lines = [(accounts["payables"], cur, amount, label), (money_account, cur, -(amount - withheld), label)]
+                if withheld:
+                    lines.append((accounts["wht_payable"], cur, -withheld, f"Withholding tax: {label}"))
             postings = [(day, label, lines)]
         changed += _sync(conn, business_id, key, fingerprint, postings, [], user_id)
     return changed

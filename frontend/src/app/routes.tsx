@@ -3,7 +3,7 @@
 import { lazy, type ComponentType, type LazyExoticComponent } from 'react';
 import type { IconName } from '../lib/icons';
 
-export type PageName = 'overview' | 'products' | 'insights' | 'lance' | 'inventory' | 'notebook' | 'invoices' | 'debts' | 'reconcile' | 'books' | 'position' | 'data' | 'settings';
+export type PageName = 'overview' | 'products' | 'insights' | 'lance' | 'inventory' | 'notebook' | 'invoices' | 'debts' | 'reconcile' | 'tax' | 'books' | 'position' | 'data' | 'settings';
 
 export interface PageDef {
   name: PageName;
@@ -90,6 +90,14 @@ export const PAGES: PageDef[] = [
     scoped: false,
     nav: { label: 'Reconcile', icon: 'check', group: 'operate' },
     Component: lazy(() => import('./views/Reconcile')),
+  },
+  {
+    name: 'tax',
+    title: 'Tax & payroll',
+    description: 'The GRA and SSNIT rates Ferlance uses, what is owed for a period, and a small monthly payroll with payslips.',
+    scoped: false,
+    nav: { label: 'Tax & payroll', icon: 'scale', group: 'operate' },
+    Component: lazy(() => import('./views/TaxPayroll')),
   },
   {
     name: 'books',

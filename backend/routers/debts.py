@@ -10,7 +10,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from .. import config, debts
+from .. import config, debts, tax
 from ..deps import current_user, data_writer, read_business
 
 router = APIRouter(prefix="/api/businesses/{business_id}/debts", tags=["debts"])
@@ -49,13 +49,14 @@ class PaymentRequest(BaseModel):
     paid_on: date | None = None
     method: Literal["cash", "momo_mtn", "momo_telecel", "momo_at", "momo_other", "bank"] | None = None
     momo_ref: str | None = Field(default=None, max_length=200)
+    withhold: Literal["goods", "works", "services", "non_resident"] | None = None
 
 
 @router.post("/{debt_id}/payments")
 def add_payment(debt_id: str, payload: PaymentRequest, business: dict = Depends(data_writer), user: dict = Depends(current_user)) -> dict:
     try:
         return debts.add_payment(config.DB_PATH, business["id"], user["id"], debt_id, **payload.model_dump())
-    except debts.DebtError as error:
+    except (debts.DebtError, tax.TaxError) as error:
         raise _fail(error) from error
 
 

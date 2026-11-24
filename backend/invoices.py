@@ -17,13 +17,14 @@ are never deleted, so the sequence has no gaps.
 
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import date, timedelta
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
-from . import db, debts, ledger
+from . import db, debts, ledger, tax
 from .inventory import _product, _record_movement, _stock
 
 PREFIX = {"invoice": "INV", "quote": "QUO", "receipt": "RCT"}
@@ -93,7 +94,7 @@ def _take_stock(conn, business_id: str, invoice_id: str, number: str, lines: lis
 
 
 def create(path: Path, business_id: str, user_id: str, *, kind: str, customer_name: str, phone: str, issued_on: date, due_on: date | None,
-           lines: list[dict[str, Any]], notes: str = "", paid_by: str | None = None, converted_from: str | None = None) -> dict[str, Any]:
+           lines: list[dict[str, Any]], notes: str = "", paid_by: str | None = None, converted_from: str | None = None, charge_vat: bool = False) -> dict[str, Any]:
     if kind not in PREFIX:
         raise InvoiceError("Choose invoice, quote or receipt.")
     name = " ".join(customer_name.split())
@@ -108,9 +109,13 @@ def create(path: Path, business_id: str, user_id: str, *, kind: str, customer_na
     with db.connection(path) as conn:
         conn.execute("BEGIN IMMEDIATE")
         clean = _clean_lines(conn, business_id, lines)
-        total = sum(line["line_total_minor"] for line in clean)
-        if total <= 0:
+        net = sum(line["line_total_minor"] for line in clean)
+        if net <= 0:
             raise InvoiceError("The total must be more than zero.")
+        # VAT and levies by the rule in force on the issue date (backend/tax.py); lines are before tax.
+        taxes = tax.vat(net, issued_on) if charge_vat else None
+        tax_minor = taxes.total if taxes else 0
+        total = net + tax_minor
         currency = ledger._currency(conn, business_id)
         seq = _next_seq(conn, business_id, kind)
         number = f"{PREFIX[kind]}-{seq:04d}"
@@ -120,9 +125,9 @@ def create(path: Path, business_id: str, user_id: str, *, kind: str, customer_na
         if kind in ("invoice", "receipt"):
             debt_id = str(uuid.uuid4())
             conn.execute(
-                "INSERT INTO debts (id, business_id, party_id, direction, basis, description, amount_minor, currency, issued_on, due_on, created_by, created_at) "
-                "VALUES (?, ?, ?, 'owed_to_us', 'new_sale', ?, ?, ?, ?, ?, ?, ?)",
-                (debt_id, business_id, party_id, number, total, currency, issued_on.isoformat(), due_on.isoformat() if kind == "invoice" and due_on else None, user_id, db.now()),
+                "INSERT INTO debts (id, business_id, party_id, direction, basis, description, amount_minor, currency, issued_on, due_on, created_by, created_at, tax_minor) "
+                "VALUES (?, ?, ?, 'owed_to_us', 'new_sale', ?, ?, ?, ?, ?, ?, ?, ?)",
+                (debt_id, business_id, party_id, number, total, currency, issued_on.isoformat(), due_on.isoformat() if kind == "invoice" and due_on else None, user_id, db.now(), tax_minor),
             )
             if kind == "receipt":
                 conn.execute(
@@ -130,10 +135,11 @@ def create(path: Path, business_id: str, user_id: str, *, kind: str, customer_na
                     (str(uuid.uuid4()), debt_id, business_id, total, issued_on.isoformat(), paid_by, user_id, db.now()),
                 )
         conn.execute(
-            "INSERT INTO invoices (id, business_id, kind, seq, number, party_id, customer_name, phone, issued_on, due_on, currency, total_minor, notes, debt_id, converted_from, created_by, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO invoices (id, business_id, kind, seq, number, party_id, customer_name, phone, issued_on, due_on, currency, total_minor, notes, debt_id, converted_from, created_by, created_at, tax_minor, taxes, tax_rule) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (invoice_id, business_id, kind, seq, number, party_id, name, phone.strip(), issued_on.isoformat(), due_on.isoformat() if due_on else None,
-             currency, total, notes.strip()[:500], debt_id, converted_from, user_id, db.now()),
+             currency, total, notes.strip()[:500], debt_id, converted_from, user_id, db.now(), tax_minor,
+             json.dumps(taxes.components if taxes else []), taxes.rule_id if taxes else None),
         )
         for line in clean:
             conn.execute(
@@ -156,7 +162,7 @@ def convert(path: Path, business_id: str, user_id: str, quote_id: str, issued_on
         raise InvoiceError("This quote is already an invoice.")
     lines = [{"product_id": l["product_id"], "description": l["description"], "quantity": l["quantity"], "unit_price": l["unit_price"]} for l in quote["lines"]]
     return create(path, business_id, user_id, kind="invoice", customer_name=quote["customer_name"], phone=quote["phone"], issued_on=issued_on,
-                  due_on=due_on, lines=lines, notes=quote["notes"], converted_from=quote_id)
+                  due_on=due_on, lines=lines, notes=quote["notes"], converted_from=quote_id, charge_vat=bool(quote["tax"]))
 
 
 def void(path: Path, business_id: str, user_id: str, invoice_id: str) -> None:
@@ -219,6 +225,9 @@ def _present(row: dict[str, Any], today: date) -> dict[str, Any]:
         "id": row["id"], "kind": row["kind"], "number": row["number"], "customer_name": row["customer_name"], "phone": row["phone"],
         "issued_on": row["issued_on"], "due_on": row["due_on"], "currency": row["currency"], "notes": row["notes"],
         "total": ledger.from_minor(row["total_minor"]), "paid": ledger.from_minor(paid),
+        "net": ledger.from_minor(row["total_minor"] - (row.get("tax_minor") or 0)), "tax": ledger.from_minor(row.get("tax_minor") or 0),
+        "taxes": [{"name": name, "amount": ledger.from_minor(amount)} for name, amount in json.loads(row.get("taxes") or "[]")],
+        "tax_rule": row.get("tax_rule"),
         "balance": 0 if row["voided_at"] or row["kind"] == "quote" else ledger.from_minor(row["total_minor"] - paid),
         "status": _status(row, paid, today), "debt_id": row["debt_id"], "voided": bool(row["voided_at"]),
     }
@@ -285,7 +294,8 @@ def pdf(path: Path, business_id: str, invoice_id: str) -> tuple[bytes, str]:
     page.set_font("DejaVu", "B", 16)
     page.cell(width * 0.6, 8, business["name"])
     page.set_font("DejaVu", "B", 16)
-    page.cell(width * 0.4, 8, TITLE[doc["kind"]].upper(), align="R", new_x="LMARGIN", new_y="NEXT")
+    heading = ("TAX " + TITLE[doc["kind"]].upper()) if doc["tax"] and doc["kind"] == "invoice" else TITLE[doc["kind"]].upper()
+    page.cell(width * 0.4, 8, heading, align="R", new_x="LMARGIN", new_y="NEXT")
     page.set_font("DejaVu", "", 9)
     details = [line for line in (extra["address"], extra["phone"], f"TIN: {extra['tin']}" if extra["tin"] else "") if line]
     top = page.get_y()
@@ -333,6 +343,10 @@ def pdf(path: Path, business_id: str, invoice_id: str) -> tuple[bytes, str]:
         page.cell(width * 0.8, 6, label, align="R")
         page.cell(width * 0.2, 6, value, align="R", new_x="LMARGIN", new_y="NEXT")
 
+    if doc["tax"]:
+        total_row("Subtotal (before tax)", _money(doc["currency"], doc["net"]))
+        for item in doc["taxes"]:
+            total_row(item["name"], _money(doc["currency"], item["amount"]))
     total_row("Total", _money(doc["currency"], doc["total"]), bold=True)
     if doc["kind"] == "invoice" and doc["paid"]:
         total_row("Paid", _money(doc["currency"], doc["paid"]))
