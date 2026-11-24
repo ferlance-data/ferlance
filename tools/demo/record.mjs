@@ -7,12 +7,11 @@
 //
 // Each scenario is a scripted walk through the real app on a phone-sized screen, with captions
 // that say why, when and how. Frames come from Chrome's screencast (CDP) and are encoded to a
-// small VP9 WebM with Playwright's bundled ffmpeg; a poster image is saved for each.
+// small H.264 MP4 (FFMPEG=<path to an ffmpeg with libx264>); a poster image is saved for each.
 
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 
 const [base, outDir] = process.argv.slice(2);
@@ -24,13 +23,13 @@ fs.mkdirSync(outDir, { recursive: true });
 const SIZE = { width: 390, height: 844 };
 const EMAIL = 'demo@ferlance.test';
 const PASSWORD = 'demo-pass-123';
-const FFMPEG = fs
-  .readdirSync(path.join(os.homedir(), '.cache/ms-playwright'))
-  .filter((name) => name.startsWith('ffmpeg-'))
-  .map((name) => path.join(os.homedir(), '.cache/ms-playwright', name, 'ffmpeg-linux'))
-  .find((file) => fs.existsSync(file));
+// An ffmpeg with libx264 (H.264 MP4 plays on every phone, iPhones included). Playwright's own
+// ffmpeg has no H.264 encoder; `pip install imageio-ffmpeg` ships one (see README).
+const FFMPEG = process.env.FFMPEG || 'ffmpeg';
 
 const OVERLAY_CSS = `
+  /* The recording server has no AI key: hide the AI explanation rather than film its set-up error. */
+  .advice-ai-section{display:none!important}
   #demo-caption{position:fixed;left:12px;right:12px;top:10px;z-index:2147483647;pointer-events:none;
     background:rgba(15,15,17,.92);color:#f1f1f3;border-radius:14px;padding:12px 14px;font:500 15px/1.4 system-ui,sans-serif;
     box-shadow:0 10px 30px rgba(0,0,0,.35);transition:opacity .25s}
@@ -109,6 +108,7 @@ async function type(page, locator, text) {
   const target = locator.first();
   await target.scrollIntoViewIfNeeded();
   await target.click();
+  await target.fill(''); // a saved customer may have pre-filled the field
   await target.pressSequentially(text, { delay: 45 });
   await page.waitForTimeout(250);
 }
@@ -281,12 +281,12 @@ async function screencast(page) {
   };
 }
 
-/** Write frames at a steady 25 fps (holding each until the next arrives) into a VP9 WebM. */
+/** Write frames at a steady 25 fps (holding each until the next arrives) into an H.264 MP4. */
 function encode(frames, target, fps = 25) {
   return new Promise((resolve, reject) => {
     const ffmpeg = spawn(FFMPEG, ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-c:v', 'mjpeg', '-r', String(fps), '-i', 'pipe:0',
       '-vf', `scale=${SIZE.width}:${SIZE.height}:force_original_aspect_ratio=decrease,pad=${SIZE.width}:${SIZE.height}:(ow-iw)/2:(oh-ih)/2:color=white`,
-      '-c:v', 'libvpx-vp9', '-b:v', '260k', '-row-mt', '1', '-deadline', 'good', '-cpu-used', '4', '-pix_fmt', 'yuv420p', '-an', target]);
+      '-c:v', 'libx264', '-profile:v', 'main', '-crf', '30', '-preset', 'slow', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-an', target]);
     let errors = '';
     ffmpeg.stderr.on('data', (chunk) => (errors += chunk));
     ffmpeg.on('close', (code) => (code === 0 ? resolve() : reject(new Error(errors || `ffmpeg exited ${code}`))));
@@ -318,6 +318,8 @@ async function main() {
   for (const scenario of SCENARIOS) {
     if (only && !only.includes(scenario.slug)) continue;
     const context = await browser.newContext({ viewport: SIZE, deviceScaleFactor: 1, colorScheme: 'light' });
+    // Skip the first-visit welcome tour: the guides are filmed as a returning owner sees the app.
+    await context.addInitScript(() => localStorage.setItem('ferlance-tour-seen', '1'));
     await context.request.post(`${base}/api/auth/login`, { data: { email: EMAIL, password: PASSWORD } });
     const page = await context.newPage();
     await page.goto(`${base}/app/overview`);
@@ -332,7 +334,7 @@ async function main() {
     }
     const frames = await stop();
     await context.close();
-    const target = path.join(outDir, `${scenario.slug}.webm`);
+    const target = path.join(outDir, `${scenario.slug}.mp4`);
     await encode(frames, target);
     console.log(`${scenario.slug}: ${(fs.statSync(target).size / 1024).toFixed(0)} KB`);
   }

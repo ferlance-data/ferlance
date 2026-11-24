@@ -175,7 +175,7 @@ renderAgent('summary');
 function renderHow(slug: string): void {
   const guide = GUIDES.find((item) => item.slug === slug);
   if (!guide) return;
-  const video = el('video', { class: 'how-video', controls: '', playsinline: '', muted: '', preload: 'none', poster: guide.poster, 'aria-label': `Video: ${guide.title}` }, el('source', { src: guide.video, type: 'video/webm' })) as HTMLVideoElement;
+  const video = el('video', { class: 'how-video', controls: '', playsinline: '', muted: '', preload: 'none', poster: guide.poster, 'aria-label': `Video: ${guide.title}` }, el('source', { src: guide.video, type: 'video/mp4' })) as HTMLVideoElement;
   video.muted = true;
   $('#how-panel').replaceChildren(
     el('div', { class: 'how-phone fade-in' }, video),

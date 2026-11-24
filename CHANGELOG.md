@@ -6,6 +6,28 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.22.0] - 2026-11-25
+
+The phone app, and guide videos that play on every phone.
+
+### Added
+- **Mobile app** (`mobile/`, Expo SDK 58) for the everyday jobs:
+  - **Today:** sales, costs and the change from last month, plus what to do next.
+  - **Debts:** new credit sales, recording payments, and WhatsApp or SMS reminders.
+  - **Record:** MoMo messages pasted in, or a notebook page photographed or typed, with every line checked before it is added.
+  - **Ask Lance.**
+  - **Guides:** they open on the first sign-in.
+
+  It shares the guide text, money formatting, reminder wording and API types with the website, straight from `frontend/src`. It runs free in Expo Go; see `mobile/README.md`.
+- **Phone sign-in** at `/api/auth/mobile/login`, `/refresh` and `/logout`. The refresh token travels in the JSON body and is kept in the phone's secure store. It rotates on every use, with the same one-shot grace for a lost response. Phone sessions have their own `mobile` scope, so a website cookie can't be refreshed there and a phone token can't be used as a cookie. Disabling an account ends phone sessions too.
+
+### Changed
+- The guide videos are now H.264 MP4 instead of VP9 WebM. They play on every phone, older iPhones included, and they're a quarter of the size: about 1.6 MB for all seven, down from 5.8 MB.
+- All seven videos were re-recorded, fixing three problems:
+  - The phone number in the credit video was typed twice.
+  - The welcome tour no longer covers the page.
+  - The AI explanation panel is hidden, because the recording server has no AI key.
+
 ## [1.21.0] - 2026-11-25
 
 Guides: short videos of the real app showing when, why and how to use each feature.

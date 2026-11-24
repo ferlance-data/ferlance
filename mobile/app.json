@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "Ferlance",
+    "slug": "ferlance",
+    "version": "1.22.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.ferlance.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0F1C1B",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "com.ferlance.app"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-video",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Ferlance uses the camera to photograph pages of your exercise book so they can be read into your records.",
+          "photosPermission": "Ferlance reads a page photo you choose into your records."
+        }
+      ]
+    ],
+    "scheme": "ferlance"
+  }
+}
