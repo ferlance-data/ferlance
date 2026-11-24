@@ -2117,3 +2117,7 @@ svg.icon {
   white-space: normal;
   text-align: left;
 }
+
+.recurring-amount {
+  width: 120px;
+}

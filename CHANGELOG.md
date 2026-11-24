@@ -6,6 +6,21 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.19.0] - 2026-11-24
+
+Planning extras (PRD §9, G9).
+
+### Added
+- **Planning page, Recurring tab:** regular payments such as rent and subscriptions. They never post on their own. Each month shows as **due**, and you confirm the amount actually paid, or skip that month. Confirmed months post Expense / paid-from account, and Undo reverses them. Payments can't be confirmed before their date.
+- **Budgets tab:** a budget per month for sales, cost of goods sold and each kind of expense, against the actual figures from the books, with the percentage used. Overspends are flagged.
+- **Downloads tab:**
+  - **Year-end pack** (owner and accountant): a zip of CSVs with the trial balance, profit and loss, balance sheet, the year's journal, debtors, creditors and stock valuation, plus a README listing the books start date, the period lock and any unchecked tax rules.
+  - **Download all my data** (owner): every kind of record as CSV.
+  - Spreadsheet formulas are neutralised in both.
+
+### Not yet
+- **Branches** (several shops under one business) touch nearly every table, so they're planned as their own release.
+
 ## [1.18.0] - 2026-11-24
 
 Credit-readiness report (PRD §9, G7).
