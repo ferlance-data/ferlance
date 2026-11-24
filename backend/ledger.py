@@ -24,7 +24,7 @@ Posting rules (each has a test)
 - Sales lines: receipt account by payment channel (cash, a MoMo wallet, bank), else
   *Sales receipts to allocate*; credit Sales. Negative amounts are refunds (the reverse).
 - MoMo SMS: ``momo_sale_received`` → wallet / Sales; ``momo_expense_paid`` → *Expenses to
-  categorise* / wallet. (Analytics counts the latter as revenue today; the differences check names it.)
+  categorise* / wallet. (The dashboards count payments made as costs too.)
 - Cost on a sales line → Cost of goods sold / *Payments to allocate*, unless the file was posted to
   stock, in which case cost of goods sold comes from the stock movements only (no double count).
 - Cost-only files (expenses) → an expense account chosen from the line's words / *Payments to allocate*.
@@ -1019,15 +1019,13 @@ def differences(path: Path, business_id: str, start: date, end: date) -> dict[st
                 continue
             if not first <= day <= last:
                 continue
+            if record.get("category") == "momo_expense_paid":
+                continue  # money paid out: the dashboards count it as a cost, like the books (analytics._as_spending)
             analytics_total += amount
             if booked:
                 continue
             if rule == "debt_in":
                 explained["MoMo payments of customer debts (the sale was booked when the debt was recorded)"] += amount
-            elif rule == "debt_out":
-                explained["MoMo payments made (dashboards count them as revenue; the books treat them as spending)"] += amount
-            elif rule == "momo_expense":
-                explained["MoMo payments made (dashboards count them as revenue; the books treat them as spending)"] += amount
             elif rule == "expense":
                 explained["Amounts on expense lines"] += amount
             else:

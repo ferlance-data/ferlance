@@ -6,7 +6,7 @@ import { useState, type FormEvent } from 'react';
 import { request } from '../../lib/api';
 import { formatDate, isoDate, money } from '../../lib/format';
 import { toast } from '../../lib/toast';
-import { EmptyState, Kpi, Pill, ReadOnlyNotice, Segmented, SkeletonRows, StatusText } from '../components/ui';
+import { EmptyState, Kpi, ListHeader, Modal, Pill, ReadOnlyNotice, Segmented, SkeletonRows, StatusText } from '../components/ui';
 import { PageActions } from '../page';
 import { keys, useWorkspace } from '../workspace';
 import {
@@ -296,7 +296,9 @@ function DebtCard({ debt, book, editable, onDone }: { debt: Debt; book: DebtBook
                 <option value="services">Services (7.5%)</option>
                 <option value="non_resident">Non-resident supplier (20%)</option>
               </select>
-              <span className="field-hint">Kept back for GRA; the supplier gets the rest. Rates need your accountant's check (Tax &amp; payroll).</span>
+              <span className="field-hint">
+                Kept back for GRA; the supplier gets the rest. Rates need your accountant's check (Tax &amp; payroll).
+              </span>
             </label>
           ) : null}
           <div className="button-row">
@@ -351,6 +353,7 @@ export default function Debts() {
   const [side, setSide] = useState<Direction>('owed_to_us');
   const [showClosed, setShowClosed] = useState(false);
   const [payTo, setPayTo] = useState<string | null>(null);
+  const [modal, setModal] = useState<'new' | 'payto' | null>(null);
   const bookQuery = useQuery({
     queryKey: keys.business(business.id, 'debts'),
     queryFn: ({ signal }) => request<DebtBook>(businessPath('/debts'), { signal }),
@@ -382,6 +385,7 @@ export default function Debts() {
       await request(businessPath('/debts/settings'), { method: 'PUT', json: { pay_to: payTo ?? '' } });
       toast('Saved. Reminders will show where to pay.');
       setPayTo(null);
+      setModal(null);
       await refresh();
     } catch (error) {
       toast((error as Error).message, { error: true });
@@ -443,11 +447,31 @@ export default function Debts() {
         </div>
       ) : null}
 
-      {editable ? (
-        <AddDebt key={side} side={side} book={book} onDone={refresh} />
-      ) : (
-        <ReadOnlyNotice role={business.role ?? 'accountant'} what="the debt book" />
-      )}
+      <ListHeader
+        title={SIDE[side].title}
+        action={editable ? (side === 'owed_to_us' ? 'New credit sale' : 'New supplier credit') : undefined}
+        onAction={() => setModal('new')}
+      >
+        {editable ? (
+          <button className="btn btn-ghost" type="button" onClick={() => setModal('payto')}>
+            Where customers pay
+          </button>
+        ) : null}
+      </ListHeader>
+      {!editable ? <ReadOnlyNotice role={business.role ?? 'accountant'} what="the debt book" /> : null}
+      {modal === 'new' ? (
+        <Modal label="Record a debt" onClose={() => setModal(null)}>
+          <AddDebt
+            key={side}
+            side={side}
+            book={book}
+            onDone={async () => {
+              setModal(null);
+              await refresh();
+            }}
+          />
+        </Modal>
+      ) : null}
 
       <div className="card" id="debt-list">
         <div className="card-header">
@@ -476,26 +500,28 @@ export default function Debts() {
         )}
       </div>
 
-      {editable ? (
-        <form className="card" id="debt-payto" onSubmit={(event) => void savePayTo(event)}>
-          <div className="card-header">
-            <div>
-              <h2 className="card-title">Where customers pay you</h2>
-              <p className="card-subtitle">Shown in reminders, e.g. "MTN MoMo 024 000 0000 (Ama Provisions)"</p>
+      {editable && modal === 'payto' ? (
+        <Modal label="Where customers pay you" onClose={() => setModal(null)}>
+          <form className="card" id="debt-payto" onSubmit={(event) => void savePayTo(event)}>
+            <div className="card-header">
+              <div>
+                <h2 className="card-title">Where customers pay you</h2>
+                <p className="card-subtitle">Shown in reminders, e.g. "MTN MoMo 024 000 0000 (Ama Provisions)"</p>
+              </div>
             </div>
-          </div>
-          <div className="card-body form-grid">
-            <label className="field">
-              MoMo number and name
-              <input className="input" maxLength={160} value={payTo ?? book.pay_to} onChange={(event) => setPayTo(event.target.value)} />
-            </label>
-            <div className="button-row">
-              <button className="btn btn-secondary" type="submit" disabled={payTo === null}>
-                Save
-              </button>
+            <div className="card-body form-grid">
+              <label className="field">
+                MoMo number and name
+                <input className="input" maxLength={160} value={payTo ?? book.pay_to} onChange={(event) => setPayTo(event.target.value)} />
+              </label>
+              <div className="button-row">
+                <button className="btn btn-secondary" type="submit" disabled={payTo === null}>
+                  Save
+                </button>
+              </div>
             </div>
-          </div>
-        </form>
+          </form>
+        </Modal>
       ) : null}
     </>
   );

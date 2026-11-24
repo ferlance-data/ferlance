@@ -1,6 +1,6 @@
 // Small UI primitives shared by every view. Class names match src/styles/*.css.
 
-import type { ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { Icon, type IconName } from '../../lib/icons';
 
 export type Tone = '' | 'success' | 'warning' | 'error' | 'info' | 'ai' | 'dot';
@@ -75,7 +75,15 @@ export function SkeletonRows({ count = 3, height = 18 }: { count?: number; heigh
   );
 }
 
-export function Notice({ tone = 'warning', icon = 'alert', children }: { tone?: 'warning' | 'error' | 'success' | 'info'; icon?: IconName; children: ReactNode }) {
+export function Notice({
+  tone = 'warning',
+  icon = 'alert',
+  children,
+}: {
+  tone?: 'warning' | 'error' | 'success' | 'info';
+  icon?: IconName;
+  children: ReactNode;
+}) {
   return (
     <div className={`notice notice-${tone}`}>
       <Icon name={icon} />
@@ -212,5 +220,80 @@ export function ReadOnlyNotice({ role, what }: { role: string; what: string }) {
     <Notice tone="info" icon="info">
       {`As ${role === 'accountant' ? 'an accountant' : `a ${role}`} you can view ${what}, but not change it. Ask the business owner if you need to.`}
     </Notice>
+  );
+}
+
+/**
+ * A modal for creating or editing something: the page shows what already exists, and "New…" opens
+ * this. A native <dialog> (focus is kept inside, Escape closes, the page behind is inert).
+ * On phones it is a bottom sheet; wider screens get a centred panel. Mount it only while open.
+ */
+export function Modal({
+  label,
+  onClose,
+  children,
+  wide = false,
+}: {
+  label: string;
+  onClose: () => void;
+  children: ReactNode;
+  wide?: boolean;
+}) {
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const dialog = ref.current;
+    // No cleanup: unmounting ends the modal; a close() here would fire onClose during StrictMode's replay.
+    if (dialog && !dialog.open) dialog.showModal();
+  }, []);
+  return (
+    <dialog
+      ref={ref}
+      className={`modal${wide ? ' modal-wide' : ''}`}
+      aria-label={label}
+      onClose={onClose}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div className="modal-body">
+        <button className="btn btn-ghost btn-icon modal-close" type="button" aria-label="Close" onClick={onClose}>
+          <Icon name="x" />
+        </button>
+        {children}
+      </div>
+    </dialog>
+  );
+}
+
+/** The heading row above a list of records, with the "New…" button that opens the create modal. */
+export function ListHeader({
+  title,
+  subtitle,
+  action,
+  onAction,
+  children,
+}: {
+  title: string;
+  subtitle?: ReactNode;
+  action?: string;
+  onAction?: () => void;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="list-header">
+      <div>
+        <h2 className="list-title">{title}</h2>
+        {subtitle ? <p className="card-subtitle">{subtitle}</p> : null}
+      </div>
+      <div className="list-header-actions">
+        {children}
+        {action && onAction ? (
+          <button className="btn btn-primary" type="button" onClick={onAction}>
+            <Icon name="plus" />
+            <span>{action}</span>
+          </button>
+        ) : null}
+      </div>
+    </div>
   );
 }

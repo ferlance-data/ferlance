@@ -114,7 +114,7 @@ def test_sales_channels_refunds_and_costs(client):
     assert db.one(config.DB_PATH, "SELECT COUNT(*) AS n FROM journal_entries", ())["n"] == count
 
 
-def test_momo_payments_are_spending_and_the_difference_is_named(client):
+def test_momo_payments_are_spending_on_the_dashboards_and_in_the_books(client):
     headers, base, _ = owner(client)
     sms = (
         "Payment received for GHS 150.00 from Kojo Mensah (0244123456). Current Balance: GHS 2,450.00. "
@@ -129,9 +129,11 @@ def test_momo_payments_are_spending_and_the_difference_is_named(client):
     assets = lines_of(result["balance_sheet"]["currencies"][0], "assets")
     assert assets == {"momo_mtn": 110.0, "momo_telecel": 85.5}
     diff = result["differences"]
-    assert diff["analytics_revenue"] == 275.5 and diff["ledger_sales"] == 235.5
-    assert diff["explained"][0]["amount"] == 40.0 and "MoMo payments made" in diff["explained"][0]["reason"]
-    assert diff["unexplained"] == 0
+    # The dashboards now treat money paid out as a cost too, so books and dashboards agree.
+    assert diff["analytics_revenue"] == 235.5 and diff["ledger_sales"] == 235.5
+    assert diff["explained"] == [] and diff["unexplained"] == 0
+    overview = client.get(f"{base}/analytics", headers=headers).json()
+    assert overview["kpis"]["total_revenue"] == 235.5 and overview["kpis"]["total_cost"] == 40.0
 
 
 def test_excluding_a_file_reverses_without_deleting(client):

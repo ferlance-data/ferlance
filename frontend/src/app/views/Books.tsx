@@ -7,7 +7,7 @@ import { request } from '../../lib/api';
 import { formatDate, isoDate, money } from '../../lib/format';
 import { Icon } from '../../lib/icons';
 import { toast } from '../../lib/toast';
-import { DataTable, Kpi, Notice, Pill, ReadOnlyNotice, Segmented, SkeletonRows, StatusText } from '../components/ui';
+import { DataTable, Kpi, Modal, Notice, Pill, ReadOnlyNotice, Segmented, SkeletonRows, StatusText } from '../components/ui';
 import { PageActions } from '../page';
 import { keys, useWorkspace } from '../workspace';
 import { cashOnHand, salesToPlace, type BalanceBlock, type BooksSummary, type LedgerLine } from './books.logic';
@@ -105,7 +105,15 @@ function Statements({ data }: { data: BooksSummary }) {
               <h2 className="card-title">What the business owns and owes</h2>
               <p className="card-subtitle">{`On ${formatDate(data.balance_sheet.as_of)} · ${block.currency}`}</p>
             </div>
-            {block.balanced ? <Pill tone="success" icon="check">Balances</Pill> : <Pill tone="error" icon="alert">Does not balance</Pill>}
+            {block.balanced ? (
+              <Pill tone="success" icon="check">
+                Balances
+              </Pill>
+            ) : (
+              <Pill tone="error" icon="alert">
+                Does not balance
+              </Pill>
+            )}
           </div>
           <h3 className="books-group">{`Owns · ${money(block.totals.assets, { code: block.currency })}`}</h3>
           <div className="table-wrap">
@@ -121,7 +129,8 @@ function Statements({ data }: { data: BooksSummary }) {
           </div>
           {block.to_allocate.length ? (
             <p className="footnote card-body">
-              “To allocate” holds sales and payments whose cash, MoMo or bank account is not known yet. Add a payment method column to your files to place them.
+              “To allocate” holds sales and payments whose cash, MoMo or bank account is not known yet. Add a payment method column to your
+              files to place them.
             </p>
           ) : null}
         </div>
@@ -157,7 +166,13 @@ function Statements({ data }: { data: BooksSummary }) {
             <h2 className="card-title">Books and dashboards compared</h2>
             <p className="card-subtitle">Sales in the books against revenue on the dashboards, for the same dates</p>
           </div>
-          {diff.unexplained === 0 ? <Pill tone="success" icon="check">Every difference explained</Pill> : <Pill tone="warning" icon="alert">{`${money(diff.unexplained)} unexplained`}</Pill>}
+          {diff.unexplained === 0 ? (
+            <Pill tone="success" icon="check">
+              Every difference explained
+            </Pill>
+          ) : (
+            <Pill tone="warning" icon="alert">{`${money(diff.unexplained)} unexplained`}</Pill>
+          )}
         </div>
         <dl className="books-totals card-body">
           <div>
@@ -219,7 +234,10 @@ function OpeningStep({ onDone }: { onDone: () => Promise<void> }) {
       <div className="card-header">
         <div>
           <h2 className="card-title">Where you stand on day one</h2>
-          <p className="card-subtitle">Choose the day your books start and check what you had then. Sales before that day stay on the dashboards only, so nothing is counted twice.</p>
+          <p className="card-subtitle">
+            Choose the day your books start and check what you had then. Sales before that day stay on the dashboards only, so nothing is
+            counted twice.
+          </p>
         </div>
       </div>
       <div className="card-body form-grid">
@@ -241,12 +259,20 @@ function OpeningStep({ onDone }: { onDone: () => Promise<void> }) {
             proposal.data.lines.map((line, index) => (
               <label className="field" key={`${line.account}:${line.account_name}`}>
                 {line.account_name}
-                <input className="input" inputMode="decimal" value={amounts[index] ?? String(line.amount)} onChange={(event) => setAmounts({ ...amounts, [index]: event.target.value })} />
+                <input
+                  className="input"
+                  inputMode="decimal"
+                  value={amounts[index] ?? String(line.amount)}
+                  onChange={(event) => setAmounts({ ...amounts, [index]: event.target.value })}
+                />
                 <span className="field-hint">{`From your balance on ${formatDate(line.as_of_date)}`}</span>
               </label>
             ))
           ) : (
-            <p className="body-sm muted">No balances recorded on or before this day. You can still start: your books will begin from zero, and you can add balances on Financial position first.</p>
+            <p className="body-sm muted">
+              No balances recorded on or before this day. You can still start: your books will begin from zero, and you can add balances on
+              Financial position first.
+            </p>
           )
         ) : (
           <SkeletonRows count={2} />
@@ -294,18 +320,21 @@ function Accountant({
     { account_id: '', debit: '', credit: '' },
   ]);
   const [lock, setLock] = useState(lockDate ?? '');
+  const [modal, setModal] = useState<'manual' | 'accounts' | null>(null);
   const [status, setStatus] = useState<{ message: string; error: boolean } | null>(null);
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
   const [type, setType] = useState<Account['type']>('expense');
 
-  async function act(work: () => Promise<unknown>, done: string) {
+  async function act(work: () => Promise<unknown>, done: string): Promise<boolean> {
     try {
       await work();
       setStatus({ message: done, error: false });
       await onChanged();
+      return true;
     } catch (error) {
       setStatus({ message: (error as Error).message, error: true });
+      return false;
     }
   }
 
@@ -336,10 +365,23 @@ function Accountant({
             <h2 className="card-title">Journal</h2>
             <p className="card-subtitle">{lockDate ? `Locked up to ${formatDate(lockDate)}` : 'No period is locked'}</p>
           </div>
-          <button className="btn btn-ghost btn-sm" type="button" onClick={() => void download()}>
-            <Icon name="download" />
-            <span className="btn-label">Download CSV</span>
-          </button>
+          <div className="list-header-actions">
+            <button className="btn btn-ghost btn-sm" type="button" onClick={() => void download()}>
+              <Icon name="download" />
+              <span className="btn-label">Download CSV</span>
+            </button>
+            {editable ? (
+              <>
+                <button className="btn btn-ghost btn-sm" type="button" onClick={() => setModal('accounts')}>
+                  Chart of accounts
+                </button>
+                <button className="btn btn-primary btn-sm" type="button" onClick={() => setModal('manual')}>
+                  <Icon name="plus" />
+                  <span className="btn-label">Manual journal</span>
+                </button>
+              </>
+            ) : null}
+          </div>
         </div>
         {journal.data ? (
           journal.data.length ? (
@@ -354,8 +396,12 @@ function Accountant({
                     <thead>
                       <tr>
                         <th scope="col">Account</th>
-                        <th scope="col" className="num">Debit</th>
-                        <th scope="col" className="num">Credit</th>
+                        <th scope="col" className="num">
+                          Debit
+                        </th>
+                        <th scope="col" className="num">
+                          Credit
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -378,17 +424,27 @@ function Accountant({
           <SkeletonRows count={4} />
         )}
         <div className="button-row card-body">
-          <button className="btn btn-ghost btn-sm" type="button" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - 25))}>
+          <button
+            className="btn btn-ghost btn-sm"
+            type="button"
+            disabled={offset === 0}
+            onClick={() => setOffset(Math.max(0, offset - 25))}
+          >
             Newer
           </button>
-          <button className="btn btn-ghost btn-sm" type="button" disabled={(journal.data?.length ?? 0) < 25} onClick={() => setOffset(offset + 25)}>
+          <button
+            className="btn btn-ghost btn-sm"
+            type="button"
+            disabled={(journal.data?.length ?? 0) < 25}
+            onClick={() => setOffset(offset + 25)}
+          >
             Older
           </button>
         </div>
       </div>
 
-      {editable ? (
-        <>
+      {modal === 'manual' ? (
+        <Modal label="Manual journal" onClose={() => setModal(null)} wide>
           <form
             className="card"
             id="books-manual"
@@ -398,10 +454,20 @@ function Accountant({
                 () =>
                   request(businessPath('/books/journal'), {
                     method: 'POST',
-                    json: { entry_date: entryDate, memo, lines: lines.map((line) => ({ account_id: line.account_id, debit: Number(line.debit || 0), credit: Number(line.credit || 0) })) },
+                    json: {
+                      entry_date: entryDate,
+                      memo,
+                      lines: lines.map((line) => ({
+                        account_id: line.account_id,
+                        debit: Number(line.debit || 0),
+                        credit: Number(line.credit || 0),
+                      })),
+                    },
                   }),
                 'Journal entry posted.',
-              ).then(() => {
+              ).then((ok) => {
+                if (!ok) return;
+                setModal(null);
                 setMemo('');
                 setLines([
                   { account_id: '', debit: '', credit: '' },
@@ -413,7 +479,9 @@ function Accountant({
             <div className="card-header">
               <div>
                 <h2 className="card-title">Manual journal</h2>
-                <p className="card-subtitle">Debits must equal credits. Posted entries cannot be edited; correct them with another entry.</p>
+                <p className="card-subtitle">
+                  Debits must equal credits. Posted entries cannot be edited; correct them with another entry.
+                </p>
               </div>
             </div>
             <div className="card-body form-grid">
@@ -430,23 +498,46 @@ function Accountant({
                   <legend className="visually-hidden">{`Line ${index + 1}`}</legend>
                   <label className="field">
                     Account
-                    <select className="select" required value={line.account_id} onChange={(event) => setLines(lines.map((l, i) => (i === index ? { ...l, account_id: event.target.value } : l)))}>
+                    <select
+                      className="select"
+                      required
+                      value={line.account_id}
+                      onChange={(event) => setLines(lines.map((l, i) => (i === index ? { ...l, account_id: event.target.value } : l)))}
+                    >
                       <option value="">Choose…</option>
                       {accountOptions}
                     </select>
                   </label>
                   <label className="field">
                     Debit
-                    <input className="input" inputMode="decimal" value={line.debit} onChange={(event) => setLines(lines.map((l, i) => (i === index ? { ...l, debit: event.target.value, credit: '' } : l)))} />
+                    <input
+                      className="input"
+                      inputMode="decimal"
+                      value={line.debit}
+                      onChange={(event) =>
+                        setLines(lines.map((l, i) => (i === index ? { ...l, debit: event.target.value, credit: '' } : l)))
+                      }
+                    />
                   </label>
                   <label className="field">
                     Credit
-                    <input className="input" inputMode="decimal" value={line.credit} onChange={(event) => setLines(lines.map((l, i) => (i === index ? { ...l, credit: event.target.value, debit: '' } : l)))} />
+                    <input
+                      className="input"
+                      inputMode="decimal"
+                      value={line.credit}
+                      onChange={(event) =>
+                        setLines(lines.map((l, i) => (i === index ? { ...l, credit: event.target.value, debit: '' } : l)))
+                      }
+                    />
                   </label>
                 </fieldset>
               ))}
               <div className="button-row">
-                <button className="btn btn-ghost btn-sm" type="button" onClick={() => setLines([...lines, { account_id: '', debit: '', credit: '' }])}>
+                <button
+                  className="btn btn-ghost btn-sm"
+                  type="button"
+                  onClick={() => setLines([...lines, { account_id: '', debit: '', credit: '' }])}
+                >
                   Add line
                 </button>
                 <button className="btn btn-primary" type="submit">
@@ -455,13 +546,87 @@ function Accountant({
               </div>
             </div>
           </form>
-
+        </Modal>
+      ) : null}
+      {modal === 'accounts' ? (
+        <Modal label="Chart of accounts" onClose={() => setModal(null)} wide>
+          <form
+            className="card"
+            id="books-accounts"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void act(
+                () => request(businessPath('/books/accounts'), { method: 'POST', json: { code, name, type } }),
+                `Added ${code} ${name}.`,
+              ).then(() => {
+                setCode('');
+                setName('');
+              });
+            }}
+          >
+            <div className="card-header">
+              <div>
+                <h2 className="card-title">Chart of accounts</h2>
+                <p className="card-subtitle">{`${accounts.length} accounts`}</p>
+              </div>
+            </div>
+            <div className="table-wrap">
+              <DataTable
+                columns={[
+                  { label: 'Code', value: (item) => item.code },
+                  { label: 'Account', value: (item) => item.name },
+                  { label: 'Type', value: (item) => item.type },
+                ]}
+                rows={accounts}
+                rowKey={(item) => item.id}
+              />
+            </div>
+            <div className="card-body form-grid">
+              <label className="field">
+                Code
+                <input
+                  className="input"
+                  required
+                  maxLength={12}
+                  pattern="[0-9A-Za-z-]+"
+                  value={code}
+                  onChange={(event) => setCode(event.target.value)}
+                />
+              </label>
+              <label className="field">
+                Name
+                <input className="input" required maxLength={120} value={name} onChange={(event) => setName(event.target.value)} />
+              </label>
+              <label className="field">
+                Type
+                <select className="select" value={type} onChange={(event) => setType(event.target.value as Account['type'])}>
+                  <option value="asset">Asset</option>
+                  <option value="liability">Liability</option>
+                  <option value="equity">Equity</option>
+                  <option value="income">Income</option>
+                  <option value="expense">Expense</option>
+                </select>
+              </label>
+              <div className="button-row">
+                <button className="btn btn-secondary" type="submit">
+                  Add account
+                </button>
+              </div>
+            </div>
+          </form>
+        </Modal>
+      ) : null}
+      {editable ? (
+        <>
           <form
             className="card"
             id="books-lock"
             onSubmit={(event) => {
               event.preventDefault();
-              void act(() => request(businessPath('/books/lock'), { method: 'PUT', json: { lock_date: lock || null } }), lock ? `Locked up to ${formatDate(lock)}.` : 'Period unlocked.');
+              void act(
+                () => request(businessPath('/books/lock'), { method: 'PUT', json: { lock_date: lock || null } }),
+                lock ? `Locked up to ${formatDate(lock)}.` : 'Period unlocked.',
+              );
             }}
           >
             <div className="card-header">
@@ -494,61 +659,6 @@ function Accountant({
               </div>
             </div>
           </form>
-
-          <form
-            className="card"
-            id="books-accounts"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void act(() => request(businessPath('/books/accounts'), { method: 'POST', json: { code, name, type } }), `Added ${code} ${name}.`).then(() => {
-                setCode('');
-                setName('');
-              });
-            }}
-          >
-            <div className="card-header">
-              <div>
-                <h2 className="card-title">Chart of accounts</h2>
-                <p className="card-subtitle">{`${accounts.length} accounts`}</p>
-              </div>
-            </div>
-            <div className="table-wrap">
-              <DataTable
-                columns={[
-                  { label: 'Code', value: (item) => item.code },
-                  { label: 'Account', value: (item) => item.name },
-                  { label: 'Type', value: (item) => item.type },
-                ]}
-                rows={accounts}
-                rowKey={(item) => item.id}
-              />
-            </div>
-            <div className="card-body form-grid">
-              <label className="field">
-                Code
-                <input className="input" required maxLength={12} pattern="[0-9A-Za-z-]+" value={code} onChange={(event) => setCode(event.target.value)} />
-              </label>
-              <label className="field">
-                Name
-                <input className="input" required maxLength={120} value={name} onChange={(event) => setName(event.target.value)} />
-              </label>
-              <label className="field">
-                Type
-                <select className="select" value={type} onChange={(event) => setType(event.target.value as Account['type'])}>
-                  <option value="asset">Asset</option>
-                  <option value="liability">Liability</option>
-                  <option value="equity">Equity</option>
-                  <option value="income">Income</option>
-                  <option value="expense">Expense</option>
-                </select>
-              </label>
-              <div className="button-row">
-                <button className="btn btn-secondary" type="submit">
-                  Add account
-                </button>
-              </div>
-            </div>
-          </form>
         </>
       ) : (
         <ReadOnlyNotice role={business.role ?? 'manager'} what="the journal" />
@@ -567,7 +677,8 @@ export default function Books() {
   const [tab, setTab] = useState<'statements' | 'accountant'>('statements');
   const summary = useQuery({
     queryKey: keys.business(business.id, 'books', from, to),
-    queryFn: ({ signal }) => request<BooksSummary>(businessPath(`/books?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`), { signal }),
+    queryFn: ({ signal }) =>
+      request<BooksSummary>(businessPath(`/books?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`), { signal }),
     enabled: Boolean(from && to),
     placeholderData: keepPreviousData,
   });
@@ -602,11 +713,27 @@ export default function Books() {
       <div className="toolbar toolbar-plain">
         <label className="field field-inline">
           From
-          <input className="input" id="books-from" type="date" required value={from} max={to} onChange={(event) => setFrom(event.target.value)} />
+          <input
+            className="input"
+            id="books-from"
+            type="date"
+            required
+            value={from}
+            max={to}
+            onChange={(event) => setFrom(event.target.value)}
+          />
         </label>
         <label className="field field-inline">
           To
-          <input className="input" id="books-to" type="date" required value={to} min={from} onChange={(event) => setTo(event.target.value)} />
+          <input
+            className="input"
+            id="books-to"
+            type="date"
+            required
+            value={to}
+            min={from}
+            onChange={(event) => setTo(event.target.value)}
+          />
         </label>
       </div>
 
@@ -617,8 +744,18 @@ export default function Books() {
           <>
             <Kpi label="Sales" icon="coins" value={money(pnl?.total_income ?? 0, { code })} />
             <Kpi label="Profit" icon="scale" value={money(pnl?.net_profit ?? 0, { code })} />
-            <Kpi label="Cash, MoMo and bank" icon="receipt" value={money(sheet ? cashOnHand(sheet) : 0, { code })} foot={sheet ? `On ${formatDate(data.balance_sheet.as_of)}` : null} />
-            <Kpi label="Sales not yet placed" icon="alert" value={money(sheet ? salesToPlace(sheet) : 0, { code })} foot="Cash, MoMo or bank not known" />
+            <Kpi
+              label="Cash, MoMo and bank"
+              icon="receipt"
+              value={money(sheet ? cashOnHand(sheet) : 0, { code })}
+              foot={sheet ? `On ${formatDate(data.balance_sheet.as_of)}` : null}
+            />
+            <Kpi
+              label="Sales not yet placed"
+              icon="alert"
+              value={money(sheet ? salesToPlace(sheet) : 0, { code })}
+              foot="Cash, MoMo or bank not known"
+            />
           </>
         ) : (
           <SkeletonRows count={2} />
@@ -636,7 +773,17 @@ export default function Books() {
         </Notice>
       ) : null}
 
-      {data ? tab === 'statements' ? <Statements data={data} /> : accounts.data ? <Accountant accounts={accounts.data} lockDate={data.settings.lock_date} lockHistory={data.lock_history} onChanged={refresh} /> : <SkeletonRows count={4} /> : <SkeletonRows count={6} />}
+      {data ? (
+        tab === 'statements' ? (
+          <Statements data={data} />
+        ) : accounts.data ? (
+          <Accountant accounts={accounts.data} lockDate={data.settings.lock_date} lockHistory={data.lock_history} onChanged={refresh} />
+        ) : (
+          <SkeletonRows count={4} />
+        )
+      ) : (
+        <SkeletonRows count={6} />
+      )}
     </>
   );
 }

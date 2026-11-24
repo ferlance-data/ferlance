@@ -7,7 +7,8 @@ import { formatDate, isoDate, money } from '../../lib/format';
 import { Icon } from '../../lib/icons';
 import { POSITION_LABELS, printPositionReport } from '../../lib/reports';
 import type { BalanceHistoryRow, PositionBalance, PositionResult } from '../../lib/types';
-import { DataTable, Kpi, Notice, Pill, StatusText } from '../components/ui';
+import { DataTable, Kpi, ListHeader, Modal, Notice, Pill, StatusText } from '../components/ui';
+import { toast } from '../../lib/toast';
 import { PageActions } from '../page';
 import { keys, useWorkspace } from '../workspace';
 import { categoryOptionGroups, CATEGORY_GROUPS, minimumBalance } from './position.logic';
@@ -56,7 +57,8 @@ function GroupCard({ title, items, total, asOf }: { title: string; items: Positi
 }
 
 export default function Position() {
-  const { user, business, businessPath, markSetup, setup } = useWorkspace();
+  const { user, business, businessPath, markSetup, setup, can } = useWorkspace();
+  const [adding, setAdding] = useState(false);
   const queryClient = useQueryClient();
   const today = isoDate(new Date());
   const [asOf, setAsOf] = useState(today);
@@ -100,6 +102,8 @@ export default function Position() {
       if (saved.as_of_date > asOf) setAsOf(saved.as_of_date);
       await queryClient.invalidateQueries({ queryKey: keys.business(business.id) });
       setStatus({ message: `Saved ${POSITION_LABELS[saved.category]} for ${formatDate(saved.as_of_date)}.`, error: false });
+      toast(`Saved ${POSITION_LABELS[saved.category]} for ${formatDate(saved.as_of_date)}.`);
+      setAdding(false);
     } catch (error) {
       setStatus({ message: error instanceof Error ? error.message : 'Request failed.', error: true });
     } finally {
@@ -126,9 +130,19 @@ export default function Position() {
         <span id="position-check">
           {totals ? (
             totals.complete ? (
-              totals.balanced ? <Pill tone="success" icon="check">Statement balances</Pill> : <Pill tone="error" icon="alert">Does not balance</Pill>
+              totals.balanced ? (
+                <Pill tone="success" icon="check">
+                  Statement balances
+                </Pill>
+              ) : (
+                <Pill tone="error" icon="alert">
+                  Does not balance
+                </Pill>
+              )
             ) : (
-              <Pill tone="warning" icon="alert">Partial statement</Pill>
+              <Pill tone="warning" icon="alert">
+                Partial statement
+              </Pill>
             )
           ) : null}
         </span>
@@ -140,7 +154,11 @@ export default function Position() {
             <Kpi label="Total assets" value={money(totals.assets)} icon="coins" />
             <Kpi label="Total liabilities" value={money(totals.liabilities)} icon="receipt" />
             <Kpi label="Equity" value={money(totals.equity)} icon="scale" />
-            <Kpi label={totals.complete ? 'Assets − liabilities − equity' : 'Known difference (partial)'} value={money(totals.balance_difference)} icon="check" />
+            <Kpi
+              label={totals.complete ? 'Assets − liabilities − equity' : 'Known difference (partial)'}
+              value={money(totals.balance_difference)}
+              icon="check"
+            />
           </>
         ) : null}
       </div>
@@ -149,8 +167,102 @@ export default function Position() {
         {result?.missing_categories.length ? (
           <Notice>{`Missing categories: ${result.missing_categories.map((item) => item.label).join(', ')}. Record each, including zero balances, for a complete statement.`}</Notice>
         ) : null}
-        {result?.stale_balances.length ? <Notice tone="warning" icon="info">{`${result.stale_balances.length} balance(s) are carried forward from earlier dates.`}</Notice> : null}
+        {result?.stale_balances.length ? (
+          <Notice tone="warning" icon="info">{`${result.stale_balances.length} balance(s) are carried forward from earlier dates.`}</Notice>
+        ) : null}
       </div>
+
+      <ListHeader
+        title="Statement"
+        subtitle="The latest balance of each account on or before the date above"
+        action={can('write_balances') ? 'Record a balance' : undefined}
+        onAction={() => setAdding(true)}
+      />
+      {adding ? (
+        <Modal label="Record a balance" onClose={() => setAdding(false)}>
+          <form className="card" id="balance-form" onSubmit={(event) => void submit(event)}>
+            <div className="card-header">
+              <div>
+                <h2 className="card-title">Record a balance</h2>
+                <p className="card-subtitle">Enter zero explicitly when a balance is zero</p>
+              </div>
+            </div>
+            <div className="card-body form-grid">
+              <label className="field">
+                Balance date
+                <input
+                  className="input"
+                  id="balance-date"
+                  type="date"
+                  required
+                  value={balanceDate}
+                  onChange={(event) => setBalanceDate(event.target.value)}
+                />
+              </label>
+              <label className="field">
+                Category
+                <select
+                  className="select"
+                  id="balance-category"
+                  required
+                  value={category}
+                  onChange={(event) => setCategory(event.target.value)}
+                >
+                  {OPTION_GROUPS.map((group) => (
+                    <optgroup key={group.group} label={group.group}>
+                      {group.options.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                Account
+                <input
+                  className="input"
+                  id="balance-account"
+                  maxLength={120}
+                  required
+                  placeholder="e.g. GCB current account"
+                  value={account}
+                  onChange={(event) => setAccount(event.target.value)}
+                />
+              </label>
+              <label className="field">
+                Balance
+                <input
+                  className="input"
+                  id="balance-amount"
+                  type="number"
+                  step="0.01"
+                  min={minimumBalance(category)}
+                  required
+                  value={amount}
+                  onChange={(event) => setAmount(event.target.value)}
+                />
+              </label>
+              <label className="field">
+                Note
+                <input
+                  className="input"
+                  id="balance-note"
+                  maxLength={500}
+                  placeholder="Optional"
+                  value={note}
+                  onChange={(event) => setNote(event.target.value)}
+                />
+              </label>
+              <button className="btn btn-primary" type="submit" disabled={saving}>
+                Save balance
+              </button>
+              <StatusText id="balance-status" message={status.message} error={status.error} />
+            </div>
+          </form>
+        </Modal>
+      ) : null}
 
       <div className="grid-main">
         <div className="stack" id="position-groups">
@@ -163,50 +275,11 @@ export default function Position() {
           ) : null}
         </div>
         <div className="stack">
-          <form className="card" id="balance-form" onSubmit={(event) => void submit(event)}>
-            <div className="card-header">
-              <div>
-                <h2 className="card-title">Record a balance</h2>
-                <p className="card-subtitle">Enter zero explicitly when a balance is zero</p>
-              </div>
-            </div>
-            <div className="card-body form-grid">
-              <label className="field">
-                Balance date
-                <input className="input" id="balance-date" type="date" required value={balanceDate} onChange={(event) => setBalanceDate(event.target.value)} />
-              </label>
-              <label className="field">
-                Category
-                <select className="select" id="balance-category" required value={category} onChange={(event) => setCategory(event.target.value)}>
-                  {OPTION_GROUPS.map((group) => (
-                    <optgroup key={group.group} label={group.group}>
-                      {group.options.map((option) => (
-                        <option key={option.value} value={option.value}>{option.label}</option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </select>
-              </label>
-              <label className="field">
-                Account
-                <input className="input" id="balance-account" maxLength={120} required placeholder="e.g. GCB current account" value={account} onChange={(event) => setAccount(event.target.value)} />
-              </label>
-              <label className="field">
-                Balance
-                <input className="input" id="balance-amount" type="number" step="0.01" min={minimumBalance(category)} required value={amount} onChange={(event) => setAmount(event.target.value)} />
-              </label>
-              <label className="field">
-                Note
-                <input className="input" id="balance-note" maxLength={500} placeholder="Optional" value={note} onChange={(event) => setNote(event.target.value)} />
-              </label>
-              <button className="btn btn-primary" type="submit" disabled={saving}>Save balance</button>
-              <StatusText id="balance-status" message={status.message} error={status.error} />
-            </div>
-          </form>
           <div className="card">
             <div className="card-body body-sm muted stack-sm">
               <p>
-                <strong className="fg">How this works.</strong> Each account carries forward its latest balance on or before the report date. Missing categories stay visibly incomplete — zero is never assumed.
+                <strong className="fg">How this works.</strong> Each account carries forward its latest balance on or before the report
+                date. Missing categories stay visibly incomplete — zero is never assumed.
               </p>
               <p>This is an operational view, not a tax filing or full general ledger. Verify opening balances with your accountant.</p>
             </div>
@@ -227,7 +300,10 @@ export default function Position() {
               columns={[
                 { label: 'Balance date', value: (item) => formatDate(item.as_of_date) },
                 { label: 'Account', value: (item) => item.account_name },
-                { label: 'Category', value: (item) => `${CATEGORY_GROUPS[item.category] || ''} · ${POSITION_LABELS[item.category] || item.category}` },
+                {
+                  label: 'Category',
+                  value: (item) => `${CATEGORY_GROUPS[item.category] || ''} · ${POSITION_LABELS[item.category] || item.category}`,
+                },
                 { label: 'Balance', num: true, value: (item) => money(item.amount) },
                 { label: 'Note', value: (item) => item.note || '—' },
                 { label: 'Recorded by', value: (item) => item.recorded_by },

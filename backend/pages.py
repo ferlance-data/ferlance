@@ -218,5 +218,17 @@ def _write(path: Path, business_id: str, user_id: str, page_type: str, page_date
     return {"page_type": page_type, "dataset_id": dataset["id"], "lines": len(records), "total": round(sum(row["amount"] for row in rows), 2)}
 
 
+def recent(path: Path, business_id: str, limit: int = 50) -> list[dict[str, Any]]:
+    """Pages added (or still waiting as drafts), newest first, with what each one added."""
+    rows = db.many(
+        path,
+        "SELECT id, source, page_type, page_date, status, outcome, created_at, confirmed_at FROM page_captures "
+        "WHERE business_id = ? AND status IN ('draft', 'confirmed') ORDER BY created_at DESC LIMIT ?",
+        (business_id, limit),
+    )
+    return [{**{k: row[k] for k in ("id", "source", "page_date", "status", "created_at", "confirmed_at")}, "type": row["page_type"],
+             "outcome": json.loads(row["outcome"] or "null")} for row in rows]
+
+
 def discard(path: Path, business_id: str, capture_id: str) -> None:
     db.insert(path, "UPDATE page_captures SET status = 'discarded' WHERE id = ? AND business_id = ? AND status = 'draft'", (capture_id, business_id))

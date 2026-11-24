@@ -9,7 +9,7 @@ import { formatDateTime, money, number, plural } from '../../lib/format';
 import { Icon } from '../../lib/icons';
 import { toast } from '../../lib/toast';
 import type { Dataset } from '../../lib/types';
-import { DataTable, Pill, Segmented, StatusText, type Column, ReadOnlyNotice } from '../components/ui';
+import { DataTable, ListHeader, Modal, Pill, Segmented, StatusText, type Column, ReadOnlyNotice } from '../components/ui';
 import { pagePath } from '../routes';
 import { keys, useScope, useWorkspace } from '../workspace';
 import { StatusPill } from './shared';
@@ -118,6 +118,7 @@ export default function Data() {
   const canWrite = can('write_data');
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<Tab>('file');
+  const [open, setOpen] = useState(false);
 
   // The background folder importer can add files at any time: re-read the list on every visit.
   useEffect(() => {
@@ -133,77 +134,91 @@ export default function Data() {
 
   return (
     <>
-      <div className="grid-main">
-        <div className="card">
-          <div className="card-header">
-            <Segmented
-              id="import-tabs"
-              mode="tabs"
-              label="Import method"
-              value={tab}
-              onChange={changeTab}
-              options={[
-                { value: 'file', label: 'Upload a file' },
-                { value: 'momo', label: 'Mobile Money SMS' },
-              ]}
-            />
-          </div>
-          <div className="card-body">
-            {canWrite ? (
-              <>
-                <UploadForm hidden={tab !== 'file'} businessPath={businessPath} onResult={setResult} onImported={refreshDatasets} />
-                <MomoForm hidden={tab !== 'momo'} businessPath={businessPath} onResult={setResult} onImported={refreshDatasets} />
-              </>
-            ) : (
-              <ReadOnlyNotice role={role} what="imports" />
-            )}
-            <div id="import-result" ref={resultRef}>
-              {result ? <ImportResult key={result.dataset.id} result={result} /> : null}
+      <ListHeader
+        title="Your imports"
+        subtitle="Sales files, cost files and Mobile Money messages, each checked row by row"
+        action={canWrite ? 'Import data' : undefined}
+        onAction={() => {
+          setResult(null);
+          setOpen(true);
+        }}
+      />
+      {!canWrite ? <ReadOnlyNotice role={role} what="imports" /> : null}
+      {open ? (
+        <Modal label="Import data" onClose={() => setOpen(false)} wide>
+          <div className="stack">
+            <div className="card">
+              <div className="card-header">
+                <Segmented
+                  id="import-tabs"
+                  mode="tabs"
+                  label="Import method"
+                  value={tab}
+                  onChange={changeTab}
+                  options={[
+                    { value: 'file', label: 'Upload a file' },
+                    { value: 'momo', label: 'Mobile Money SMS' },
+                  ]}
+                />
+              </div>
+              <div className="card-body">
+                {canWrite ? (
+                  <>
+                    <UploadForm hidden={tab !== 'file'} businessPath={businessPath} onResult={setResult} onImported={refreshDatasets} />
+                    <MomoForm hidden={tab !== 'momo'} businessPath={businessPath} onResult={setResult} onImported={refreshDatasets} />
+                  </>
+                ) : (
+                  <ReadOnlyNotice role={role} what="imports" />
+                )}
+                <div id="import-result" ref={resultRef}>
+                  {result ? <ImportResult key={result.dataset.id} result={result} /> : null}
+                </div>
+              </div>
+            </div>
+            <div className="card">
+              <div className="card-header">
+                <div>
+                  <h2 className="card-title">What Ferlance reads</h2>
+                  <p className="card-subtitle">Headers are matched loosely — “Order Date” and order_date are the same</p>
+                </div>
+              </div>
+              <div className="card-body">
+                <dl className="contract">
+                  <div>
+                    <dt>
+                      Date <span className="pill pill-warning">Required</span>
+                    </dt>
+                    <dd>date, transaction_date, sale_date, order_date, invoice_date</dd>
+                  </div>
+                  <div>
+                    <dt>
+                      Money <span className="pill pill-warning">One required</span>
+                    </dt>
+                    <dd>amount, revenue, sales, total — or cost, expense, unit_cost</dd>
+                  </div>
+                  <div>
+                    <dt>Product</dt>
+                    <dd>product, item, item_name, service_name</dd>
+                  </div>
+                  <div>
+                    <dt>Customer</dt>
+                    <dd>customer, client, customer_name</dd>
+                  </div>
+                  <div>
+                    <dt>Quantity</dt>
+                    <dd>quantity, qty, units</dd>
+                  </div>
+                  <div>
+                    <dt>Transaction ID</dt>
+                    <dd>transaction_id, id, sale_id — enables duplicate detection</dd>
+                  </div>
+                </dl>
+                <p className="body-sm muted">Rejected rows are never dropped silently: every one is listed with its reason.</p>
+              </div>
             </div>
           </div>
-        </div>
-        <div className="card">
-          <div className="card-header">
-            <div>
-              <h2 className="card-title">What Ferlance reads</h2>
-              <p className="card-subtitle">Headers are matched loosely — “Order Date” and order_date are the same</p>
-            </div>
-          </div>
-          <div className="card-body">
-            <dl className="contract">
-              <div>
-                <dt>
-                  Date <span className="pill pill-warning">Required</span>
-                </dt>
-                <dd>date, transaction_date, sale_date, order_date, invoice_date</dd>
-              </div>
-              <div>
-                <dt>
-                  Money <span className="pill pill-warning">One required</span>
-                </dt>
-                <dd>amount, revenue, sales, total — or cost, expense, unit_cost</dd>
-              </div>
-              <div>
-                <dt>Product</dt>
-                <dd>product, item, item_name, service_name</dd>
-              </div>
-              <div>
-                <dt>Customer</dt>
-                <dd>customer, client, customer_name</dd>
-              </div>
-              <div>
-                <dt>Quantity</dt>
-                <dd>quantity, qty, units</dd>
-              </div>
-              <div>
-                <dt>Transaction ID</dt>
-                <dd>transaction_id, id, sale_id — enables duplicate detection</dd>
-              </div>
-            </dl>
-            <p className="body-sm muted">Rejected rows are never dropped silently: every one is listed with its reason.</p>
-          </div>
-        </div>
-      </div>
+        </Modal>
+      ) : null}
       <div className="card">
         <div className="card-header">
           <div>
@@ -380,17 +395,26 @@ function History({
   const { business, refreshInventory } = useWorkspace();
   const queryClient = useQueryClient();
   const postsKey = ['posts', business.id];
-  const posts = useQuery({ queryKey: postsKey, queryFn: ({ signal }) => request<Record<string, { status: string }>>(businessPath('/inventory/posts'), { signal }) });
+  const posts = useQuery({
+    queryKey: postsKey,
+    queryFn: ({ signal }) => request<Record<string, { status: string }>>(businessPath('/inventory/posts'), { signal }),
+  });
 
   async function postToStock(dataset: Dataset) {
     try {
-      const result = await request<{ units: number; products: number; skipped: Record<string, number> }>(businessPath(`/inventory/posts/${dataset.id}`), { method: 'POST' });
+      const result = await request<{ units: number; products: number; skipped: Record<string, number> }>(
+        businessPath(`/inventory/posts/${dataset.id}`),
+        { method: 'POST' },
+      );
       const left = result.skipped.unlinked ? ` ${number(result.skipped.unlinked)} line(s) skipped: link their names in Inventory.` : '';
       toast(`${number(result.units)} units across ${number(result.products)} product(s) taken out of stock.${left}`);
     } catch (error) {
-      const detail = error instanceof ApiError ? (error.detail as { conflicts?: { name: string; short: number }[] } | undefined) : undefined;
+      const detail =
+        error instanceof ApiError ? (error.detail as { conflicts?: { name: string; short: number }[] } | undefined) : undefined;
       const short = detail?.conflicts?.map((item) => `${item.name} (short ${number(item.short)})`).join(', ');
-      toast(short ? `Not enough stock recorded for ${short}. Record the purchase or a stocktake first.` : (error as Error).message, { error: true });
+      toast(short ? `Not enough stock recorded for ${short}. Record the purchase or a stocktake first.` : (error as Error).message, {
+        error: true,
+      });
     } finally {
       await Promise.all([queryClient.invalidateQueries({ queryKey: postsKey }), refreshInventory()]);
     }
