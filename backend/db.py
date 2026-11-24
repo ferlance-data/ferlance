@@ -407,6 +407,26 @@ CREATE TABLE IF NOT EXISTS payroll_lines (
     rules TEXT NOT NULL,
     FOREIGN KEY(run_id) REFERENCES payroll_runs(id)
 );
+CREATE TABLE IF NOT EXISTS credit_shares (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    created_by TEXT NOT NULL,
+    lender TEXT NOT NULL DEFAULT '',
+    token_hash TEXT NOT NULL UNIQUE,
+    code TEXT NOT NULL,
+    snapshot TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    revoked_at TEXT,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(business_id) REFERENCES businesses(id)
+);
+CREATE TABLE IF NOT EXISTS credit_share_views (
+    id TEXT PRIMARY KEY,
+    share_id TEXT NOT NULL,
+    viewed_at TEXT NOT NULL,
+    user_agent TEXT NOT NULL DEFAULT '',
+    FOREIGN KEY(share_id) REFERENCES credit_shares(id)
+);
 CREATE TABLE IF NOT EXISTS business_members (
     business_id TEXT NOT NULL,
     user_id TEXT NOT NULL,

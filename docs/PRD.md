@@ -294,7 +294,7 @@ The global tools assume someone types clean transactions in. **Ferlance becomes 
 | 1.15.0 | Read paper books: exercise-book pages to drafts. Done. | G4 |
 | 1.16.0 | MoMo and bank reconciliation. Done. | G5 |
 | 1.17.0 | Ghana tax and payroll basics (rates from GRA/SSNIT pages, pending accountant checks). Done. | G6 |
-| 2.6.0 | Credit-readiness report | G7 |
+| 1.18.0 | Credit-readiness report. Done. | G7 |
 | 2.7.0 | WhatsApp channel and local languages | G8 |
 | 2.x patches | Recurring expenses, budgets, branches, year-end pack | G9 |
 
@@ -368,7 +368,7 @@ The global tools assume someone types clean transactions in. **Ferlance becomes 
 
 **Non-goal:** filing directly with GRA or SSNIT in this phase. Ferlance produces summaries an owner or accountant files.
 
-#### G7: Credit-readiness report (v2.6.0)
+#### G7: Credit-readiness report (v1.18.0)
 
 | ID | Requirement | Acceptance |
 | --- | --- | --- |
