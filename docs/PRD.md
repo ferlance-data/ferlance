@@ -293,7 +293,7 @@ The global tools assume someone types clean transactions in. **Ferlance becomes 
 | 1.14.0 | Invoices, quotes and receipts, shareable on WhatsApp (1.12.0 was deployment and backups; 1.13.0 the admin suite and dark theme). Done. | G3 |
 | 1.15.0 | Read paper books: exercise-book pages to drafts. Done. | G4 |
 | 1.16.0 | MoMo and bank reconciliation. Done. | G5 |
-| 2.5.0 | Ghana tax and payroll basics | G6 |
+| 1.17.0 | Ghana tax and payroll basics (rates from GRA/SSNIT pages, pending accountant checks). Done. | G6 |
 | 2.6.0 | Credit-readiness report | G7 |
 | 2.7.0 | WhatsApp channel and local languages | G8 |
 | 2.x patches | Recurring expenses, budgets, branches, year-end pack | G9 |
@@ -357,7 +357,7 @@ The global tools assume someone types clean transactions in. **Ferlance becomes 
 | G5.3 | MoMo charges and levies are recorded as expenses automatically | Rates come from the G6 rules table |
 | G5.4 | Later: direct provider APIs or an aggregator instead of SMS and statements | **Decision at build time:** which provider, its cost, and the business accounts it needs |
 
-#### G6: Ghana tax and payroll basics (v2.5.0)
+#### G6: Ghana tax and payroll basics (v1.17.0)
 
 | ID | Requirement | Acceptance |
 | --- | --- | --- |

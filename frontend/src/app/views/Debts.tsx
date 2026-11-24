@@ -175,6 +175,7 @@ function DebtCard({ debt, book, editable, onDone }: { debt: Debt; book: DebtBook
   const [amount, setAmount] = useState(String(debt.balance));
   const [method, setMethod] = useState('cash');
   const [paidOn, setPaidOn] = useState(isoDate(new Date()));
+  const [withhold, setWithhold] = useState('');
   const [language, setLanguage] = useState<Language>('en');
   const [status, setStatus] = useState<{ message: string; error: boolean } | null>(null);
   const balance = money(debt.balance, { code: debt.currency });
@@ -185,9 +186,9 @@ function DebtCard({ debt, book, editable, onDone }: { debt: Debt; book: DebtBook
     try {
       await request(businessPath(`/debts/${debt.id}/payments`), {
         method: 'POST',
-        json: { amount: Number(amount), method, paid_on: paidOn },
+        json: { amount: Number(amount), method, paid_on: paidOn, withhold: withhold || null },
       });
-      toast(`Payment from ${debt.party_name} recorded.`);
+      toast(debt.direction === 'we_owe' ? `Payment to ${debt.party_name} recorded.` : `Payment from ${debt.party_name} recorded.`);
       setMode('none');
       await onDone();
     } catch (error) {
@@ -285,6 +286,19 @@ function DebtCard({ debt, book, editable, onDone }: { debt: Debt; book: DebtBook
               onChange={(event) => setPaidOn(event.target.value)}
             />
           </label>
+          {debt.direction === 'we_owe' ? (
+            <label className="field">
+              Withholding tax
+              <select className="select" value={withhold} onChange={(event) => setWithhold(event.target.value)}>
+                <option value="">None</option>
+                <option value="goods">Goods (3%)</option>
+                <option value="works">Works (5%)</option>
+                <option value="services">Services (7.5%)</option>
+                <option value="non_resident">Non-resident supplier (20%)</option>
+              </select>
+              <span className="field-hint">Kept back for GRA; the supplier gets the rest. Rates need your accountant's check (Tax &amp; payroll).</span>
+            </label>
+          ) : null}
           <div className="button-row">
             <button className="btn btn-primary btn-sm" type="submit">
               Save payment

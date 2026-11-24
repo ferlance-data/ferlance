@@ -2095,3 +2095,25 @@ svg.icon {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
 }
+
+/* Cards in a list (debts, invoices, rules, statement lines): long text wraps instead of widening the page. */
+.debt-card {
+  min-width: 0;
+}
+
+.debt-head > .file-cell {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.debt-card .file-cell strong,
+.debt-card .file-cell small {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.debt-card .btn {
+  max-width: 100%;
+  white-space: normal;
+  text-align: left;
+}
