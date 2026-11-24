@@ -3,7 +3,7 @@
 import { lazy, type ComponentType, type LazyExoticComponent } from 'react';
 import type { IconName } from '../lib/icons';
 
-export type PageName = 'overview' | 'products' | 'insights' | 'lance' | 'inventory' | 'notebook' | 'invoices' | 'debts' | 'reconcile' | 'tax' | 'credit' | 'planning' | 'books' | 'position' | 'data' | 'settings';
+export type PageName = 'overview' | 'products' | 'insights' | 'lance' | 'inventory' | 'notebook' | 'invoices' | 'debts' | 'reconcile' | 'tax' | 'credit' | 'planning' | 'books' | 'position' | 'data' | 'help' | 'settings';
 
 export interface PageDef {
   name: PageName;
@@ -140,6 +140,14 @@ export const PAGES: PageDef[] = [
     Component: lazy(() => import('./views/Data')),
   },
   {
+    name: 'help',
+    title: 'Help & guides',
+    description: 'Short videos of the real app for each everyday situation: when to use a feature, why, and how.',
+    scoped: false,
+    nav: { label: 'Help & guides', icon: 'info', group: 'bottom' },
+    Component: lazy(() => import('./views/Help')),
+  },
+  {
     name: 'settings',
     title: 'Settings',
     description: 'Your profile, how the workspace looks, and who on your team can see it.',
@@ -150,7 +158,7 @@ export const PAGES: PageDef[] = [
 ];
 
 /** Menu order inside each group (most-used first). */
-export const NAV_ORDER: PageName[] = ['overview', 'insights', 'products', 'lance', 'credit', 'invoices', 'debts', 'inventory', 'notebook', 'data', 'books', 'reconcile', 'tax', 'planning', 'position', 'settings'];
+export const NAV_ORDER: PageName[] = ['overview', 'insights', 'products', 'lance', 'credit', 'invoices', 'debts', 'inventory', 'notebook', 'data', 'books', 'reconcile', 'tax', 'planning', 'position', 'help', 'settings'];
 
 /** Old page names (and old hash links) that still resolve. */
 export const LEGACY_ROUTES: Record<string, PageName> = {

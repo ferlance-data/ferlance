@@ -1006,6 +1006,62 @@
 }
 
 /* ---------- Responsive ---------- */
+/* ---------- How it works ---------- */
+.how { margin-top: 36px; }
+.how-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+.how-tabs button {
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--white-a10);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--fog-400);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.how-tabs button[aria-selected="true"] {
+  border-color: var(--mint-glow);
+  background: var(--mint-glow-a08);
+  color: var(--white);
+}
+.how-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 300px) minmax(0, 1fr);
+  gap: 48px;
+  align-items: center;
+  max-width: 900px;
+  margin: 36px auto 0;
+}
+.how-phone {
+  padding: 10px;
+  border: 1px solid var(--white-a12);
+  border-radius: 30px;
+  background: var(--ink-900);
+  box-shadow: 0 30px 80px -30px #000c;
+}
+.how-video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 390 / 844;
+  border-radius: 22px;
+  background: var(--ink-950);
+  object-fit: cover;
+}
+.how-copy h3 { font-size: clamp(1.3rem, 2.4vw, 1.75rem); margin: 0 0 14px; }
+.how-copy p { color: var(--fog-400); margin: 0 0 10px; line-height: 1.55; }
+.how-copy b { color: var(--white); font-weight: 600; }
+.how-copy ol { margin: 18px 0 0; padding-left: 1.2rem; display: grid; gap: 10px; color: var(--fog-300, #d5dedc); line-height: 1.5; }
+.how-copy li::marker { color: var(--mint-glow); font-weight: 600; }
+@media (max-width: 760px) {
+  .how-panel { grid-template-columns: 1fr; gap: 28px; }
+  .how-phone { width: min(280px, 100%); margin-inline: auto; }
+}
+
 @media (max-width: 960px) {
   .site-links {
     display: none;

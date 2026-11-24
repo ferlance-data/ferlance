@@ -4,6 +4,7 @@
 
 import '../styles/base.css';
 import '../styles/landing.css';
+import { GUIDES } from '../lib/guides';
 import { prefetchWorkspace } from './prefetch';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -169,6 +170,30 @@ function bindTabs(selector: string, attribute: string, render: (key: string) => 
 }
 bindTabs('[data-agent-tab]', 'agentTab', renderAgent);
 renderAgent('summary');
+
+/* ---------- How it works: one short screen recording per everyday situation ---------- */
+function renderHow(slug: string): void {
+  const guide = GUIDES.find((item) => item.slug === slug);
+  if (!guide) return;
+  const video = el('video', { class: 'how-video', controls: '', playsinline: '', muted: '', preload: 'none', poster: guide.poster, 'aria-label': `Video: ${guide.title}` }, el('source', { src: guide.video, type: 'video/webm' })) as HTMLVideoElement;
+  video.muted = true;
+  $('#how-panel').replaceChildren(
+    el('div', { class: 'how-phone fade-in' }, video),
+    el(
+      'div',
+      { class: 'how-copy fade-in' },
+      el('h3', {}, guide.title),
+      el('p', { class: 'how-when' }, el('b', {}, 'When: '), guide.when),
+      el('p', {}, el('b', {}, 'Why: '), guide.why),
+      el('ol', {}, guide.steps.map((step) => el('li', {}, step))),
+    ),
+  );
+}
+$('#how-tabs').replaceChildren(
+  ...GUIDES.map((guide, index) => el('button', { role: 'tab', type: 'button', 'aria-selected': String(index === 0), 'data-how': guide.slug }, guide.title)),
+);
+bindTabs('[data-how]', 'how', renderHow);
+renderHow(GUIDES[0]?.slug ?? '');
 
 /* ---------- Use cases ---------- */
 type Usecase = [title: string, summary: string, points: string[]];

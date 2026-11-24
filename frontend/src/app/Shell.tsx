@@ -7,6 +7,7 @@ import { Link, NavLink, Redirect, useLocation, useNavigate } from '../lib/router
 import { Icon, IconSlot } from '../lib/icons';
 import { toast } from '../lib/toast';
 import { RANGE_OPTIONS, analysableDatasets, type RangePreset } from '../lib/scope';
+import { WelcomeTour } from './components/Guides';
 import { PageErrorBoundary } from './components/PageErrorBoundary';
 import { SkeletonRows } from './components/ui';
 import { ActionsSlotContext } from './page';
@@ -278,6 +279,7 @@ export function Shell() {
           </ActionsSlotContext.Provider>
         </main>
       </div>
+      {pathname === pagePath('help') ? null : <WelcomeTour />}
     </div>
   );
 }
