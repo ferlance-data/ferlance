@@ -6,6 +6,24 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.18.0] - 2026-11-24
+
+Credit-readiness report (PRD §9, G7).
+
+### Added
+- **Credit report page:** the last 12 months as a lender would see them, including sales and profit by month, net margin, months with sales, what customers owe and how late, and stock turnover. Every figure comes from the books.
+- **Evidence levels:** sales are split into those matched to an imported MoMo or bank statement (strongest), those from MoMo messages, and self-reported. Lenders see the split.
+- **Readiness score** out of 100, made of six parts: track record, evidence, profitability, steady sales, collecting debts and complete books. Each part shows its points, the reason, and what would raise it. It's not a credit decision.
+- **Share with a lender** (owner only, after ticking consent): creates a link to a **frozen copy**, not live access, valid for 7, 14 or 30 days.
+  - **The lender's page** is plain, printable HTML with no scripts. Every value is escaped, the page has a strict content security policy, and search engines are told not to index it.
+  - **What the lender sees** is the summary only: no line items or customer names.
+  - **Verification:** a code is shown to both the owner and the lender.
+  - **Control:** every view is logged with its time, and you can withdraw the link at any time.
+
+### Not yet
+- Lender partnerships and a revenue model are business decisions (PRD §9.6).
+- A Data Protection Act review of sharing is still to be done.
+
 ## [1.17.0] - 2026-11-24
 
 Ghana tax and payroll basics (PRD §9, G6). **Every rate needs an accountant's check.**

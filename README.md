@@ -70,6 +70,10 @@ Photograph or type a page of the shop's exercise book: a day's sales, the debtor
 
 The Invoices page makes invoices, quotes and receipts with gapless numbers and shares them as small PDFs (`backend/invoices.py`). An invoice becomes a debt-book entry, so payments, reminders and the books follow it. A receipt is a sale paid on the spot, and a quote posts nothing until it's converted.
 
+## Credit report
+
+The Credit report page summarises the last 12 months from the books for a lender, with how well each cedi of sales is evidenced (statement-matched, MoMo SMS, or self-reported) and a readiness score whose every point is explained (`backend/credit.py`). The owner can share a frozen copy through an expiring, revocable link. The lender's page (`/r/<token>`) is plain HTML with no scripts, and every view is logged.
+
 ## Tax & payroll
 
 Tax rates are dated data with sources (`backend/tax.py`): VAT and levies, monthly PAYE, SSNIT and withholding tax, taken from GRA and SSNIT pages and each marked "needs accountant check" until a business's owner or accountant confirms it. VAT invoices book the tax to "VAT and levies payable", supplier payments can withhold tax, and a small payroll (`backend/payroll.py`) produces payslips and posts wages, PAYE and SSNIT to the books. Ferlance does not file with GRA or SSNIT.
