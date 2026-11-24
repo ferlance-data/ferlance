@@ -131,9 +131,10 @@ def test_s3_target_writes_encrypted_objects_only(monkeypatch):
 
 def test_admin_export_status_and_run(client, tmp_path, monkeypatch):
     owner, _, _ = seed(client)
-    root, _, _ = business(client, "root@example.com", "Root Co")
+    business(client, "root@example.com", "Root Co")
+    root = {"Authorization": f"Bearer {client.post('/api/admin/auth/login', json={'email': 'root@example.com', 'password': 'password123'}).json()['access_token']}"}
     for method, path in (("get", "/api/admin/exports"), ("post", "/api/admin/exports/run")):
-        assert getattr(client, method)(path, headers=owner).status_code == 403
+        assert getattr(client, method)(path, headers=owner).status_code == 401  # workspace tokens never open the admin API
 
     assert client.get("/api/admin/exports", headers=root).json()["enabled"] is False
     assert client.post("/api/admin/exports/run", headers=root).status_code == 400

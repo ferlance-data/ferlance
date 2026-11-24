@@ -8,8 +8,8 @@ export const isThemeChoice = (value: unknown): value is ThemeChoice => value ===
 export function applyTheme(choice: string): void {
   const dark = choice === 'dark' || (choice === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
   document.documentElement.dataset.theme = dark ? 'dark' : 'light';
-  // Browser UI colour must be a literal: it matches --ink-900 / --mud-50. color-lint: allow
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#0f1c1b' : '#fbfaf6'); // color-lint: allow
+  // Browser UI colour must be a literal: it matches --graphite-950 / --mud-50. color-lint: allow
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#0f0f11' : '#fbfaf6'); // color-lint: allow
 }
 
 export function savedTheme(): string {

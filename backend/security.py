@@ -27,15 +27,21 @@ def verify_password(password: str, stored: str) -> bool:
     return hmac.compare_digest(actual, expected)
 
 
-def create_access_token(user_id: str) -> str:
+# Workspace and admin sessions use different token types, so a token from one suite is refused by
+# the other: the admin console is a separate sign-in, even for someone who also runs a business.
+WORKSPACE = "access"
+ADMIN = "admin_access"
+
+
+def create_access_token(user_id: str, kind: str = WORKSPACE) -> str:
     now = datetime.now(timezone.utc)
-    return jwt.encode({"sub": user_id, "iat": now, "exp": now + timedelta(seconds=ACCESS_TOKEN_SECONDS), "jti": str(uuid.uuid4()), "type": "access"}, SECRET_KEY, algorithm="HS256")
+    return jwt.encode({"sub": user_id, "iat": now, "exp": now + timedelta(seconds=ACCESS_TOKEN_SECONDS), "jti": str(uuid.uuid4()), "type": kind}, SECRET_KEY, algorithm="HS256")
 
 
-def read_access_token(token: str) -> str | None:
+def read_access_token(token: str, kind: str = WORKSPACE) -> str | None:
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
-        if payload.get("type") != "access" or not payload.get("sub"):
+        if payload.get("type") != kind or not payload.get("sub"):
             return None
         return str(payload["sub"])
     except (jwt.InvalidTokenError, TypeError):

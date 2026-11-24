@@ -50,6 +50,10 @@ Copy `.env.example` to `.env` to configure secrets and the optional AI and searc
 
 Suggestions on the Insights page are calculated without AI. With an AI key configured (`OPENROUTER_KEY`, `GROQ_API_KEY` or `AGENTROUTER_API_KEY`), tapping a suggestion adds Lance's explanation, cached per suggestion. Outside context comes from free sources only: a built-in Ghana holiday and season calendar, and keyless GDELT news headlines (best effort). No search API key is needed.
 
+## Admin console
+
+Platform administrators use a separate app at `/admin`, with its own sign-in, tokens and session cookie. Admin accounts can be created there only for emails listed in `FERLANCE_ADMIN_EMAILS`.
+
 ## Deploying
 
 Ferlance deploys as one Docker web service: the `Dockerfile` builds the React frontend, and FastAPI serves it alongside the API. The data folder must live on a lasting disk. `deploy/aws/user-data.sh` sets up a single AWS EC2 server with HTTPS and no domain needed, and `render.yaml` is a paid Render alternative. A restorable backup goes to S3 every night. See `docs/DEPLOY.md`.

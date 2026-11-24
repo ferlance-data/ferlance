@@ -22,15 +22,26 @@ def signup(client, email, business="Shop"):
     return {"Authorization": f"Bearer {response.json()['access_token']}"}, response
 
 
+def admin_login(client, email, password="password123"):
+    response = client.post("/api/admin/auth/login", json={"email": email, "password": password})
+    assert response.status_code == 200, response.text
+    return {"Authorization": f"Bearer {response.json()['access_token']}"}
+
+
 def test_admin_console_disable_audit_and_counts(client):
-    root, _ = signup(client, "root@example.com", "Root Co")
+    root_workspace, _ = signup(client, "root@example.com", "Root Co")
+    root = admin_login(client, "root@example.com")  # the console is a separate sign-in
     owner, owner_signup = signup(client, "ama@example.com", "Ama Retail")
     base = f"/api/businesses/{owner_signup.json()['business']['id']}"
     client.post(f"{base}/datasets", headers=owner, files={"file": ("s.csv", b"transaction_date,product,amount\n2026-01-01,Rice,10\n", "text/csv")})
 
-    # Non-admins are refused everywhere.
+    # Workspace tokens never open the admin API, not even an admin's own workspace token.
     for path in ("/api/admin/users", "/api/admin/businesses", "/api/admin/onboarding", "/api/admin/audit"):
-        assert client.get(path, headers=owner).status_code == 403
+        assert client.get(path, headers=owner).status_code == 401
+        assert client.get(path, headers=root_workspace).status_code == 401
+    # And an admin token never opens a business.
+    assert client.get(f"{base}/datasets", headers=root).status_code == 401
+    assert client.post("/api/admin/auth/login", json={"email": "ama@example.com", "password": "password123"}).status_code == 403
 
     users = client.get("/api/admin/users?q=ama", headers=root).json()
     assert [u["email"] for u in users] == ["ama@example.com"] and users[0]["businesses"] == 1
@@ -54,11 +65,8 @@ def test_admin_console_disable_audit_and_counts(client):
     me = client.get("/api/admin/users?q=root", headers=root).json()[0]["id"]
     assert client.post(f"/api/admin/users/{me}/disable", headers=root).status_code == 400
     client.patch(f"/api/admin/users/{target}/role", headers=root, json={"role": "admin"})
-    second_admin, _ = (owner, None)
-    relogin = client.post("/api/auth/login", json={"email": "ama@example.com", "password": "password123"}).json()
-    ama_admin = {"Authorization": f"Bearer {relogin['access_token']}"}
+    ama_admin = admin_login(client, "ama@example.com")  # promoted: may now sign in to the console
     assert client.post(f"/api/admin/users/{me}/disable", headers=ama_admin).status_code == 400  # env-listed
-    _ = second_admin
 
     actions = [entry["action"] for entry in client.get("/api/admin/audit", headers=root).json()]
     assert actions == ["role", "enable", "disable"]
@@ -68,11 +76,38 @@ def test_admin_console_disable_audit_and_counts(client):
 
 def test_last_admin_cannot_be_demoted_by_another_path(client, monkeypatch):
     monkeypatch.setattr(config, "ADMIN_EMAILS", set())
-    a, _ = signup(client, "a@example.com")
-    b, _ = signup(client, "b@example.com")
+    signup(client, "a@example.com")
+    signup(client, "b@example.com")
     ids = {row["email"]: row["id"] for row in db.many(config.DB_PATH, "SELECT id, email FROM users", ())}
     db.insert(config.DB_PATH, "UPDATE users SET role = 'admin' WHERE email IN ('a@example.com', 'b@example.com')", ())
+    a, b = admin_login(client, "a@example.com"), admin_login(client, "b@example.com")
     # Two admins: a can demote b, but then b (no longer admin) cannot act, and a is the last admin.
     assert client.patch(f"/api/admin/users/{ids['b@example.com']}/role", headers=a, json={"role": "owner"}).status_code == 200
     assert client.patch(f"/api/admin/users/{ids['a@example.com']}/role", headers=a, json={"role": "owner"}).status_code == 400
     assert client.get("/api/admin/users", headers=b).status_code == 403
+
+
+def test_admin_accounts_are_created_only_for_listed_emails(client):
+    weak = {"email": "root@example.com", "password": "short"}
+    assert client.post("/api/admin/auth/signup", json=weak).status_code == 422  # 12+ characters
+    outsider = {"email": "mallory@example.com", "password": "a-long-password-1"}
+    assert client.post("/api/admin/auth/signup", json=outsider).status_code == 403
+    created = client.post("/api/admin/auth/signup", json={"email": "Root@Example.com", "password": "a-long-password-1", "full_name": "Root"})
+    assert created.status_code == 200 and created.json()["user"]["role"] == "admin"
+    assert created.cookies.get("ferlance_admin_refresh") and not created.cookies.get("ferlance_refresh")
+    assert client.post("/api/admin/auth/signup", json={"email": "root@example.com", "password": "a-long-password-1"}).status_code == 409
+    headers = {"Authorization": f"Bearer {created.json()['access_token']}"}
+    assert client.get("/api/admin/auth/me", headers=headers).json()["user"]["email"] == "root@example.com"
+    # A pure admin account has no business; the workspace sign-in points it to /admin.
+    workspace = client.post("/api/auth/login", json={"email": "root@example.com", "password": "a-long-password-1"})
+    assert workspace.status_code == 403 and "/admin" in workspace.json()["detail"]
+
+    # Admin and workspace refresh cookies are not interchangeable.
+    admin_cookie = created.cookies.get("ferlance_admin_refresh")
+    assert client.post("/api/auth/refresh", cookies={"ferlance_refresh": admin_cookie}).status_code == 401
+    client.cookies.clear()
+    renewed = client.post("/api/admin/auth/refresh", cookies={"ferlance_admin_refresh": admin_cookie})
+    assert renewed.status_code == 200 and renewed.json()["user"]["role"] == "admin"
+    assert client.post("/api/admin/auth/logout", cookies={"ferlance_admin_refresh": renewed.cookies.get("ferlance_admin_refresh")}).status_code == 200
+    audit = db.many(config.DB_PATH, "SELECT action FROM admin_audit", ())
+    assert audit[0]["action"] == "admin_signup"

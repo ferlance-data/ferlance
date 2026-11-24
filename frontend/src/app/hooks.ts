@@ -41,20 +41,3 @@ export function useBusinessQuery<T>(suffix: string, { enabled = true, silent = f
   });
 }
 
-/** True when the signed-in user is a platform administrator. A 403 resolves to false without a toast. */
-export function useIsAdmin(): boolean {
-  const query = useQuery({
-    queryKey: ['admin', 'capabilities'],
-    queryFn: async ({ signal }) => {
-      try {
-        await request<unknown>('/api/admin/capabilities', { signal });
-        return true;
-      } catch {
-        return false;
-      }
-    },
-    retry: false,
-    staleTime: Infinity,
-  });
-  return query.data === true;
-}

@@ -79,6 +79,14 @@ sudo tail -n 50 /var/log/ferlance-setup.log
 
 The last line says `Ferlance is starting at https://…` when setup has finished.
 
+### 3b. Create your admin account
+
+The admin console is separate from the business workspace: **`https://<your-address>/admin`**.
+
+1. The email must be listed in `FERLANCE_ADMIN_EMAILS` in the server's settings: it's the `ADMIN_EMAIL` you put in the setup script, or you can add it as in step 4. To list several emails, separate them with commas.
+2. Open `/admin`, choose **Create admin account**, and use that email with a password of at least 12 characters.
+3. If that email already has a business account, choose **Sign in** instead: a listed account can use both. For a fully separate admin identity, list a different email (for example `you+admin@gmail.com`).
+
 ### 4. Add the AI key and other settings
 
 The settings live in one file on the server, readable only by the administrator. Connect as in step 3, then run:

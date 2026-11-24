@@ -116,6 +116,23 @@
   --red-900: #4f2427;
   --red-950: #2d1517;
   --stone-800: #33302a;
+  /* Graphite: neutral, slightly warm greys for the dark theme (no green cast). */
+  --graphite-950: #0f0f11;
+  --graphite-925: #131316;
+  --graphite-900: #17171a;
+  --graphite-850: #1c1c20;
+  --graphite-800: #222226;
+  --graphite-750: #2a2a2f;
+  --graphite-700: #34343a;
+  --graphite-600: #45454c;
+  --graphite-400: #9d9da6;
+  --graphite-300: #babac2;
+  --graphite-100: #e4e4e8;
+  --graphite-50: #f1f1f3;
+  --sky-300: #93c5fd;
+  --sky-900: #1b2a3d;
+  --sky-950: #121b27;
+  --black-a75: #000000bf;
   --print-ink: #111;
   --print-muted: #555;
   --print-rule: #ddd;
@@ -192,8 +209,8 @@
   --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
   --text-2xs: 0.75rem; /* 12 px floor: nothing on screen is smaller (budget phones, sunlight) */
   --text-xs: 0.75rem;
-  --text-sm: 0.8125rem;
-  --text-base: 0.9375rem;
+  --text-sm: 0.875rem; /* 14 px */
+  --text-base: 1rem; /* 16 px: comfortable on phones */
   --text-lg: 1.125rem;
   --text-xl: 1.375rem;
   --text-2xl: 1.75rem;
@@ -268,24 +285,28 @@
 }
 
 :root[data-theme="dark"] {
-  --background: var(--ink-950);
-  --foreground: var(--fog-50);
-  --surface: var(--ink-850);
-  --surface-muted: var(--ink-900);
-  --sidebar: var(--ink-900);
-  --border: var(--ink-600);
-  --border-strong: var(--ink-500);
-  --input: var(--fog-750);
-  --muted: var(--ink-800);
-  --muted-foreground: var(--fog-500);
-  --subtle-foreground: var(--fog-400);
-  --primary: var(--mint-glow);
-  --primary-foreground: var(--ink-950);
-  --cta: var(--mint-glow);
-  --cta-hover: var(--mint-300);
-  --ai-foreground: var(--mint-300);
-  --ai-background: var(--mint-950);
-  --ai-border: var(--mint-900);
+  /* Neutral graphite: near-black page, grey surfaces, off-white text (not pure white, which glares).
+     Body text is about 15:1 on the page and secondary text over 7:1, so both read easily. */
+  --background: var(--graphite-950);
+  --foreground: var(--graphite-50);
+  --surface: var(--graphite-900);
+  --surface-muted: var(--graphite-925);
+  --sidebar: var(--graphite-925);
+  --border: var(--graphite-750);
+  --border-strong: var(--graphite-600);
+  --input: var(--graphite-600);
+  --muted: var(--graphite-800);
+  --muted-foreground: var(--graphite-400);
+  --subtle-foreground: var(--graphite-300);
+  --primary: var(--graphite-100);
+  --primary-foreground: var(--graphite-950);
+  --cta: var(--graphite-100);
+  --cta-hover: var(--white);
+  --ai-foreground: var(--sky-300);
+  --ai-background: var(--sky-950);
+  --ai-border: var(--sky-900);
+  --dialog-backdrop: var(--black-a75);
+  --table-row-hover: var(--graphite-850);
   --success-foreground: #7ee2a8;
   --success-background: #10291d;
   --success-border: #1d4630;
@@ -307,8 +328,8 @@
   --chart-cat-4: var(--viz-magenta-600);
   --chart-cat-5: var(--viz-violet-400);
   --chart-other: var(--viz-other-dark);
-  --chart-track: var(--ink-700);
-  --chart-grid: #1f2a29;
+  --chart-track: var(--graphite-750);
+  --chart-grid: var(--graphite-800);
   --shadow-xs: none;
   --shadow-sm: none;
   --shadow-lg: 0 18px 40px -12px #00000080;
@@ -1075,5 +1096,5 @@ textarea {
 
 :root[data-theme="dark"] .segmented button[aria-pressed="true"],
 :root[data-theme="dark"] .segmented button[aria-selected="true"] {
-  background: var(--ink-700);
+  background: var(--graphite-700);
 }

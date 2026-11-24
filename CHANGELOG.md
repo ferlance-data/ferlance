@@ -6,6 +6,23 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.13.0] - 2026-11-24
+
+A separate admin suite, and a calmer dark theme.
+
+### Added
+- **Admin console at `/admin`,** a separate app with its own sign-in (later its own subdomain). It's split from the workspace at every level:
+  - admin tokens use their own type
+  - a separate refresh cookie (`ferlance_admin_refresh` on `/api/admin/auth`)
+  - refresh sessions scoped to `admin`
+
+  A workspace token never opens the admin API, and an admin token never opens a business. `/app/admin` redirects to `/admin`, and the workspace menu no longer shows Admin.
+- **Admin accounts** (`POST /api/admin/auth/signup`) can be created only for emails in `FERLANCE_ADMIN_EMAILS`, with passwords of 12+ characters; each one is logged in the admin log. A listed person who already runs a business can instead sign in at `/admin` with that account. A pure admin account is pointed to `/admin` if it tries the workspace sign-in.
+
+### Changed
+- **Dark theme:** neutral graphite instead of green-tinted ink, with a near-black page, grey surfaces and off-white text (about 15:1 contrast; secondary text over 7:1). Primary buttons are light, and AI touches use a soft blue.
+- **Larger text** in both themes: body 16 px (was 15), small text 14 px (was 13).
+
 ## [1.12.0] - 2026-11-22
 
 Deployment on a single AWS server, and a nightly backup that can be restored.

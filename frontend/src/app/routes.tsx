@@ -3,7 +3,7 @@
 import { lazy, type ComponentType, type LazyExoticComponent } from 'react';
 import type { IconName } from '../lib/icons';
 
-export type PageName = 'overview' | 'products' | 'insights' | 'lance' | 'inventory' | 'debts' | 'books' | 'position' | 'data' | 'settings' | 'admin';
+export type PageName = 'overview' | 'products' | 'insights' | 'lance' | 'inventory' | 'debts' | 'books' | 'position' | 'data' | 'settings';
 
 export interface PageDef {
   name: PageName;
@@ -14,8 +14,6 @@ export interface PageDef {
   /** Extra class on the page's <section class="view"> wrapper. */
   sectionClass?: string;
   nav: { label: string; icon: IconName; group: 'analyse' | 'operate' | 'bottom' };
-  /** Shown in navigation only to platform administrators (the server enforces access). */
-  adminOnly?: boolean;
   Component: LazyExoticComponent<ComponentType>;
 }
 
@@ -100,15 +98,6 @@ export const PAGES: PageDef[] = [
     scoped: false,
     nav: { label: 'Settings', icon: 'settings', group: 'bottom' },
     Component: lazy(() => import('./views/Settings')),
-  },
-  {
-    name: 'admin',
-    title: 'Admin',
-    description: 'Platform accounts, businesses, setup progress and the log of admin changes. Counts only; business records stay private.',
-    scoped: false,
-    adminOnly: true,
-    nav: { label: 'Admin', icon: 'users', group: 'bottom' },
-    Component: lazy(() => import('./views/Admin')),
   },
 ];
 

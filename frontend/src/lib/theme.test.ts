@@ -23,7 +23,7 @@ describe('theme', () => {
     mockMedia(false);
     applyTheme('dark');
     expect(document.documentElement.dataset.theme).toBe('dark');
-    expect(document.querySelector('meta[name="theme-color"]')?.getAttribute('content')).toBe('#0f1c1b');
+    expect(document.querySelector('meta[name="theme-color"]')?.getAttribute('content')).toBe('#0f0f11');
     applyTheme('light');
     expect(document.documentElement.dataset.theme).toBe('light');
     expect(document.querySelector('meta[name="theme-color"]')?.getAttribute('content')).toBe('#fbfaf6');

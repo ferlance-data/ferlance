@@ -3,13 +3,11 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useDeferredValue, useEffect, useState } from 'react';
-import { request } from '../../lib/api';
-import { RadialProgress } from '../../lib/chart/RadialProgress';
-import { formatDate, formatDateTime, number } from '../../lib/format';
-import { toast } from '../../lib/toast';
-import { DataTable, EmptyState, Pill, SkeletonRows, type Column } from '../components/ui';
-import { useIsAdmin } from '../hooks';
-import { useWorkspace } from '../workspace';
+import { request } from '../lib/api';
+import { RadialProgress } from '../lib/chart/RadialProgress';
+import { formatDate, formatDateTime, number } from '../lib/format';
+import { toast } from '../lib/toast';
+import { DataTable, Pill, SkeletonRows, type Column } from '../app/components/ui';
 
 interface AdminUser {
   id: string;
@@ -89,9 +87,8 @@ function useDebounced(value: string): string {
   return useDeferredValue(settled);
 }
 
-export default function Admin() {
-  const isAdmin = useIsAdmin();
-  const { user } = useWorkspace();
+/** The platform console, mounted by the separate admin app (/admin) for a signed-in administrator. */
+export function AdminConsole({ user }: { user: { id: string; email: string } }) {
   const queryClient = useQueryClient();
   const [userSearch, setUserSearch] = useState('');
   const [businessSearch, setBusinessSearch] = useState('');
@@ -100,25 +97,20 @@ export default function Admin() {
   const users = useQuery({
     queryKey: ['admin', 'users', userQuery],
     queryFn: ({ signal }) => request<AdminUser[]>(`/api/admin/users?q=${encodeURIComponent(userQuery)}`, { signal }),
-    enabled: isAdmin,
   });
   const businesses = useQuery({
     queryKey: ['admin', 'businesses', businessQuery],
     queryFn: ({ signal }) => request<AdminBusiness[]>(`/api/admin/businesses?q=${encodeURIComponent(businessQuery)}`, { signal }),
-    enabled: isAdmin,
   });
-  const funnel = useQuery({ queryKey: ['admin', 'onboarding'], queryFn: ({ signal }) => request<Funnel>('/api/admin/onboarding', { signal }), enabled: isAdmin });
-  const audit = useQuery({ queryKey: ['admin', 'audit'], queryFn: ({ signal }) => request<AuditEntry[]>('/api/admin/audit', { signal }), enabled: isAdmin });
+  const funnel = useQuery({ queryKey: ['admin', 'onboarding'], queryFn: ({ signal }) => request<Funnel>('/api/admin/onboarding', { signal }) });
+  const audit = useQuery({ queryKey: ['admin', 'audit'], queryFn: ({ signal }) => request<AuditEntry[]>('/api/admin/audit', { signal }) });
   const exportStatus = useQuery({
     queryKey: ['admin', 'exports'],
     queryFn: ({ signal }) => request<ExportStatus>('/api/admin/exports', { signal }),
-    enabled: isAdmin,
     refetchInterval: (query) => (query.state.data?.running ? 2000 : false),
   });
   const [exporting, setExporting] = useState(false);
   const exportRunning = exporting || Boolean(exportStatus.data?.running);
-
-  if (!isAdmin) return <EmptyState title="Administrators only" message="This page is for Ferlance platform administrators." />;
 
   async function act(path: string, init: Parameters<typeof request>[1], done: string) {
     try {
