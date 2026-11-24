@@ -484,6 +484,31 @@ def catch_up(path: Path, business_id: str, user_id: str | None = None) -> int:
         changed += _catch_up_debts(conn, business_id, accounts, start, known, user_id)
         changed += _catch_up_statements(conn, business_id, accounts, start, known, user_id)
         changed += _catch_up_payroll(conn, business_id, accounts, start, known, user_id)
+        changed += _catch_up_recurring(conn, business_id, accounts, start, known, user_id)
+    return changed
+
+
+def _catch_up_recurring(conn, business_id: str, accounts: dict[str, str], start: str | None, known: dict[str, str], user_id: str | None) -> int:
+    """Confirmed months of recurring expenses: Expense / paid-from account. An undone month is reversed."""
+    changed = 0
+    currency = _currency(conn, business_id)
+    rows = conn.execute(
+        "SELECT p.*, i.name, i.account, i.paid_from FROM recurring_posts p JOIN recurring_items i ON i.id = p.item_id WHERE p.business_id = ?", (business_id,)
+    ).fetchall()
+    present = set()
+    for row in rows:
+        key = f"recurring:{row['item_id']}:{row['month']}"
+        present.add(key)
+        fingerprint = f"{RULES_VERSION}:{start}:{row['status']}:{row['amount_minor']}:{row['posted_on']}"
+        if known.get(key) == fingerprint:
+            continue
+        postings: list[Posting] = []
+        if row["status"] == "confirmed" and not (start and row["posted_on"] < start):
+            label = f"{row['name']} ({row['month']})"
+            postings = [(row["posted_on"], label, [(accounts[row["account"]], currency, row["amount_minor"], label), (accounts[row["paid_from"]], currency, -row["amount_minor"], label)])]
+        changed += _sync(conn, business_id, key, fingerprint, postings, [], user_id)
+    for key in [k for k in known if k.startswith("recurring:") and k not in present and known[k] != "undone"]:
+        changed += _sync(conn, business_id, key, "undone", [], [], user_id)
     return changed
 
 

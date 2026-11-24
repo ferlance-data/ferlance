@@ -427,6 +427,40 @@ CREATE TABLE IF NOT EXISTS credit_share_views (
     user_agent TEXT NOT NULL DEFAULT '',
     FOREIGN KEY(share_id) REFERENCES credit_shares(id)
 );
+CREATE TABLE IF NOT EXISTS recurring_items (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    account TEXT NOT NULL,
+    amount_minor INTEGER NOT NULL CHECK(amount_minor > 0),
+    paid_from TEXT NOT NULL,
+    day_of_month INTEGER NOT NULL CHECK(day_of_month BETWEEN 1 AND 28),
+    start_month TEXT NOT NULL,
+    end_month TEXT,
+    active INTEGER NOT NULL DEFAULT 1,
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(business_id) REFERENCES businesses(id)
+);
+CREATE TABLE IF NOT EXISTS recurring_posts (
+    item_id TEXT NOT NULL,
+    month TEXT NOT NULL,
+    business_id TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('confirmed', 'skipped')),
+    amount_minor INTEGER NOT NULL,
+    posted_on TEXT NOT NULL,
+    decided_by TEXT NOT NULL,
+    decided_at TEXT NOT NULL,
+    PRIMARY KEY(item_id, month)
+);
+CREATE TABLE IF NOT EXISTS budgets (
+    business_id TEXT NOT NULL,
+    month TEXT NOT NULL,
+    account TEXT NOT NULL,
+    amount_minor INTEGER NOT NULL CHECK(amount_minor >= 0),
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY(business_id, month, account)
+);
 CREATE TABLE IF NOT EXISTS business_members (
     business_id TEXT NOT NULL,
     user_id TEXT NOT NULL,
