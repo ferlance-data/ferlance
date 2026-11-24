@@ -359,6 +359,54 @@ CREATE TABLE IF NOT EXISTS statement_lines (
     FOREIGN KEY(business_id) REFERENCES businesses(id)
 );
 CREATE INDEX IF NOT EXISTS statement_lines_account ON statement_lines(business_id, account, txn_date);
+CREATE TABLE IF NOT EXISTS tax_rule_checks (
+    business_id TEXT NOT NULL,
+    rule_id TEXT NOT NULL,
+    checked_by TEXT NOT NULL,
+    checked_at TEXT NOT NULL,
+    PRIMARY KEY(business_id, rule_id)
+);
+CREATE TABLE IF NOT EXISTS employees (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    ssnit_number TEXT NOT NULL DEFAULT '',
+    tin TEXT NOT NULL DEFAULT '',
+    basic_minor INTEGER NOT NULL CHECK(basic_minor >= 0),
+    allowances_minor INTEGER NOT NULL DEFAULT 0 CHECK(allowances_minor >= 0),
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(business_id) REFERENCES businesses(id)
+);
+CREATE TABLE IF NOT EXISTS payroll_runs (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    month TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('draft', 'posted', 'void')),
+    paid_from TEXT,
+    paid_on TEXT,
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    posted_at TEXT,
+    FOREIGN KEY(business_id) REFERENCES businesses(id)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS payroll_runs_month ON payroll_runs(business_id, month) WHERE status != 'void';
+CREATE TABLE IF NOT EXISTS payroll_lines (
+    id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL,
+    employee_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    basic_minor INTEGER NOT NULL,
+    allowances_minor INTEGER NOT NULL,
+    gross_minor INTEGER NOT NULL,
+    ssnit_employee_minor INTEGER NOT NULL,
+    ssnit_employer_minor INTEGER NOT NULL,
+    chargeable_minor INTEGER NOT NULL,
+    paye_minor INTEGER NOT NULL,
+    net_minor INTEGER NOT NULL,
+    rules TEXT NOT NULL,
+    FOREIGN KEY(run_id) REFERENCES payroll_runs(id)
+);
 CREATE TABLE IF NOT EXISTS business_members (
     business_id TEXT NOT NULL,
     user_id TEXT NOT NULL,
@@ -479,6 +527,21 @@ def initialize(path: Path) -> None:
         session_columns = {row[1] for row in db.execute("PRAGMA table_info(refresh_sessions)").fetchall()}
         if "replaced_by" not in session_columns:
             db.execute("ALTER TABLE refresh_sessions ADD COLUMN replaced_by TEXT")
+        debt_columns = {row[1] for row in db.execute("PRAGMA table_info(debts)").fetchall()}
+        if debt_columns and "tax_minor" not in debt_columns:
+            # VAT and levies inside a debt's amount (from a VAT invoice): booked to 'VAT and levies payable'.
+            db.execute("ALTER TABLE debts ADD COLUMN tax_minor INTEGER NOT NULL DEFAULT 0")
+        payment_columns = {row[1] for row in db.execute("PRAGMA table_info(debt_payments)").fetchall()}
+        if payment_columns and "wht_minor" not in payment_columns:
+            # Withholding tax kept back from a supplier payment (paid to GRA, not the supplier).
+            db.execute("ALTER TABLE debt_payments ADD COLUMN wht_minor INTEGER NOT NULL DEFAULT 0")
+            db.execute("ALTER TABLE debt_payments ADD COLUMN wht_kind TEXT")
+            db.execute("ALTER TABLE debt_payments ADD COLUMN wht_rule TEXT")
+        invoice_columns = {row[1] for row in db.execute("PRAGMA table_info(invoices)").fetchall()}
+        if invoice_columns and "tax_minor" not in invoice_columns:
+            db.execute("ALTER TABLE invoices ADD COLUMN tax_minor INTEGER NOT NULL DEFAULT 0")
+            db.execute("ALTER TABLE invoices ADD COLUMN taxes TEXT NOT NULL DEFAULT '[]'")
+            db.execute("ALTER TABLE invoices ADD COLUMN tax_rule TEXT")
         if "scope" not in session_columns:
             # 'workspace' or 'admin': a refresh cookie only renews a session of its own kind.
             db.execute("ALTER TABLE refresh_sessions ADD COLUMN scope TEXT NOT NULL DEFAULT 'workspace'")

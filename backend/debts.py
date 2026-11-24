@@ -16,7 +16,7 @@ from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
-from . import dataset_store, db, ledger
+from . import dataset_store, db, ledger, tax
 
 DIRECTIONS = {"owed_to_us": "customer", "we_owe": "supplier"}
 BASES = {"owed_to_us": ("new_sale", "recorded_sale"), "we_owe": ("recorded_purchase", "expense")}
@@ -106,7 +106,9 @@ def _momo_record(business_id: str, momo_ref: str) -> dict[str, Any] | None:
     return next((r for r in records if str(r.get("transaction_id")) == transaction and r.get("category") in ("momo_sale_received", "momo_expense_paid")), None)
 
 
-def add_payment(path: Path, business_id: str, user_id: str, debt_id: str, *, amount: float | None, paid_on: date | None, method: str | None, momo_ref: str | None) -> dict[str, Any]:
+def add_payment(path: Path, business_id: str, user_id: str, debt_id: str, *, amount: float | None, paid_on: date | None, method: str | None, momo_ref: str | None, withhold: str | None = None) -> dict[str, Any]:
+    """Record a payment. For a supplier, ``withhold`` (goods, works, services, non_resident) keeps back
+    withholding tax by the rule in force: the debt goes down by the full amount, the supplier gets the rest."""
     record = None
     if momo_ref:
         record = _momo_record(business_id, momo_ref)
@@ -140,13 +142,18 @@ def add_payment(path: Path, business_id: str, user_id: str, debt_id: str, *, amo
             raise DebtError(f"That is more than the {ledger.from_minor(balance):,.2f} still owed.")
         if momo_ref and conn.execute("SELECT 1 FROM debt_payments WHERE business_id = ? AND momo_ref = ? AND voided_at IS NULL", (business_id, momo_ref)).fetchone():
             raise DebtError("That MoMo message is already matched to a payment.")
+        withheld, wht_rule = 0, None
+        if withhold:
+            if debt["direction"] != "we_owe" or momo_ref:
+                raise DebtError("Withholding tax applies to payments you make to suppliers.")
+            withheld, wht_rule = tax.wht(amount_minor, withhold, paid_on)
         payment_id = str(uuid.uuid4())
         conn.execute(
-            "INSERT INTO debt_payments (id, debt_id, business_id, amount_minor, paid_on, method, momo_ref, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (payment_id, debt_id, business_id, amount_minor, paid_on.isoformat(), method, momo_ref, user_id, db.now()),
+            "INSERT INTO debt_payments (id, debt_id, business_id, amount_minor, paid_on, method, momo_ref, created_by, created_at, wht_minor, wht_kind, wht_rule) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (payment_id, debt_id, business_id, amount_minor, paid_on.isoformat(), method, momo_ref, user_id, db.now(), withheld, withhold, wht_rule),
         )
     ledger.catch_up(path, business_id, user_id)
-    return {"id": payment_id, "balance": ledger.from_minor(balance - amount_minor)}
+    return {"id": payment_id, "balance": ledger.from_minor(balance - amount_minor), "withheld": ledger.from_minor(withheld), "paid_out": ledger.from_minor(amount_minor - withheld)}
 
 
 def void_debt(path: Path, business_id: str, user_id: str, debt_id: str) -> None:
