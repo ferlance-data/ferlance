@@ -310,6 +310,20 @@ CREATE TABLE IF NOT EXISTS invoice_settings (
     footer TEXT NOT NULL DEFAULT '',
     updated_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS page_captures (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    created_by TEXT NOT NULL,
+    source TEXT NOT NULL CHECK(source IN ('vision', 'text')),
+    page_type TEXT NOT NULL,
+    page_date TEXT,
+    status TEXT NOT NULL CHECK(status IN ('draft', 'confirming', 'confirmed', 'discarded')),
+    lines TEXT NOT NULL,
+    outcome TEXT,
+    created_at TEXT NOT NULL,
+    confirmed_at TEXT,
+    FOREIGN KEY(business_id) REFERENCES businesses(id)
+);
 CREATE TABLE IF NOT EXISTS business_members (
     business_id TEXT NOT NULL,
     user_id TEXT NOT NULL,
