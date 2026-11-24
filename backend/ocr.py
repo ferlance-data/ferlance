@@ -173,6 +173,11 @@ def _reply_json(content: str) -> Any:
 
 def read_document(content: bytes, filename: str = "document") -> list[dict[str, Any]]:
     """Send one image or PDF to the vision model and return cleaned lines."""
+    return clean_lines(ask_vision(content, filename, PROMPT))
+
+
+def ask_vision(content: bytes, filename: str, prompt: str) -> Any:
+    """Send one image or PDF with a prompt to the vision model; return its JSON reply (not yet cleaned)."""
     if not config.OPENROUTER_KEY:
         raise OcrError("Reading photos needs an AI key on the server. You can paste the invoice text instead.")
     if len(content) > MAX_BYTES:
@@ -189,7 +194,7 @@ def read_document(content: bytes, filename: str = "document") -> list[dict[str, 
         "temperature": 0,
         "max_tokens": 4000,
         "response_format": {"type": "json_object"},
-        "messages": [{"role": "user", "content": [{"type": "text", "text": PROMPT}, part]}],
+        "messages": [{"role": "user", "content": [{"type": "text", "text": prompt}, part]}],
     }
     try:
         response = httpx.post(
@@ -209,7 +214,7 @@ def read_document(content: bytes, filename: str = "document") -> list[dict[str, 
     except (httpx.HTTPError, KeyError, IndexError, TypeError, ValueError) as error:
         logger.warning("OCR provider failed: %s", type(error).__name__)
         raise OcrError("The reading service did not answer. Try again in a moment, or paste the text instead.") from error
-    return clean_lines(_reply_json(message if isinstance(message, str) else ""))
+    return _reply_json(message if isinstance(message, str) else "")
 
 
 def _norm(value: str | None) -> str:

@@ -52,7 +52,7 @@ export function initialDecision(line: CaptureLine): Decision {
 }
 
 /** Shrink a phone photo before upload: less mobile data, and re-encoding drops EXIF (including location). */
-async function shrink(file: File): Promise<Blob> {
+export async function shrink(file: File): Promise<Blob> {
   if (file.type === 'application/pdf' || !('createImageBitmap' in window)) return file;
   try {
     const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });

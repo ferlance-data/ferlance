@@ -6,6 +6,27 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.15.0] - 2026-11-24
+
+Notebook pages (PRD §9, G4): the exercise book, read into the records.
+
+### Added
+- **Notebook pages:** photograph a page, or type it in for free with no AI. The AI decides whether it's a **sales**, **debts** or **expenses** page (you can change it), reads the date and every written row, and flags doubtful lines. Nothing is added until each line is checked: tick, edit or untick it, then press **Add**. The photo is shrunk on the phone, which strips its location, and is never stored.
+- **Where the lines go:**
+  - A sales page becomes a normal import, on the dashboards and in the books.
+  - An expenses page becomes spending, sorted into rent, transport, airtime and so on.
+  - A debts page creates one debt-book entry per customer.
+- **Safeguards:**
+  - A page can be added only once.
+  - The exact same lines added again carry a warning.
+  - Future dates are refused.
+  - Each photo uses one AI call from the daily cap, refunded if the read fails.
+- **Accuracy on a live run** (gemini-2.5-flash-lite, a synthetic page in a script font): 24 of 24 fields right in 3.5 s. It read "12/11/2026" as day/month and skipped the total line.
+
+### Not yet
+- Accuracy on real handwriting needs a set of real pages, used with the owner's consent; the script font is only a stand-in.
+- Stock-count pages still go through **Scan invoice** on Inventory.
+
 ## [1.14.0] - 2026-11-24
 
 Invoices, quotes and receipts (PRD §9, G3).

@@ -291,7 +291,7 @@ The global tools assume someone types clean transactions in. **Ferlance becomes 
 | later | Expo app with offline capture in mind (§5.8). **Deferred by the owner, 2026-11-22.** | #9 |
 | 1.11.0 | Debt book: customer and supplier credit (additive, so a minor; phase 2 features ship as 1.x minors until the 2.0.0 switch-over) | G2 |
 | 1.14.0 | Invoices, quotes and receipts, shareable on WhatsApp (1.12.0 was deployment and backups; 1.13.0 the admin suite and dark theme). Done. | G3 |
-| 2.3.0 | Read paper books: exercise-book pages to drafts | G4 |
+| 1.15.0 | Read paper books: exercise-book pages to drafts. Done. | G4 |
 | 2.4.0 | MoMo and bank reconciliation | G5 |
 | 2.5.0 | Ghana tax and payroll basics | G6 |
 | 2.6.0 | Credit-readiness report | G7 |
@@ -338,7 +338,7 @@ The global tools assume someone types clean transactions in. **Ferlance becomes 
 | G3.2 | Invoice status: sent, part-paid, paid, overdue. Paid invoices post to the ledger, and sales from stock post stock movements through #2. | Status matches the debt book. Voiding is a reversal, not a delete. |
 | G3.3 | A GRA E-VAT mode for VAT-registered businesses | **Decision at build time:** integrate with GRA's E-VAT system, or produce compliant invoices for manual entry. Needs GRA documentation and an accountant's review. |
 
-#### G4: Read paper books (v2.3.0)
+#### G4: Read paper books (v1.15.0)
 
 | ID | Requirement | Acceptance |
 | --- | --- | --- |
