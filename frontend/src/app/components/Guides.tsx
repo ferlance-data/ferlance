@@ -17,7 +17,7 @@ export function GuideVideo({ guide, autoPlay = false }: { guide: Guide; autoPlay
       poster={guide.poster}
       aria-label={`Video: ${guide.title}`}
     >
-      <source src={guide.video} type="video/webm" />
+      <source src={guide.video} type="video/mp4" />
       Your browser cannot play this video.
     </video>
   );

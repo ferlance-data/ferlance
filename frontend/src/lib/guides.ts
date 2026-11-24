@@ -15,7 +15,7 @@ export interface Guide {
   poster: string;
 }
 
-const media = (slug: string) => ({ video: `/assets/demo/${slug}.webm`, poster: `/assets/demo/${slug}.jpg` });
+const media = (slug: string) => ({ video: `/assets/demo/${slug}.mp4`, poster: `/assets/demo/${slug}.jpg` });
 
 export const GUIDES: Guide[] = [
   {

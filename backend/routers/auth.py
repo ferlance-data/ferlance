@@ -2,6 +2,10 @@
 
 Access tokens are short-lived JWTs held in memory by the client; refresh
 sessions are opaque, hashed, single-use tokens in an HttpOnly cookie.
+
+The phone app has no cookie jar, so it uses /api/auth/mobile/*: the refresh token travels in the
+JSON body and the app keeps it in the device's secure store. Those sessions have their own scope
+('mobile'), so a web cookie can't be refreshed there and a phone token can't be used as a cookie.
 """
 
 import uuid
@@ -105,8 +109,8 @@ def signup(payload: SignupRequest, response: Response) -> dict:
     return _issue_session(user_id, {"id": business_id, "name": name, "currency": config.DEFAULT_CURRENCY, "role": "owner"}, response)
 
 
-@router.post("/login")
-def login(payload: LoginRequest, response: Response) -> dict:
+def check_login(payload: LoginRequest) -> tuple[dict, dict | None]:
+    """The workspace sign-in checks shared by the web and the phone app. Returns (user, business)."""
     user = db.one(config.DB_PATH, "SELECT * FROM users WHERE email = ?", (payload.email.strip().lower(),))
     if not user or not verify_password(payload.password, user["password_hash"]):
         raise HTTPException(401, "Invalid email or password.")
@@ -115,6 +119,12 @@ def login(payload: LoginRequest, response: Response) -> dict:
     business = primary_business(user["id"])
     if business is None and is_admin(user):
         raise HTTPException(403, "This is an administrator account. Sign in at /admin instead.")
+    return user, business
+
+
+@router.post("/login")
+def login(payload: LoginRequest, response: Response) -> dict:
+    user, business = check_login(payload)
     return _issue_session(user["id"], business, response)
 
 
@@ -200,4 +210,44 @@ def refresh(response: Response, refresh_token: str | None = Cookie(default=None,
 def logout(response: Response, refresh_token: str | None = Cookie(default=None, alias=REFRESH_COOKIE)) -> dict[str, str]:
     end_session(refresh_token)
     response.delete_cookie(REFRESH_COOKIE, path="/api/auth")
+    return {"status": "signed_out"}
+
+
+# ---------- Phone app: refresh token in the body, kept in the device's secure store ----------
+MOBILE = "mobile"
+
+
+class MobileRefresh(BaseModel):
+    refresh_token: str = Field(min_length=1, max_length=200)
+
+
+def _mobile_tokens(user_id: str, refresh_token: str, business: dict | None) -> dict:
+    return {
+        "access_token": create_access_token(user_id, WORKSPACE),
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+        "business": business,
+    }
+
+
+@router.post("/mobile/login")
+def mobile_login(payload: LoginRequest) -> dict:
+    user, business = check_login(payload)
+    refresh_token, _ = start_session(user["id"], MOBILE)
+    return _mobile_tokens(user["id"], refresh_token, business)
+
+
+@router.post("/mobile/refresh")
+def mobile_refresh(payload: MobileRefresh) -> dict:
+    user_id, replacement, _ = rotate_session(payload.refresh_token, MOBILE)
+    return _mobile_tokens(user_id, replacement, primary_business(user_id))
+
+
+@router.post("/mobile/logout")
+def mobile_logout(payload: MobileRefresh) -> dict[str, str]:
+    db.insert(
+        config.DB_PATH,
+        "UPDATE refresh_sessions SET revoked_at = ? WHERE token_hash = ? AND scope = ? AND revoked_at IS NULL",
+        (db.now(), token_hash(payload.refresh_token), MOBILE),
+    )
     return {"status": "signed_out"}
