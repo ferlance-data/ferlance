@@ -62,6 +62,10 @@ Ferlance deploys as one Docker web service: the `Dockerfile` builds the React fr
 
 The Books page keeps real double-entry books automatically from imports, MoMo SMS and stock movements (`backend/ledger.py`). Owners see profit and loss, what the business owns and owes, and money in and out in plain words. The "For your accountant" tab has the journal, manual journals, a period lock, the chart of accounts and a CSV journal export. The database refuses unbalanced or edited entries, and corrections are reversals. Posting rules are listed at the top of `backend/ledger.py`. In v1.10 the books sit beside the dashboards; a comparison card names every difference.
 
+## Invoices
+
+The Invoices page makes invoices, quotes and receipts with gapless numbers and shares them as small PDFs (`backend/invoices.py`). An invoice becomes a debt-book entry, so payments, reminders and the books follow it. A receipt is a sale paid on the spot, and a quote posts nothing until it's converted.
+
 ## Debt book
 
 The Debt book page records who owes the business and whom it owes: credit sales, supplier credit, part-payments and voids, aged by how late they are (`backend/debts.py`). Reminders open the owner's own WhatsApp or SMS with the message filled in, and MoMo messages that may pay a debt are suggested for the owner to confirm. Every debt and payment is posted to the ledger, so the debt book's totals equal the books' receivables and payables.
