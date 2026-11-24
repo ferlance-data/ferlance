@@ -1981,3 +1981,42 @@ svg.icon {
   padding-left: 18px;
   font-size: var(--text-sm);
 }
+
+/* ---------- Admin console (separate app at /admin) ---------- */
+.admin-signin {
+  display: grid;
+  min-height: 100dvh;
+  place-items: center;
+  padding: 24px 16px;
+}
+
+.admin-signin .card {
+  width: min(440px, 100%);
+}
+
+.admin-shell {
+  min-height: 100dvh;
+}
+
+.admin-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--background);
+}
+
+.admin-topbar strong {
+  margin-right: auto;
+}
+
+.admin-main {
+  width: min(1100px, 100%);
+  margin: 0 auto;
+  padding: 16px;
+}

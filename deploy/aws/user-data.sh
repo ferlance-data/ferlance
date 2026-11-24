@@ -10,7 +10,7 @@ set -euxo pipefail
 exec > >(tee -a /var/log/ferlance-setup.log) 2>&1
 
 # Your sign-in email, so you get the Admin page. You can also change it later (see docs/DEPLOY.md).
-ADMIN_EMAIL=""
+ADMIN_EMAIL="phoenixtag1@gmail.com"
 
 if ! swapon --show | grep -q /swapfile; then
   fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile

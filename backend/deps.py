@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import Depends, Header, HTTPException, Query
 
 from . import config, dataset_store, db
-from .security import read_access_token
+from .security import ADMIN, read_access_token
 
 
 def current_user(authorization: str | None = Header(default=None)) -> dict:
@@ -25,8 +25,15 @@ def is_admin(user: dict) -> bool:
     return user["role"] == "admin" or user["email"].lower() in config.ADMIN_EMAILS
 
 
-def admin_user(user: dict = Depends(current_user)) -> dict:
-    if not is_admin(user):
+def admin_user(authorization: str | None = Header(default=None)) -> dict:
+    """The admin console's own session (signed in at /admin). Workspace tokens are refused here."""
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(401, "Authentication required.")
+    user_id = read_access_token(authorization.split(" ", 1)[1], ADMIN)
+    user = db.one(config.DB_PATH, "SELECT id, email, role, full_name FROM users WHERE id = ? AND disabled_at IS NULL", (user_id or "",))
+    if not user:
+        raise HTTPException(401, "Invalid or expired token.")
+    if not is_admin(user):  # the role was removed after sign-in: refused at once
         raise HTTPException(403, "Administrator privileges are required.")
     return user
 

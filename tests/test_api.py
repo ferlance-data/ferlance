@@ -413,9 +413,12 @@ def test_profile_update_and_admin_capabilities(tmp_path, monkeypatch):
     assert profile.json()["user"]["full_name"] == "Admin User"
     renamed = client.patch(f"/api/businesses/{signup.json()['business']['id']}", headers=headers, json={"name": "New Name"})
     assert renamed.status_code == 200 and renamed.json()["name"] == "New Name"
-    assert client.get("/api/admin/capabilities", headers=headers).status_code == 403
+    assert client.get("/api/admin/capabilities", headers=headers).status_code == 401  # workspace token
+    assert client.post("/api/admin/auth/login", json={"email": "admin@example.com", "password": "password123"}).status_code == 403
 
     db.insert(config.DB_PATH, "UPDATE users SET role = 'admin' WHERE email = ?", ("admin@example.com",))
+    login = client.post("/api/admin/auth/login", json={"email": "admin@example.com", "password": "password123"})
+    headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
     capabilities = client.get("/api/admin/capabilities", headers=headers)
     assert capabilities.status_code == 200
     assert "manage_roles" in capabilities.json()["capabilities"]

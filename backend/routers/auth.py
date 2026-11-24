@@ -11,9 +11,9 @@ from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
 from pydantic import BaseModel, Field
 
 from .. import config, db
-from ..deps import current_user, memberships, primary_business
+from ..deps import current_user, is_admin, memberships, primary_business
 from .team import accept_invite, find_invite
-from ..security import create_access_token, create_refresh_token, hash_password, token_hash, verify_password
+from ..security import WORKSPACE, create_access_token, create_refresh_token, hash_password, token_hash, verify_password
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 REFRESH_COOKIE = "ferlance_refresh"
@@ -36,27 +36,33 @@ class ProfileUpdate(BaseModel):
     full_name: str = Field(default="", max_length=120)
 
 
-def _set_refresh_cookie(response: Response, token: str, expires_at: datetime) -> None:
+def set_refresh_cookie(response: Response, token: str, expires_at: datetime, name: str = REFRESH_COOKIE, path: str = "/api/auth") -> None:
     response.set_cookie(
-        REFRESH_COOKIE,
+        name,
         token,
         httponly=True,
         secure=config.COOKIE_SECURE,
         samesite="lax",
         max_age=int((expires_at - datetime.now(timezone.utc)).total_seconds()),
-        path="/api/auth",
+        path=path,
     )
 
 
-def _issue_session(user_id: str, business: dict | None, response: Response) -> dict:
+def start_session(user_id: str, scope: str) -> tuple[str, datetime]:
+    """A new refresh session of the given scope ('workspace' or 'admin')."""
     refresh_token, expires_at = create_refresh_token()
     db.insert(
         config.DB_PATH,
-        "INSERT INTO refresh_sessions (id, user_id, token_hash, expires_at, revoked_at, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-        (str(uuid.uuid4()), user_id, token_hash(refresh_token), expires_at.isoformat(), None, db.now()),
+        "INSERT INTO refresh_sessions (id, user_id, token_hash, expires_at, revoked_at, created_at, scope) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (str(uuid.uuid4()), user_id, token_hash(refresh_token), expires_at.isoformat(), None, db.now(), scope),
     )
-    _set_refresh_cookie(response, refresh_token, expires_at)
-    return {"access_token": create_access_token(user_id), "token_type": "bearer", "business": business}
+    return refresh_token, expires_at
+
+
+def _issue_session(user_id: str, business: dict | None, response: Response) -> dict:
+    refresh_token, expires_at = start_session(user_id, "workspace")
+    set_refresh_cookie(response, refresh_token, expires_at)
+    return {"access_token": create_access_token(user_id, WORKSPACE), "token_type": "bearer", "business": business}
 
 
 @router.post("/signup")
@@ -106,7 +112,10 @@ def login(payload: LoginRequest, response: Response) -> dict:
         raise HTTPException(401, "Invalid email or password.")
     if user.get("disabled_at"):
         raise HTTPException(403, "This account has been disabled. Contact Ferlance support.")
-    return _issue_session(user["id"], primary_business(user["id"]), response)
+    business = primary_business(user["id"])
+    if business is None and is_admin(user):
+        raise HTTPException(403, "This is an administrator account. Sign in at /admin instead.")
+    return _issue_session(user["id"], business, response)
 
 
 @router.get("/me")
@@ -122,13 +131,13 @@ def update_profile(payload: ProfileUpdate, user: dict = Depends(current_user)) -
     return {"user": updated, "business": primary_business(user["id"])}
 
 
-@router.post("/refresh")
-def refresh(response: Response, refresh_token: str | None = Cookie(default=None, alias=REFRESH_COOKIE)) -> dict:
+def rotate_session(refresh_token: str | None, scope: str) -> tuple[str, str, datetime]:
+    """Swap a refresh token for a new one of the same scope. Returns (user id, new token, expiry)."""
     if not refresh_token:
         raise HTTPException(401, "Refresh session is required.")
     with db.connection(config.DB_PATH) as connection:
         connection.execute("BEGIN IMMEDIATE")
-        session = connection.execute("SELECT * FROM refresh_sessions WHERE token_hash = ?", (token_hash(refresh_token),)).fetchone()
+        session = connection.execute("SELECT * FROM refresh_sessions WHERE token_hash = ? AND scope = ?", (token_hash(refresh_token), scope)).fetchone()
         now = datetime.now(timezone.utc)
         if not session or datetime.fromisoformat(session["expires_at"]) <= now:
             raise HTTPException(401, "Refresh session is invalid or expired.")
@@ -160,25 +169,35 @@ def refresh(response: Response, refresh_token: str | None = Cookie(default=None,
         replacement, expires_at = create_refresh_token()
         replacement_id = str(uuid.uuid4())
         connection.execute(
-            "INSERT INTO refresh_sessions (id, user_id, token_hash, expires_at, revoked_at, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-            (replacement_id, session["user_id"], token_hash(replacement), expires_at.isoformat(), None, db.now()),
+            "INSERT INTO refresh_sessions (id, user_id, token_hash, expires_at, revoked_at, created_at, scope) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (replacement_id, session["user_id"], token_hash(replacement), expires_at.isoformat(), None, db.now(), scope),
         )
         connection.execute("UPDATE refresh_sessions SET replaced_by = ? WHERE id = ?", (None if grace else replacement_id, session["id"]))
-    _set_refresh_cookie(response, replacement, expires_at)
-    return {
-        "access_token": create_access_token(session["user_id"]),
-        "token_type": "bearer",
-        "business": primary_business(session["user_id"]),
-    }
+    return session["user_id"], replacement, expires_at
 
 
-@router.post("/logout")
-def logout(response: Response, refresh_token: str | None = Cookie(default=None, alias=REFRESH_COOKIE)) -> dict[str, str]:
+def end_session(refresh_token: str | None) -> None:
     if refresh_token:
         db.insert(
             config.DB_PATH,
             "UPDATE refresh_sessions SET revoked_at = ? WHERE token_hash = ? AND revoked_at IS NULL",
             (db.now(), token_hash(refresh_token)),
         )
+
+
+@router.post("/refresh")
+def refresh(response: Response, refresh_token: str | None = Cookie(default=None, alias=REFRESH_COOKIE)) -> dict:
+    user_id, replacement, expires_at = rotate_session(refresh_token, "workspace")
+    set_refresh_cookie(response, replacement, expires_at)
+    return {
+        "access_token": create_access_token(user_id, WORKSPACE),
+        "token_type": "bearer",
+        "business": primary_business(user_id),
+    }
+
+
+@router.post("/logout")
+def logout(response: Response, refresh_token: str | None = Cookie(default=None, alias=REFRESH_COOKIE)) -> dict[str, str]:
+    end_session(refresh_token)
     response.delete_cookie(REFRESH_COOKIE, path="/api/auth")
     return {"status": "signed_out"}

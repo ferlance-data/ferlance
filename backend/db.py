@@ -386,6 +386,9 @@ def initialize(path: Path) -> None:
         session_columns = {row[1] for row in db.execute("PRAGMA table_info(refresh_sessions)").fetchall()}
         if "replaced_by" not in session_columns:
             db.execute("ALTER TABLE refresh_sessions ADD COLUMN replaced_by TEXT")
+        if "scope" not in session_columns:
+            # 'workspace' or 'admin': a refresh cookie only renews a session of its own kind.
+            db.execute("ALTER TABLE refresh_sessions ADD COLUMN scope TEXT NOT NULL DEFAULT 'workspace'")
         # The v1 retrieval index (field names indexed, no dates) is replaced by rag_records_fts,
         # which rebuilds itself lazily per file on the next Ask Lance question.
         db.execute("DROP TABLE IF EXISTS rag_documents_fts")

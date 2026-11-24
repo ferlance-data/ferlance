@@ -18,6 +18,9 @@ function workspaceFallback(): Plugin {
         if (path === '/app' || (path.startsWith('/app/') && !path.slice(5).includes('.'))) {
           req.url = '/app/index.html';
         }
+        if (path === '/admin' || (path.startsWith('/admin/') && !path.slice(7).includes('.'))) {
+          req.url = '/admin/index.html';
+        }
         next();
       });
     },
@@ -33,6 +36,7 @@ export default defineConfig({
       input: {
         landing: fileURLToPath(new URL('./index.html', import.meta.url)),
         app: fileURLToPath(new URL('./app/index.html', import.meta.url)),
+        admin: fileURLToPath(new URL('./admin/index.html', import.meta.url)),
       },
       output: {
         // Third-party code changes far less often than ours. In its own chunk it keeps its

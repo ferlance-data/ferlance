@@ -6,6 +6,22 @@ import type { AuthResponse } from './types';
 let accessToken: string | null = null;
 let refreshing: Promise<AuthResponse> | null = null;
 
+/**
+ * Which suite this page belongs to. The workspace uses /api/auth; the admin console has its own
+ * sign-in at /api/admin/auth with a separate refresh cookie, so the two sessions never mix.
+ */
+const session = { base: '/api/auth', signedOut: '/?signin' };
+
+export function configureSession(options: { base: string; signedOut: string }): void {
+  session.base = options.base;
+  session.signedOut = options.signedOut;
+}
+
+/** Keep the access token from a sign-in response (the refresh cookie is set by the server). */
+export function setAccessToken(token: string | null): void {
+  accessToken = token;
+}
+
 export class ApiError extends Error {
   readonly status: number;
   /** Structured error body from the server, when it sent one (for example a list of conflicts). */
@@ -25,7 +41,7 @@ export const navigation = {
 };
 
 export function refreshSession(): Promise<AuthResponse> {
-  refreshing ??= fetch('/api/auth/refresh', { method: 'POST', credentials: 'same-origin' })
+  refreshing ??= fetch(`${session.base}/refresh`, { method: 'POST', credentials: 'same-origin' })
     .then(async (response) => {
       if (!response.ok) throw new ApiError('Your session has ended. Please sign in again.', 401);
       const body = (await response.json()) as AuthResponse;
@@ -75,11 +91,11 @@ export async function request<T>(path: string, { method = 'GET', json, body, sig
     });
   };
   let response = await send();
-  if (response.status === 401 && !path.startsWith('/api/auth/')) {
+  if (response.status === 401 && !path.startsWith(`${session.base}/`)) {
     try {
       await refreshSession();
     } catch (error) {
-      navigation.replace('/?signin');
+      navigation.replace(session.signedOut);
       throw error;
     }
     response = await send();
@@ -91,9 +107,9 @@ export async function request<T>(path: string, { method = 'GET', json, body, sig
 }
 
 export async function signOut(): Promise<void> {
-  await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' }).catch(() => undefined);
+  await fetch(`${session.base}/logout`, { method: 'POST', credentials: 'same-origin' }).catch(() => undefined);
   accessToken = null;
-  navigation.replace('/');
+  navigation.replace(session.base === '/api/auth' ? '/' : session.signedOut);
 }
 
 /** Test hook: forget any token and in-flight refresh. */
