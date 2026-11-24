@@ -75,9 +75,11 @@ export interface RequestOptions {
   signal?: AbortSignal;
   /** Return the response body as text (e.g. a CSV download) instead of parsing JSON. */
   asText?: boolean;
+  /** Return the response body as a Blob (e.g. a PDF) instead of parsing JSON. */
+  asBlob?: boolean;
 }
 
-export async function request<T>(path: string, { method = 'GET', json, body, signal, asText = false }: RequestOptions = {}): Promise<T> {
+export async function request<T>(path: string, { method = 'GET', json, body, signal, asText = false, asBlob = false }: RequestOptions = {}): Promise<T> {
   const send = () => {
     const headers: Record<string, string> = {};
     if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
@@ -101,6 +103,7 @@ export async function request<T>(path: string, { method = 'GET', json, body, sig
     response = await send();
   }
   if (asText && response.ok) return (await response.text()) as T;
+  if (asBlob && response.ok) return (await response.blob()) as T;
   const payload = (await response.json().catch(() => ({}))) as unknown;
   if (!response.ok) throw new ApiError(detail(payload as ErrorBody, response.status), response.status, (payload as ErrorBody)?.detail);
   return payload as T;

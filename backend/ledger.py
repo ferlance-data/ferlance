@@ -421,7 +421,7 @@ def movement_postings(conn, business_id: str, movement: dict[str, Any], accounts
         counter = accounts["opening_equity"]
     elif kind == "purchase":
         counter = accounts["payments_clearing"]
-    elif kind == "sale" or str(movement["source"]).startswith("sales-reversal:"):
+    elif kind == "sale" or str(movement["source"]).startswith(("sales-reversal:", "invoice-reversal:")):
         counter = accounts["cogs"]  # a file's stock sales, and their reversal when the file is left out
     else:  # adjustment, stocktake
         counter = accounts["shrinkage"]
@@ -960,7 +960,7 @@ def differences(path: Path, business_id: str, start: date, end: date) -> dict[st
         if source.startswith("manual:"):
             explained["Manual journal entries"] -= row["amount"]
         elif source.startswith("debt:"):
-            explained["Credit sales recorded in the debt book"] -= row["amount"]
+            explained["Sales recorded in the debt book or on invoices and receipts"] -= row["amount"]
         elif source.startswith("dataset:"):
             explained["Corrections dated after a locked period"] -= row["amount"] - expected.pop(source, 0)
         else:

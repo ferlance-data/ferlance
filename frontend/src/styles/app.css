@@ -2020,3 +2020,44 @@ svg.icon {
   margin: 0 auto;
   padding: 16px;
 }
+
+/* ---------- Invoices ---------- */
+.invoice-lines {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.invoice-line {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 0.7fr) minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: end;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.invoice-line-total {
+  display: grid;
+  gap: 4px;
+  justify-items: end;
+}
+
+.invoice-total {
+  margin-right: auto;
+  font-size: var(--text-lg);
+}
+
+@media (max-width: 560px) {
+  .invoice-line {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .invoice-line .field:first-child,
+  .invoice-line .field:nth-child(2):not(:nth-last-child(2)) {
+    grid-column: 1 / -1;
+  }
+}

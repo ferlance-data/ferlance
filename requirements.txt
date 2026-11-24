@@ -11,3 +11,4 @@ charset-normalizer==3.4.1
 cryptography==46.0.3
 pyarrow==26.0.1
 boto3==1.44.9
+fpdf2==2.9.0

@@ -290,7 +290,7 @@ The global tools assume someone types clean transactions in. **Ferlance becomes 
 | 2.0.0 | Switch-over: the ledger becomes the source of truth for money reports, after an accountant signs off the chart of accounts and posting rules (a change to report semantics, hence MAJOR) | G1 |
 | later | Expo app with offline capture in mind (§5.8). **Deferred by the owner, 2026-11-22.** | #9 |
 | 1.11.0 | Debt book: customer and supplier credit (additive, so a minor; phase 2 features ship as 1.x minors until the 2.0.0 switch-over) | G2 |
-| 1.14.0 | Invoices, quotes and receipts, shareable on WhatsApp (1.12.0 was deployment and backups; 1.13.0 the admin suite and dark theme) | G3 |
+| 1.14.0 | Invoices, quotes and receipts, shareable on WhatsApp (1.12.0 was deployment and backups; 1.13.0 the admin suite and dark theme). Done. | G3 |
 | 2.3.0 | Read paper books: exercise-book pages to drafts | G4 |
 | 2.4.0 | MoMo and bank reconciliation | G5 |
 | 2.5.0 | Ghana tax and payroll basics | G6 |
@@ -330,7 +330,7 @@ The global tools assume someone types clean transactions in. **Ferlance becomes 
 | G2.3 | Reminders: a ready-made WhatsApp or SMS message with the amount and the owner's MoMo number, opened in the phone's own app | Nothing is sent automatically, and the owner sends it. Templates come in English and Twi (G8 adds more). |
 | G2.4 | Part-payments and settlement, including matching an incoming MoMo SMS to an open debt | Suggested matches only, confirmed by the owner (feeds G5) |
 
-#### G3: Invoices, quotes and receipts (v2.2.0)
+#### G3: Invoices, quotes and receipts (v1.14.0)
 
 | ID | Requirement | Acceptance |
 | --- | --- | --- |

@@ -6,6 +6,24 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.14.0] - 2026-11-24
+
+Invoices, quotes and receipts (PRD §9, G3).
+
+### Added
+- **Invoices page:** create an invoice, quote or receipt in cedis from stock products or free-text lines, with a live total.
+- **Numbering:** INV-, QUO- and RCT- numbers per business, with no gaps. A voided document keeps its number.
+- **Share PDF:** one-page A4 PDFs, about 25 KB, with your address, phone, TIN, footer and the MoMo pay-to line. They print ₵ and Ghanaian letters (ɛ, ɔ, ŋ) correctly using a bundled DejaVu font. On phones the PDF opens the share sheet (WhatsApp); elsewhere it downloads.
+- **In the books:**
+  - An invoice is a debt-book entry, so part-payments, overdue status, reminders and the ledger all follow.
+  - A receipt is a sale paid on the spot, to cash, MoMo or bank.
+  - A quote posts nothing until you click **Make invoice**.
+  - Stock lines leave stock, and you can't sell more than you have.
+  - Voiding voids the payments, returns the stock and reverses cost of goods sold.
+
+### Not yet
+- GRA E-VAT: whether to integrate with GRA or only produce compliant invoices is still open (PRD §9.6), and needs GRA's documentation and an accountant.
+
 ## [1.13.0] - 2026-11-24
 
 A separate admin suite, and a calmer dark theme.

@@ -266,6 +266,50 @@ CREATE TABLE IF NOT EXISTS backup_runs (
     started_at TEXT NOT NULL,
     finished_at TEXT
 );
+CREATE TABLE IF NOT EXISTS invoices (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK(kind IN ('invoice', 'quote', 'receipt')),
+    seq INTEGER NOT NULL,
+    number TEXT NOT NULL,
+    party_id TEXT,
+    customer_name TEXT NOT NULL,
+    phone TEXT NOT NULL DEFAULT '',
+    issued_on TEXT NOT NULL,
+    due_on TEXT,
+    currency TEXT NOT NULL,
+    total_minor INTEGER NOT NULL CHECK(total_minor > 0),
+    notes TEXT NOT NULL DEFAULT '',
+    debt_id TEXT,
+    converted_from TEXT,
+    voided_at TEXT,
+    voided_by TEXT,
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE(business_id, kind, seq),
+    FOREIGN KEY(business_id) REFERENCES businesses(id)
+);
+CREATE INDEX IF NOT EXISTS invoices_business ON invoices(business_id, issued_on);
+CREATE TABLE IF NOT EXISTS invoice_lines (
+    id TEXT PRIMARY KEY,
+    invoice_id TEXT NOT NULL,
+    position INTEGER NOT NULL,
+    product_id TEXT,
+    description TEXT NOT NULL,
+    quantity REAL NOT NULL CHECK(quantity > 0),
+    unit_price_minor INTEGER NOT NULL CHECK(unit_price_minor >= 0),
+    line_total_minor INTEGER NOT NULL,
+    FOREIGN KEY(invoice_id) REFERENCES invoices(id)
+);
+CREATE INDEX IF NOT EXISTS invoice_lines_invoice ON invoice_lines(invoice_id);
+CREATE TABLE IF NOT EXISTS invoice_settings (
+    business_id TEXT PRIMARY KEY,
+    tin TEXT NOT NULL DEFAULT '',
+    address TEXT NOT NULL DEFAULT '',
+    phone TEXT NOT NULL DEFAULT '',
+    footer TEXT NOT NULL DEFAULT '',
+    updated_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS business_members (
     business_id TEXT NOT NULL,
     user_id TEXT NOT NULL,
