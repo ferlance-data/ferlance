@@ -1,6 +1,6 @@
 {
   "name": "ferlance-mobile",
-  "version": "1.22.0",
+  "version": "1.23.0",
   "main": "index.ts",
   "dependencies": {
     "@expo/metro-runtime": "~58.0.17",

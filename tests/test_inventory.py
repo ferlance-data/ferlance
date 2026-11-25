@@ -239,3 +239,37 @@ def test_concurrent_sales_cannot_overdraw_inventory(tmp_path, monkeypatch):
     snapshot = client.get(base, headers=headers).json()
     assert snapshot["items"][0]["quantity_on_hand"] == 0
     assert len(client.get(f"{base}/movements", headers=headers).json()) == 2
+
+
+def test_stocktake_from_a_count_sheet_typed_checked_and_applied(tmp_path, monkeypatch):
+    from backend import ocr
+
+    assert [(line["name"], line["quantity"]) for line in ocr.parse_counts("Rice 5kg 12\nMilo 400g - 30\nheader only\nSugar 1kg 1,250")] == [
+        ("Rice 5kg", 12.0), ("Milo 400g", 30.0), ("Sugar 1kg", 1250.0),
+    ]
+    client, business_id, headers = _client(tmp_path, monkeypatch)
+    base = f"/api/businesses/{business_id}/inventory"
+    rice = client.post(f"{base}/products", headers=headers, json={"name": "Rice 5kg", "unit": "bag", "unit_cost": 70, "opening_stock": 10}).json()
+    milo = client.post(f"{base}/products", headers=headers, json={"name": "Milo 400g", "unit": "tin", "opening_stock": 30}).json()
+
+    read = client.post(f"{base}/counts/text", headers=headers, json={"text": "Rice 5kg 8\nMilo 400g 30\nGari 4"})
+    assert read.status_code == 200, read.text
+    lines = read.json()["lines"]
+    assert [line["match"]["product_id"] if line["match"] else None for line in lines] == [rice["id"], milo["id"], None]
+    assert client.post(f"{base}/counts/text", headers=headers, json={"text": "nothing counted here"}).status_code == 422
+
+    applied = client.post(f"{base}/counts", headers=headers, json={"counts": [{"product_id": rice["id"], "counted": 8}, {"product_id": milo["id"], "counted": 30}]})
+    assert applied.json() == {"counted": 2, "changed": 1}
+    items = {item["name"]: item for item in client.get(base, headers=headers).json()["items"]}
+    assert items["Rice 5kg"]["quantity_on_hand"] == 8 and items["Milo 400g"]["quantity_on_hand"] == 30
+    movement = client.get(f"{base}/movements", headers=headers).json()[0]
+    assert movement["movement_type"] == "stocktake" and movement["quantity_delta"] == -2
+
+    # Duplicates, negatives and another business's product are refused, and nothing changes.
+    assert client.post(f"{base}/counts", headers=headers, json={"counts": [{"product_id": rice["id"], "counted": 1}, {"product_id": rice["id"], "counted": 2}]}).status_code == 400
+    assert client.post(f"{base}/counts", headers=headers, json={"counts": [{"product_id": rice["id"], "counted": -1}]}).status_code == 422
+    other = client.post("/api/auth/signup", json={"email": "other@example.com", "password": "password123", "business_name": "Other"}).json()
+    other_headers = {"Authorization": f"Bearer {other['access_token']}"}
+    stolen = client.post(f"/api/businesses/{other['business']['id']}/inventory/counts", headers=other_headers, json={"counts": [{"product_id": rice["id"], "counted": 0}]})
+    assert stolen.status_code == 404
+    assert {item["name"]: item["quantity_on_hand"] for item in client.get(base, headers=headers).json()["items"]}["Rice 5kg"] == 8

@@ -13,6 +13,7 @@ import { DataTable, Kpi, ListHeader, Modal, Pill, Segmented, StatusText, ReadOnl
 import { PageActions } from '../page';
 import { Reconciliation, SalesLinks } from './SalesLinks';
 import { ScanInvoice } from './ScanInvoice';
+import { StockCount } from './StockCount';
 import { keys, useWorkspace } from '../workspace';
 import { buildStocktakeTemplate, filterProducts, resolveSelectedProduct, STOCKTAKE_TEMPLATE_FILENAME } from './inventory.logic';
 
@@ -73,6 +74,7 @@ export default function Inventory() {
   const [search, setSearch] = useState('');
   const [showArchived, setShowArchived] = useState(false);
   const [tab, setTab] = useState<Tab>('movement');
+  const [countWay, setCountWay] = useState<'sheet' | 'csv'>('sheet');
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState<{ message: string; error: boolean }>({ message: '', error: false });
   const [busy, setBusy] = useState<Busy>(null);
@@ -453,11 +455,30 @@ export default function Inventory() {
                     </div>
                   </form>
 
+                  <div className="form-grid" hidden={tab !== 'stocktake'}>
+                    <Segmented
+                      label="How you counted"
+                      value={countWay}
+                      onChange={setCountWay}
+                      options={[
+                        { value: 'sheet', label: 'Count sheet (photo or typed)' },
+                        { value: 'csv', label: 'Spreadsheet (CSV)' },
+                      ]}
+                    />
+                    {countWay === 'sheet' ? (
+                      <StockCount
+                        products={items}
+                        onApplied={async () => {
+                          await refreshInventory();
+                        }}
+                      />
+                    ) : null}
+                  </div>
                   <form
                     className="form-grid"
                     id="stocktake-form"
                     data-panel="stocktake"
-                    hidden={tab !== 'stocktake'}
+                    hidden={tab !== 'stocktake' || countWay !== 'csv'}
                     onSubmit={submitStocktake}
                   >
                     <p className="body-sm muted">

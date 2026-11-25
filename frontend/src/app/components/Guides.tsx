@@ -1,25 +1,76 @@
 // The guide video player and the one-time welcome tour (shown on the first visit to the app).
 
 import { useState } from 'react';
-import { GUIDES, TOUR_KEY, type Guide } from '../../lib/guides';
+import {
+  GUIDE_LANGS,
+  GUIDES,
+  LANG_KEY,
+  TOUR_KEY,
+  guideScript,
+  guideVideo,
+  isGuideLang,
+  type Guide,
+  type GuideLang,
+} from '../../lib/guides';
 import { Link } from '../../lib/router';
-import { Modal } from './ui';
+import { Modal, Segmented } from './ui';
 
-export function GuideVideo({ guide, autoPlay = false }: { guide: Guide; autoPlay?: boolean }) {
+function savedLang(): GuideLang {
+  try {
+    const saved = localStorage.getItem(LANG_KEY);
+    return isGuideLang(saved) ? saved : 'en';
+  } catch {
+    return 'en';
+  }
+}
+
+/** The viewer's narration language, remembered in this browser. */
+export function useGuideLang(): [GuideLang, (lang: GuideLang) => void] {
+  const [lang, setLang] = useState<GuideLang>(savedLang);
+  const choose = (next: GuideLang) => {
+    setLang(next);
+    try {
+      localStorage.setItem(LANG_KEY, next);
+    } catch {
+      // storage blocked: the choice lasts until the page closes
+    }
+  };
+  return [lang, choose];
+}
+
+export function LangPicker({ lang, onChange }: { lang: GuideLang; onChange: (lang: GuideLang) => void }) {
   return (
-    <video
-      className="guide-video"
-      controls
-      playsInline
-      muted={autoPlay}
-      autoPlay={autoPlay}
-      preload={autoPlay ? 'auto' : 'none'}
-      poster={guide.poster}
-      aria-label={`Video: ${guide.title}`}
-    >
-      <source src={guide.video} type="video/mp4" />
-      Your browser cannot play this video.
-    </video>
+    <Segmented
+      label="Narration language"
+      value={lang}
+      onChange={onChange}
+      options={GUIDE_LANGS.map((item) => ({ value: item.code, label: item.label }))}
+    />
+  );
+}
+
+export function GuideVideo({ guide, lang }: { guide: Guide; lang: GuideLang }) {
+  const draft = GUIDE_LANGS.find((item) => item.code === lang)?.draft;
+  return (
+    <div className="guide-player">
+      {/* Keyed by language so switching swaps the narrated file. */}
+      <video
+        key={lang}
+        className="guide-video"
+        controls
+        playsInline
+        preload="none"
+        poster={guide.poster}
+        aria-label={`Video: ${guide.title}`}
+      >
+        <source src={guideVideo(guide.slug, lang)} type="video/mp4" />
+        Your browser cannot play this video.
+      </video>
+      <details className="guide-script">
+        <summary>What the voice says{draft ? ' (draft translation)' : ''}</summary>
+        <p lang={lang === 'fat' ? 'fat' : lang}>{guideScript(guide.slug, lang)}</p>
+      </details>
+    </div>
   );
 }
 
@@ -34,6 +85,7 @@ export function tourSeen(): boolean {
 /** Offered once per browser, on the first visit after signing up or in. */
 export function WelcomeTour() {
   const [open, setOpen] = useState(() => !tourSeen());
+  const [lang, setLang] = useGuideLang();
   if (!open) return null;
   const close = () => {
     try {
@@ -51,12 +103,14 @@ export function WelcomeTour() {
           <div>
             <h2 className="card-title">Welcome to Ferlance</h2>
             <p className="card-subtitle">
-              A one-minute tour of how the app helps you each day. You can find all the guides later under Help &amp; guides.
+              A one-minute tour of how the app helps you each day, with a voice in your language. Press play. You can find all the guides
+              later under Help &amp; guides.
             </p>
           </div>
         </div>
         <div className="card-body form-grid">
-          <GuideVideo guide={first} autoPlay />
+          <LangPicker lang={lang} onChange={setLang} />
+          <GuideVideo guide={first} lang={lang} />
           <div className="button-row">
             <Link className="btn btn-primary" to="/app/help" onClick={close}>
               See all guides

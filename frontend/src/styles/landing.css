@@ -1029,6 +1029,30 @@
   background: var(--mint-glow-a08);
   color: var(--white);
 }
+.how-langs {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  margin-top: 14px;
+}
+.how-langs-label { color: var(--fog-400); font-size: var(--text-sm); margin-right: 4px; }
+.how-langs button {
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--white-a10);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--fog-400);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.how-langs button[aria-pressed="true"] { border-color: var(--mint-glow); color: var(--white); background: var(--mint-glow-a08); }
+.how-script { margin-top: 16px; color: var(--fog-400); font-size: var(--text-sm); }
+.how-script summary { cursor: pointer; color: var(--white); }
+.how-script p { margin-top: 8px; }
+.how-credit { max-width: 900px; margin: 28px auto 0; color: var(--fog-550, #8a9593); font-size: 12px; text-align: center; }
 .how-panel {
   display: grid;
   grid-template-columns: minmax(0, 300px) minmax(0, 1fr);

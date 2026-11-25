@@ -6,7 +6,18 @@ import { useState, type FormEvent } from 'react';
 import { request } from '../../lib/api';
 import { formatDate, isoDate, money } from '../../lib/format';
 import { toast } from '../../lib/toast';
-import { EmptyState, ListHeader, Modal, Notice, Pill, ReadOnlyNotice, Segmented, SkeletonRows, StatusText } from '../components/ui';
+import {
+  EmptyState,
+  ListHeader,
+  Modal,
+  Notice,
+  PhotoInput,
+  Pill,
+  ReadOnlyNotice,
+  Segmented,
+  SkeletonRows,
+  StatusText,
+} from '../components/ui';
 import { keys, useWorkspace } from '../workspace';
 import { shrink } from './ScanInvoice';
 
@@ -252,17 +263,7 @@ function PageCapture({ onDone }: { onDone: () => Promise<void> }) {
         />
         {mode === 'photo' ? (
           <>
-            <label className="field">
-              Photo of the page
-              <input
-                className="input"
-                id="page-file"
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                capture="environment"
-                onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-              />
-            </label>
+            <PhotoInput id="page-file" label="Photo of the page" file={file} onFile={setFile} />
             <Notice tone="info" icon="info">
               Lay the book flat in good light. The photo is made smaller on your phone (which also removes its location), sent to your AI
               provider to read, and not stored.

@@ -2222,3 +2222,16 @@ svg.icon {
   .guide-card { grid-template-columns: 260px 1fr; align-items: start; }
 }
 .modal .guide-video { max-height: 60vh; width: auto; }
+
+/* Photo fields and count-sheet review */
+.photo-input .button-row { flex-wrap: wrap; }
+.count-lines { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.count-lines > li { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--border); border-radius: 12px; }
+
+/* Narrated guides */
+.guide-player { display: grid; gap: 8px; justify-items: center; }
+.guide-script { width: 100%; max-width: 300px; font-size: var(--text-sm); }
+.guide-script summary { cursor: pointer; color: var(--text-muted, inherit); }
+.guide-script p { margin: 6px 0 0; line-height: 1.5; }
+.guide-langs { display: grid; gap: 10px; padding: var(--space-4, 16px); }
+.guide-langs .segmented, .modal .segmented { flex-wrap: wrap; }

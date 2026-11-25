@@ -9,7 +9,7 @@ import { request } from '../api';
 import { useSession } from '../session';
 import { Body, Button, Card, Field, Notice, Screen, Segmented, Title, useTheme } from '../ui';
 
-type Mode = 'momo' | 'page';
+type Mode = 'momo' | 'page' | 'stock';
 type PageType = 'sales' | 'debts' | 'expenses';
 
 interface PageLine {
@@ -36,6 +36,170 @@ const TYPES: [PageType, string][] = [
   ['debts', 'Debtors'],
   ['expenses', 'Spending'],
 ];
+
+/**
+ * Take a photo with the camera, or pick one from the gallery, as an upload form.
+ * Returns null when cancelled, or a message when permission was refused.
+ */
+async function pickPhoto(camera: boolean, what: string): Promise<FormData | string | null> {
+  const permission = camera ? await ImagePicker.requestCameraPermissionsAsync() : await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (!permission.granted) {
+    return camera
+      ? `Ferlance needs the camera to photograph the ${what}. You can allow it in your phone settings, or type it instead.`
+      : `Allow access to photos to pick the ${what}.`;
+  }
+  const options: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality: 0.7 };
+  const picked = camera ? await ImagePicker.launchCameraAsync(options) : await ImagePicker.launchImageLibraryAsync(options);
+  const asset = picked.canceled ? null : picked.assets[0];
+  if (!asset) return null;
+  const form = new FormData();
+  // React Native's FormData takes a { uri, name, type } file description.
+  form.append('file', { uri: asset.uri, name: asset.fileName ?? 'photo.jpg', type: asset.mimeType ?? 'image/jpeg' } as unknown as Blob);
+  return form;
+}
+
+interface CountLine {
+  name: string;
+  quantity: number | null;
+  confidence: number;
+  match: { product_id: string; name: string } | null;
+}
+
+interface CountRow {
+  line: CountLine;
+  counted: string;
+  include: boolean;
+}
+
+function StockCount() {
+  const { path } = useSession();
+  const c = useTheme();
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState<'photo' | 'text' | 'apply' | null>(null);
+  const [rows, setRows] = useState<CountRow[] | null>(null);
+  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const fail = (failure: unknown, fallback: string) =>
+    setMessage({ ok: false, text: failure instanceof Error ? failure.message : fallback });
+  const show = (lines: CountLine[]) =>
+    setRows(
+      lines.map((line) => ({
+        line,
+        counted: line.quantity === null ? '' : String(line.quantity),
+        include: Boolean(line.match) && line.quantity !== null,
+      })),
+    );
+
+  const photo = async (camera: boolean) => {
+    setMessage(null);
+    const picked = await pickPhoto(camera, 'count sheet');
+    if (picked === null) return;
+    if (typeof picked === 'string') {
+      setMessage({ ok: false, text: picked });
+      return;
+    }
+    setBusy('photo');
+    try {
+      show((await request<{ lines: CountLine[] }>(path('/inventory/counts/read'), { body: picked })).lines);
+    } catch (failure) {
+      fail(failure, 'Could not read the photo.');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const typed = async () => {
+    setMessage(null);
+    setBusy('text');
+    try {
+      show((await request<{ lines: CountLine[] }>(path('/inventory/counts/text'), { body: { text } })).lines);
+    } catch (failure) {
+      fail(failure, 'Could not read the counts.');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const chosen = (rows ?? []).filter((row) => row.include && row.line.match && row.counted !== '' && Number(row.counted) >= 0);
+
+  const apply = async () => {
+    setBusy('apply');
+    try {
+      const done = await request<{ counted: number; changed: number }>(path('/inventory/counts'), {
+        body: { counts: chosen.map((row) => ({ product_id: row.line.match!.product_id, counted: Number(row.counted) })) },
+      });
+      setRows(null);
+      setText('');
+      setMessage({ ok: true, text: `Counted ${done.counted} product${done.counted === 1 ? '' : 's'}; ${done.changed} changed.` });
+    } catch (failure) {
+      fail(failure, 'Could not apply the counts.');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  if (rows) {
+    return (
+      <Card title="Check the counts">
+        <Body muted>Lines not in your stock records are skipped: add those products on the website first.</Body>
+        {rows.map((row, index) => (
+          <View key={index} style={{ gap: 6, borderTopWidth: 1, borderColor: c.border, paddingTop: 10 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <Switch
+                accessibilityLabel={`Apply the count for ${row.line.name}`}
+                value={row.include}
+                disabled={!row.line.match}
+                onValueChange={(include) => setRows(rows.map((other, at) => (at === index ? { ...other, include } : other)))}
+              />
+              <View style={{ flex: 1 }}>
+                <Body>
+                  {row.line.confidence < 0.7 ? '⚠ ' : ''}
+                  {row.line.name}
+                </Body>
+                <Body muted>{row.line.match ? `→ ${row.line.match.name}` : 'Not in your stock records'}</Body>
+              </View>
+            </View>
+            {row.line.match ? (
+              <Field
+                label="Counted"
+                value={row.counted}
+                keyboardType="decimal-pad"
+                onChangeText={(counted) => setRows(rows.map((other, at) => (at === index ? { ...other, counted } : other)))}
+              />
+            ) : null}
+          </View>
+        ))}
+        {message ? <Notice text={message.text} error={!message.ok} /> : null}
+        <Button
+          label={`Apply ${chosen.length} count${chosen.length === 1 ? '' : 's'}`}
+          onPress={() => void apply()}
+          busy={busy === 'apply'}
+          disabled={!chosen.length}
+        />
+        <Button label="Start again" kind="ghost" onPress={() => setRows(null)} />
+      </Card>
+    );
+  }
+
+  return (
+    <Card title="Count your stock">
+      <Body muted>
+        Photograph your count sheet (read by AI) or type the counts for free. Stock is set to what you counted only after you check it.
+      </Body>
+      <Button label="Take a photo" onPress={() => void photo(true)} busy={busy === 'photo'} disabled={busy !== null} />
+      <Button label="Pick a photo" kind="secondary" onPress={() => void photo(false)} disabled={busy !== null} />
+      <Field label="Or type the counts, one per line" value={text} onChangeText={setText} multiline placeholder="Rice 5kg 12" />
+      <Button
+        label="Read typed counts"
+        kind="secondary"
+        onPress={() => void typed()}
+        busy={busy === 'text'}
+        disabled={!text.trim() || busy !== null}
+      />
+      {message ? <Notice text={message.text} error={!message.ok} /> : null}
+    </Card>
+  );
+}
 
 function MoMo() {
   const { path } = useSession();
@@ -158,26 +322,15 @@ function Notebook() {
 
   const photo = async (camera: boolean) => {
     setMessage(null);
-    const permission = camera ? await ImagePicker.requestCameraPermissionsAsync() : await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      setMessage({
-        ok: false,
-        text: camera
-          ? 'Ferlance needs the camera to photograph a page. You can allow it in your phone settings, or type the page instead.'
-          : 'Allow access to photos to pick a page.',
-      });
+    const picked = await pickPhoto(camera, 'page');
+    if (picked === null) return;
+    if (typeof picked === 'string') {
+      setMessage({ ok: false, text: picked });
       return;
     }
-    const options: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality: 0.7 };
-    const picked = camera ? await ImagePicker.launchCameraAsync(options) : await ImagePicker.launchImageLibraryAsync(options);
-    const asset = picked.canceled ? null : picked.assets[0];
-    if (!asset) return;
     setBusy('photo');
     try {
-      const form = new FormData();
-      // React Native's FormData takes a { uri, name, type } file description.
-      form.append('file', { uri: asset.uri, name: asset.fileName ?? 'page.jpg', type: asset.mimeType ?? 'image/jpeg' } as unknown as Blob);
-      setDraft(await request<Draft>(path('/pages'), { body: form }));
+      setDraft(await request<Draft>(path('/pages'), { body: picked }));
     } catch (failure) {
       fail(failure, 'Could not read the photo.');
     } finally {
@@ -252,12 +405,13 @@ export default function Record() {
           <Segmented
             value={mode}
             options={[
-              ['momo', 'MoMo messages'],
-              ['page', 'Notebook page'],
+              ['momo', 'MoMo'],
+              ['page', 'Notebook'],
+              ['stock', 'Stock count'],
             ]}
             onChange={setMode}
           />
-          {mode === 'momo' ? <MoMo /> : <Notebook />}
+          {mode === 'momo' ? <MoMo /> : mode === 'page' ? <Notebook /> : <StockCount />}
         </>
       ) : (
         <Notice text="Your role can read the books but not add records. Ask the owner if you need to." />

@@ -4,7 +4,7 @@
 
 import '../styles/base.css';
 import '../styles/landing.css';
-import { GUIDES } from '../lib/guides';
+import { GUIDE_LANGS, GUIDES, LANG_KEY, VOICE_CREDIT, guideScript, guideVideo, isGuideLang, type GuideLang } from '../lib/guides';
 import { prefetchWorkspace } from './prefetch';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -125,22 +125,37 @@ const agentScripts: Record<string, AgentScript> = {
   summary: {
     question: 'How did the shop do this week?',
     step: 'Read 412 records from 3 files · compared with last week',
-    answer: 'Revenue was GH₵12,480 across 412 sales, up 9.2% on last week. Rice 25kg and Frytol oil drove most of the growth; Thursday was the strongest day.',
-    metrics: [['Revenue', 'GH₵12,480', '▲ 9.2%'], ['Average sale', 'GH₵30.29', '▲ 2.1%'], ['Sales', '412', '▲ 7.0%']],
+    answer:
+      'Revenue was GH₵12,480 across 412 sales, up 9.2% on last week. Rice 25kg and Frytol oil drove most of the growth; Thursday was the strongest day.',
+    metrics: [
+      ['Revenue', 'GH₵12,480', '▲ 9.2%'],
+      ['Average sale', 'GH₵30.29', '▲ 2.1%'],
+      ['Sales', '412', '▲ 7.0%'],
+    ],
     followups: ['Which customers bought most?', 'Show the daily trend'],
   },
   margin: {
     question: 'Which items are losing us money?',
     step: 'Checked item revenue against recorded unit costs',
-    answer: 'Two items sold below their recorded cost this month. Milo 400g lost GH₵120 after GH₵1,840 in sales; Peak milk tins lost GH₵36. Every other costed item made a profit.',
-    metrics: [['Milo 400g', 'GH₵-120', 'Margin -6.5%'], ['Peak milk', 'GH₵-36', 'Margin -2.9%'], ['Best return', 'Sugar 1kg', 'ROI 41%']],
+    answer:
+      'Two items sold below their recorded cost this month. Milo 400g lost GH₵120 after GH₵1,840 in sales; Peak milk tins lost GH₵36. Every other costed item made a profit.',
+    metrics: [
+      ['Milo 400g', 'GH₵-120', 'Margin -6.5%'],
+      ['Peak milk', 'GH₵-36', 'Margin -2.9%'],
+      ['Best return', 'Sugar 1kg', 'ROI 41%'],
+    ],
     followups: ['What price would break even?', 'Compare with last month'],
   },
   stock: {
     question: 'What do I need to reorder?',
     step: 'Checked 58 products against their reorder levels',
-    answer: 'Rice 25kg (4 bags) and Frytol oil 5L (2 tins) are at or below their reorder levels. At last week\'s pace, rice runs out in about 3 days.',
-    metrics: [['Low stock', '2 items', 'Reorder now'], ['Stock value', 'GH₵21,300', 'Costed'], ['Products', '58', 'Active']],
+    answer:
+      "Rice 25kg (4 bags) and Frytol oil 5L (2 tins) are at or below their reorder levels. At last week's pace, rice runs out in about 3 days.",
+    metrics: [
+      ['Low stock', '2 items', 'Reorder now'],
+      ['Stock value', 'GH₵21,300', 'Costed'],
+      ['Products', '58', 'Active'],
+    ],
     followups: ['Print the inventory report', 'Who supplies rice?'],
   },
 };
@@ -155,28 +170,54 @@ function renderAgent(key: string): void {
       'div',
       { class: 'agent-answer fade-in', style: 'animation-delay:.3s' },
       el('p', {}, script.answer),
-      el('div', { class: 'agent-metrics' }, script.metrics.map(([label, value, note]) => el('div', { class: 'agent-metric' }, el('small', {}, label), el('b', {}, value), el('small', {}, note)))),
-      el('div', { class: 'agent-followups' }, script.followups.map((text) => el('span', {}, text))),
+      el(
+        'div',
+        { class: 'agent-metrics' },
+        script.metrics.map(([label, value, note]) =>
+          el('div', { class: 'agent-metric' }, el('small', {}, label), el('b', {}, value), el('small', {}, note)),
+        ),
+      ),
+      el(
+        'div',
+        { class: 'agent-followups' },
+        script.followups.map((text) => el('span', {}, text)),
+      ),
     ),
   );
 }
 
 function bindTabs(selector: string, attribute: string, render: (key: string) => void): void {
   const tabs = $$(selector);
-  tabs.forEach((tab) => tab.addEventListener('click', () => {
-    tabs.forEach((other) => other.setAttribute('aria-selected', String(other === tab)));
-    render(tab.dataset[attribute] ?? '');
-  }));
+  tabs.forEach((tab) =>
+    tab.addEventListener('click', () => {
+      tabs.forEach((other) => other.setAttribute('aria-selected', String(other === tab)));
+      render(tab.dataset[attribute] ?? '');
+    }),
+  );
 }
 bindTabs('[data-agent-tab]', 'agentTab', renderAgent);
 renderAgent('summary');
 
-/* ---------- How it works: one short screen recording per everyday situation ---------- */
+/* ---------- How it works: one short screen recording per everyday situation, narrated ---------- */
+let howLang: GuideLang = 'en';
+try {
+  const saved = localStorage.getItem(LANG_KEY);
+  if (isGuideLang(saved)) howLang = saved;
+} catch {
+  // storage blocked: English
+}
+let howSlug = GUIDES[0]?.slug ?? '';
+
 function renderHow(slug: string): void {
   const guide = GUIDES.find((item) => item.slug === slug);
   if (!guide) return;
-  const video = el('video', { class: 'how-video', controls: '', playsinline: '', muted: '', preload: 'none', poster: guide.poster, 'aria-label': `Video: ${guide.title}` }, el('source', { src: guide.video, type: 'video/mp4' })) as HTMLVideoElement;
-  video.muted = true;
+  howSlug = slug;
+  const draft = GUIDE_LANGS.find((item) => item.code === howLang)?.draft;
+  const video = el(
+    'video',
+    { class: 'how-video', controls: '', playsinline: '', preload: 'none', poster: guide.poster, 'aria-label': `Video: ${guide.title}` },
+    el('source', { src: guideVideo(guide.slug, howLang), type: 'video/mp4' }),
+  );
   $('#how-panel').replaceChildren(
     el('div', { class: 'how-phone fade-in' }, video),
     el(
@@ -185,25 +226,90 @@ function renderHow(slug: string): void {
       el('h3', {}, guide.title),
       el('p', { class: 'how-when' }, el('b', {}, 'When: '), guide.when),
       el('p', {}, el('b', {}, 'Why: '), guide.why),
-      el('ol', {}, guide.steps.map((step) => el('li', {}, step))),
+      el(
+        'ol',
+        {},
+        guide.steps.map((step) => el('li', {}, step)),
+      ),
+      el(
+        'details',
+        { class: 'how-script' },
+        el('summary', {}, `What the voice says${draft ? ' (draft translation)' : ''}`),
+        el('p', { lang: howLang }, guideScript(guide.slug, howLang)),
+      ),
     ),
   );
 }
 $('#how-tabs').replaceChildren(
-  ...GUIDES.map((guide, index) => el('button', { role: 'tab', type: 'button', 'aria-selected': String(index === 0), 'data-how': guide.slug }, guide.title)),
+  ...GUIDES.map((guide, index) =>
+    el('button', { role: 'tab', type: 'button', 'aria-selected': String(index === 0), 'data-how': guide.slug }, guide.title),
+  ),
 );
 bindTabs('[data-how]', 'how', renderHow);
-renderHow(GUIDES[0]?.slug ?? '');
+$('#how-langs').replaceChildren(
+  el('span', { class: 'how-langs-label' }, 'Voice:'),
+  ...GUIDE_LANGS.map((lang) =>
+    el('button', { type: 'button', 'aria-pressed': String(lang.code === howLang), 'data-how-lang': lang.code }, lang.label),
+  ),
+);
+$$<HTMLButtonElement>('[data-how-lang]').forEach((button) =>
+  button.addEventListener('click', () => {
+    const code = button.dataset.howLang;
+    if (!isGuideLang(code)) return;
+    howLang = code;
+    try {
+      localStorage.setItem(LANG_KEY, code);
+    } catch {
+      // storage blocked
+    }
+    $$('[data-how-lang]').forEach((other) => other.setAttribute('aria-pressed', String(other === button)));
+    renderHow(howSlug);
+  }),
+);
+renderHow(howSlug);
+$('#how-credit').textContent = VOICE_CREDIT;
 
 /* ---------- Use cases ---------- */
 type Usecase = [title: string, summary: string, points: string[]];
 
 const usecases: Record<string, Usecase> = {
-  retail: ['Retail & provisions', 'Know which shelves pay the rent. Ferlance ranks every item by sales and profit, flags lines selling below cost, and warns you before fast movers run out.', ['Top and slow sellers for any week, month or year', 'Item profit and margin from your unit costs', 'Low-stock alerts from a simple stock ledger']],
-  wholesale: ['Wholesale & distribution', 'Bulk orders, credit customers and thin margins. See which customers and lines carry the business, and whether growth is outpacing last period.', ['Customer ranking and repeat buyers', 'Period-over-period comparisons on every number', 'Stocktake imports that reconcile counted stock']],
-  pharmacy: ['Pharmacy', 'Hundreds of SKUs and strict stock discipline. Keep an auditable ledger of every purchase, sale and adjustment alongside your sales performance.', ['SKU-level stock with reorder levels', 'Audit trail for every stock movement', 'Printable inventory and financial reports']],
-  food: ['Food & hospitality', 'Daily cash, Mobile Money and ingredients. Paste MoMo alerts straight in and see the day\'s takings next to what it cost to make them.', ['Mobile Money SMS turned into sales records', 'Daily and weekly revenue trends', 'Cost files supported alongside sales']],
-  services: ['Services', 'Salons, repairs, consulting. Track revenue by service and client, and keep a dated statement of what the business owns and owes.', ['Revenue by service and by client', 'Statement of financial position for any date', 'Ask Lance plain-language questions about your month']],
+  retail: [
+    'Retail & provisions',
+    'Know which shelves pay the rent. Ferlance ranks every item by sales and profit, flags lines selling below cost, and warns you before fast movers run out.',
+    [
+      'Top and slow sellers for any week, month or year',
+      'Item profit and margin from your unit costs',
+      'Low-stock alerts from a simple stock ledger',
+    ],
+  ],
+  wholesale: [
+    'Wholesale & distribution',
+    'Bulk orders, credit customers and thin margins. See which customers and lines carry the business, and whether growth is outpacing last period.',
+    [
+      'Customer ranking and repeat buyers',
+      'Period-over-period comparisons on every number',
+      'Stocktake imports that reconcile counted stock',
+    ],
+  ],
+  pharmacy: [
+    'Pharmacy',
+    'Hundreds of SKUs and strict stock discipline. Keep an auditable ledger of every purchase, sale and adjustment alongside your sales performance.',
+    ['SKU-level stock with reorder levels', 'Audit trail for every stock movement', 'Printable inventory and financial reports'],
+  ],
+  food: [
+    'Food & hospitality',
+    "Daily cash, Mobile Money and ingredients. Paste MoMo alerts straight in and see the day's takings next to what it cost to make them.",
+    ['Mobile Money SMS turned into sales records', 'Daily and weekly revenue trends', 'Cost files supported alongside sales'],
+  ],
+  services: [
+    'Services',
+    'Salons, repairs, consulting. Track revenue by service and client, and keep a dated statement of what the business owns and owes.',
+    [
+      'Revenue by service and by client',
+      'Statement of financial position for any date',
+      'Ask Lance plain-language questions about your month',
+    ],
+  ],
 };
 
 function renderUsecase(key: string): void {
@@ -212,7 +318,11 @@ function renderUsecase(key: string): void {
   const [title, summary, points] = entry;
   $('#usecase-panel').replaceChildren(
     el('div', { class: 'fade-in' }, el('h3', {}, title), el('p', {}, summary)),
-    el('ul', { class: 'fade-in' }, points.map((point, index) => el('li', {}, el('span', {}, String(index + 1).padStart(2, '0')), point))),
+    el(
+      'ul',
+      { class: 'fade-in' },
+      points.map((point, index) => el('li', {}, el('span', {}, String(index + 1).padStart(2, '0')), point)),
+    ),
   );
 }
 bindTabs('[data-usecase]', 'usecase', renderUsecase);
@@ -221,12 +331,15 @@ renderUsecase('retail');
 /* ---------- Facts curve draws in when visible ---------- */
 const curve = $('.facts-curve-path');
 if ('IntersectionObserver' in window) {
-  const observer = new IntersectionObserver((entries) => {
-    if (entries.some((entry) => entry.isIntersecting)) {
-      curve.classList.add('drawn');
-      observer.disconnect();
-    }
-  }, { threshold: 0.4 });
+  const observer = new IntersectionObserver(
+    (entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        curve.classList.add('drawn');
+        observer.disconnect();
+      }
+    },
+    { threshold: 0.4 },
+  );
   observer.observe(curve);
 } else {
   curve.classList.add('drawn');
@@ -243,7 +356,9 @@ const copy: Record<Mode, [string, string]> = {
 };
 
 function setMode(mode: Mode): void {
-  (Object.entries(forms) as [Mode, HTMLFormElement][]).forEach(([name, form]) => { form.hidden = name !== mode; });
+  (Object.entries(forms) as [Mode, HTMLFormElement][]).forEach(([name, form]) => {
+    form.hidden = name !== mode;
+  });
   $$('[data-auth-mode]').forEach((tab) => tab.setAttribute('aria-selected', String(tab.dataset.authMode === mode)));
   const [title, subtitle] = copy[mode];
   $('#auth-title').textContent = title;
@@ -261,7 +376,9 @@ function openAuth(mode: Mode): void {
 
 $$('[data-auth]').forEach((button) => button.addEventListener('click', () => openAuth(asMode(button.dataset.auth))));
 $$('[data-auth-mode]').forEach((tab) => tab.addEventListener('click', () => setMode(asMode(tab.dataset.authMode))));
-dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
+dialog.addEventListener('click', (event) => {
+  if (event.target === dialog) dialog.close();
+});
 
 interface ErrorPayload {
   detail?: string | { msg: string }[];

@@ -6,7 +6,7 @@ import { request } from '../../lib/api';
 import { money, number } from '../../lib/format';
 import { toast } from '../../lib/toast';
 import type { InventoryItem } from '../../lib/types';
-import { Notice, Pill, Segmented, StatusText } from '../components/ui';
+import { Notice, PhotoInput, Pill, Segmented, StatusText } from '../components/ui';
 import { useWorkspace } from '../workspace';
 
 export interface CaptureLine {
@@ -68,7 +68,15 @@ export async function shrink(file: File): Promise<Blob> {
   }
 }
 
-export function ScanInvoice({ hidden, products, onApplied }: { hidden: boolean; products: InventoryItem[]; onApplied: () => Promise<void> }) {
+export function ScanInvoice({
+  hidden,
+  products,
+  onApplied,
+}: {
+  hidden: boolean;
+  products: InventoryItem[];
+  onApplied: () => Promise<void>;
+}) {
   const { businessPath } = useWorkspace();
   const [mode, setMode] = useState<'photo' | 'text'>('photo');
   const [file, setFile] = useState<File | null>(null);
@@ -123,7 +131,10 @@ export function ScanInvoice({ hidden, products, onApplied }: { hidden: boolean; 
               unit_cost: item.unit_cost.trim() === '' ? null : Number(item.unit_cost),
             },
       );
-      const result = await request<{ outcome: { action: string }[] }>(businessPath(`/inventory/captures/${capture.id}/confirm`), { method: 'POST', json: { lines } });
+      const result = await request<{ outcome: { action: string }[] }>(businessPath(`/inventory/captures/${capture.id}/confirm`), {
+        method: 'POST',
+        json: { lines },
+      });
       const added = result.outcome.filter((item) => item.action === 'added').length;
       toast(`${number(added)} line(s) added to stock.`);
       setCapture(null);
@@ -169,7 +180,11 @@ export function ScanInvoice({ hidden, products, onApplied }: { hidden: boolean; 
                 <div className="scan-line-fields">
                   <label className="field">
                     What to do
-                    <select className="select" value={decision.action} onChange={(event) => update(index, { action: event.target.value as Decision['action'] })}>
+                    <select
+                      className="select"
+                      value={decision.action}
+                      onChange={(event) => update(index, { action: event.target.value as Decision['action'] })}
+                    >
                       <option value="add">Add to an existing product</option>
                       <option value="create">Create a new product</option>
                       <option value="skip">Skip this line</option>
@@ -178,7 +193,11 @@ export function ScanInvoice({ hidden, products, onApplied }: { hidden: boolean; 
                   {decision.action === 'add' ? (
                     <label className="field">
                       Product
-                      <select className="select" value={decision.product_id} onChange={(event) => update(index, { product_id: event.target.value })}>
+                      <select
+                        className="select"
+                        value={decision.product_id}
+                        onChange={(event) => update(index, { product_id: event.target.value })}
+                      >
                         <option value="">Choose…</option>
                         {choosable.map((item) => (
                           <option key={item.id} value={item.id}>
@@ -186,29 +205,53 @@ export function ScanInvoice({ hidden, products, onApplied }: { hidden: boolean; 
                           </option>
                         ))}
                       </select>
-                      {line.match?.kind === 'similar' && !decision.product_id ? <span className="field-hint">{`Did you mean ${line.match.name}?`}</span> : null}
+                      {line.match?.kind === 'similar' && !decision.product_id ? (
+                        <span className="field-hint">{`Did you mean ${line.match.name}?`}</span>
+                      ) : null}
                     </label>
                   ) : null}
                   {decision.action === 'create' ? (
                     <label className="field">
                       New product name
-                      <input className="input" value={decision.name} maxLength={200} onChange={(event) => update(index, { name: event.target.value })} />
+                      <input
+                        className="input"
+                        value={decision.name}
+                        maxLength={200}
+                        onChange={(event) => update(index, { name: event.target.value })}
+                      />
                     </label>
                   ) : null}
                   {decision.action === 'skip' ? (
                     <label className="field">
                       Why skip (optional)
-                      <input className="input" value={decision.reason} maxLength={200} placeholder="e.g. delivery fee" onChange={(event) => update(index, { reason: event.target.value })} />
+                      <input
+                        className="input"
+                        value={decision.reason}
+                        maxLength={200}
+                        placeholder="e.g. delivery fee"
+                        onChange={(event) => update(index, { reason: event.target.value })}
+                      />
                     </label>
                   ) : (
                     <>
                       <label className="field">
                         Quantity
-                        <input className="input" inputMode="decimal" value={decision.quantity} onChange={(event) => update(index, { quantity: event.target.value })} />
+                        <input
+                          className="input"
+                          inputMode="decimal"
+                          value={decision.quantity}
+                          onChange={(event) => update(index, { quantity: event.target.value })}
+                        />
                       </label>
                       <label className="field">
                         Unit cost
-                        <input className="input" inputMode="decimal" value={decision.unit_cost} placeholder="optional" onChange={(event) => update(index, { unit_cost: event.target.value })} />
+                        <input
+                          className="input"
+                          inputMode="decimal"
+                          value={decision.unit_cost}
+                          placeholder="optional"
+                          onChange={(event) => update(index, { unit_cost: event.target.value })}
+                        />
                       </label>
                     </>
                   )}
@@ -244,18 +287,23 @@ export function ScanInvoice({ hidden, products, onApplied }: { hidden: boolean; 
       />
       {mode === 'photo' ? (
         <>
-          <label className="field">
-            Invoice, delivery note or stock list
-            <input className="input" id="scan-file" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
-          </label>
+          <PhotoInput id="scan-file" label="Invoice, delivery note or stock list" file={file} onFile={setFile} allowPdf />
           <Notice tone="info" icon="info">
-            The photo is made smaller on your phone (which also removes its location data) and sent to your AI provider to read. It is not stored. Nothing goes into stock until you check each line.
+            The photo is made smaller on your phone (which also removes its location data) and sent to your AI provider to read. It is not
+            stored. Nothing goes into stock until you check each line.
           </Notice>
         </>
       ) : (
         <label className="field">
           One product per line: name, quantity, unit cost
-          <textarea className="textarea" id="scan-text" rows={6} placeholder={'Rice 5kg, 10, 70\nMilo 400g x 12 @ 47.50'} value={text} onChange={(event) => setText(event.target.value)} />
+          <textarea
+            className="textarea"
+            id="scan-text"
+            rows={6}
+            placeholder={'Rice 5kg, 10, 70\nMilo 400g x 12 @ 47.50'}
+            value={text}
+            onChange={(event) => setText(event.target.value)}
+          />
           <span className="field-hint">Read on our server without any AI. Free.</span>
         </label>
       )}

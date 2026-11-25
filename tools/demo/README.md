@@ -42,3 +42,33 @@ node tools/demo/record.mjs http://localhost:8782 frontend/public/assets/demo
 Set `ONLY=credit,stock` to record only some scenarios. The output is `<slug>.mp4` (H.264, about 250 KB)
 and a `<slug>.jpg` poster for each scenario. Frames come from Chrome's screencast. The welcome
 tour is skipped, and the AI explanation panel is hidden, because the recording server has no AI key.
+
+## Narration (English, Twi, Ga, Ewe, Fante)
+
+`voice.py` speaks the scripts in `frontend/src/lib/narration.json` and lays them over each silent
+video. The output is `<slug>.<lang>.mp4` next to it, with lang one of `en`, `tw`, `ga`, `ee` or `fat`.
+If the speech runs longer than the video, it holds the last frame.
+
+- **English:** [Kokoro](https://github.com/thewh1teagle/kokoro-onnx) (Apache 2.0), voice `af_heart`.
+  The two model files (about 120 MB) come from the kokoro-onnx `model-files-v1.0` release.
+- **Twi, Ga, Ewe, Fante:** [Africa TTS](https://huggingface.co/AfriSpeech/africa-tts) by AfriSpeech.
+  It's **CC BY-NC 4.0**: non-commercial use only, with credit, which the guides show. It downloads
+  about 440 MB on first use.
+
+Only the English scripts are final. The Twi, Ga, Ewe and Fante scripts are drafts (`"draft": true`
+in `narration.json`). When a native speaker has corrected a script, edit it, set `draft` to false,
+and run the voices again for that language.
+
+```bash
+python3 -m venv /tmp/tts && /tmp/tts/bin/pip install torch --index-url https://download.pytorch.org/whl/cpu
+```
+
+```bash
+/tmp/tts/bin/pip install africa-tts kokoro-onnx soundfile imageio-ffmpeg
+```
+
+```bash
+FFMPEG=$(/tmp/tts/bin/python -c "import imageio_ffmpeg; print(imageio_ffmpeg.get_ffmpeg_exe())") /tmp/tts/bin/python tools/demo/voice.py --kokoro <kokoro folder> --langs tw
+```
+
+`--only credit,stock` limits it to some guides, and `--langs` to some languages.
