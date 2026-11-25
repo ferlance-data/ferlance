@@ -408,6 +408,33 @@ def import_stocktake(
     return {"created": created_count, "updated": updated_count, "rows_imported": len(rows)}
 
 
+def apply_counts(path: Path, business_id: str, user_id: str, counts: list[dict[str, Any]]) -> dict[str, Any]:
+    """A stocktake from a checked count sheet: each product's stock is set to what was counted.
+
+    The difference from the records is one auditable 'stocktake' movement per product, all in one
+    transaction. Only existing products can be counted (add new ones first).
+    """
+    if not counts:
+        raise InventoryError("Tick at least one counted product.")
+    seen: set[str] = set()
+    for count in counts:
+        if count["product_id"] in seen:
+            raise InventoryError("A product is counted twice. Keep one line for each product.")
+        seen.add(count["product_id"])
+        _nonnegative(count["counted"], "Counted quantity")
+    changed = 0
+    with db.connection(path) as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        for count in counts:
+            product = _product(conn, count["product_id"], business_id)
+            delta = round(count["counted"] - _stock(conn, product["id"]), 6)
+            if delta == 0:
+                continue
+            _record_movement(conn, business_id, product["id"], user_id, "stocktake", delta, "Counted on a stock sheet", "stocktake_count", product["unit_cost"])
+            changed += 1
+    return {"counted": len(counts), "changed": changed}
+
+
 def confirm_capture(path: Path, business_id: str, user_id: str, capture_id: str, decisions: list[dict[str, Any]]) -> dict[str, Any]:
     """Apply a reviewed OCR draft in ONE transaction: every accepted line becomes a purchase
     (creating products where asked), skipped lines are kept with their reason, and the draft

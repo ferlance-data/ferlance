@@ -6,6 +6,24 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.23.0] - 2026-11-25
+
+Guides you can hear in five languages, and a camera button wherever a photo is needed.
+
+### Added
+- **Spoken guides in English, Twi, Ga, Ewe and Fante.** Every guide video has a voice, and a language picker on the landing page, the Help page, the welcome tour and the phone app switches between them. The choice is remembered. "What the voice says" shows the words under each video, for reading along or watching without sound.
+  - **English** uses Kokoro (Apache 2.0).
+  - **Twi, Ga, Ewe and Fante** use AfriSpeech's Africa TTS, which is **CC BY-NC 4.0: non-commercial use only, with credit**. The credit is shown next to the guides.
+  - The four Ghanaian-language scripts are **drafts** for a native speaker to check, and they are labelled "draft translation".
+  - `tools/demo/voice.py` rebuilds the narration from `frontend/src/lib/narration.json`.
+- **Take a photo.** Every photo field (scan an invoice, notebook pages, and stocktake) now has a **Take a photo** button that opens the phone camera straight away, next to **Choose a file**.
+- **Stocktake from a count sheet.** Photograph your count sheet (read by AI) or type the counts (free). Check each product and count, then apply. Each product's stock is set to what was counted, with one auditable stocktake movement per difference. The CSV import is still there under "Spreadsheet (CSV)".
+  - New endpoints: `POST /inventory/counts/read`, `/inventory/counts/text` and `/inventory/counts`.
+- **Stock count in the phone app.** Record → Stock count lets you take or pick a photo of the count sheet, or type the counts, then check and apply.
+
+### Changed
+- The welcome tour no longer plays silently on its own: pick a language and press play to hear it.
+
 ## [1.22.0] - 2026-11-25
 
 The phone app, and guide videos that play on every phone.

@@ -1,0 +1,61 @@
+{
+  "_note": "Spoken narration for the guide videos (tools/demo/voice.py turns this into audio). English is final; Twi, Ga, Ewe and Fante are first drafts that need a native speaker's check. Button names stay in English so they match the screen. Spell numbers out.",
+  "languages": {
+    "en": { "label": "English", "draft": false },
+    "tw": { "label": "Twi", "draft": true },
+    "ga": { "label": "Ga", "draft": true },
+    "ee": { "label": "Ewe", "draft": true },
+    "fat": { "label": "Fante", "draft": true }
+  },
+  "guides": {
+    "start": {
+      "en": "Welcome to Ferlance. Every morning, before you open the shop, take one minute here. Overview shows your sales, profit and what changed since last time. Insights tells you what is selling, what is slowing down, and what to restock. Bring your records in from Data imports: a spreadsheet, or your MoMo messages. Then read the advice, and act.",
+      "tw": "Akwaaba ba Ferlance. Anɔpa biara, ansa na wobue wo sotɔɔ no, fa simma baako hwɛ ha. Overview kyerɛ wo nneɛma a woatɔn, mfaso a wonyae, ne nea asesa. Insights ka nea ɛretɔn yie, nea ɛrebrɛ ase, ne nea ɛsɛ sɛ wotɔ bio kyerɛ wo. Fa wo nkrataa ba wɔ Data imports mu: spreadsheet anaa wo MoMo nkra. Afei kenkan afotu no, na yɛ ho biribi.",
+      "ga": "Ojekoo, ba Ferlance. Leebi fɛɛ leebi, dani obaagbele o-shɔp lɛ, kɛ miniti kome ahyɛ biɛ. Overview tsɔɔ bo nɔ ni ohɔɔ, sɛɛnamɔ ni oná, kɛ nɔ ni etsake. Insights kɛɔ bo nɔ ni ahɔɔ jogbaŋŋ, nɔ ni efee blɛoo, kɛ nɔ ni esa akɛ ohe ekoŋŋ. Kɛ o-woji lɛ aba yɛ Data imports mli: spreadsheet loo o-MoMo saji. No sɛɛ lɛ, kane ŋaawoo lɛ, ni otsu he nii.",
+      "ee": "Woezɔ va Ferlance. Ŋdi sia ŋdi, hafi nàʋu wò fiase, tsɔ miniti ɖeka kpɔ afi sia. Overview ɖea nu siwo nèdzra, viɖe si nèkpɔ, kple nu si trɔ la fiana wò. Insights gblɔa nu siwo dzrana nyuie, nu siwo ƒe dzadzra le ɖiɖim, kple nu siwo nàgaƒle la na wò. Tsɔ wò agbalẽwo va le Data imports me: spreadsheet alo wò MoMo gbedasiwo. Emegbe, xlẽ aɖaŋuɖoɖoa, eye nàwɔ ɖe edzi.",
+      "fat": "Akwaaba ba Ferlance. Anɔpa biara, ansaana ebebue wo sotɔɔ no, fa simma kor hwɛ ha. Overview kyerɛ wo ndzɛmba a etɔn, mfaso a enya, na dza asesa. Insights ka dza ɔretɔn yie, dza ɔrebrɛ ase, na dza ɔwɔ dɛ etɔ bio kyerɛ wo. Fa wo nkrataa bra wɔ Data imports mu: spreadsheet anaa wo MoMo nkra. Afei kenkan afotu no, na yɛ ho biribi."
+    },
+    "credit": {
+      "en": "Selling on credit. When a customer takes goods now and pays later, open the Debt book and tap New credit sale. A name and an amount are enough, and it goes into your books too. Tap Remind to send a polite WhatsApp or SMS from your own phone, with where to pay by MoMo. When they pay, record it, or let Ferlance match their MoMo payment.",
+      "tw": "Nneɛma a wɔde ma na wɔtua akyiri. Sɛ obi fa nneɛma nnɛ na ɔbɛtua akyiri a, bue Debt book no na mia New credit sale. Ne din ne sika dodow no ara na ɛho hia, na ɛkɔ wo nkrataa mu nso. Mia Remind na fa WhatsApp anaa SMS a ɛyɛ fɛ kɔma no fi wo ankasa wo fon so, a ɛkyerɛ baabi a ɔbɛtua MoMo. Sɛ ɔtua a, kyerɛw, anaa ma Ferlance mfa ne MoMo tua no nhyia ka no.",
+      "ga": "Nɔ ni akɛhaa ni awoɔ sɛɛ. Kɛ mɔ ko kɛ nibii ya ŋmɛnɛ ni ebaawo sɛɛ lɛ, gbele Debt book lɛ ni omia New credit sale. E-gbɛi kɛ shika lɛ pɛ hiaa, ni eyaa o-woji lɛ amli hu. Mia Remind ni okɛ WhatsApp loo SMS ni hi ha lɛ kɛjɛ bo diŋŋ o-fon nɔ, ni tsɔɔ he ni ebaawo yɛ MoMo nɔ. Kɛ ewo lɛ, ŋmalamɔ, loo ŋmɛ gbɛ ni Ferlance akɛ e-MoMo wɔmɔ lɛ akpe he.",
+      "ee": "Nudzadza le agbanu me. Ne ame aɖe xɔ nuwo egbea eye wòaxe fe emegbe la, ʋu Debt book eye nàzi New credit sale dzi. Eŋkɔ kple ga home ko hiã, eye wòyina wò agbalẽwo me hã. Zi Remind dzi nàdɔ WhatsApp alo SMS nyui ɖe eŋu tso wò ŋutɔ wò fon dzi, si fia afi si wòaxe fe le MoMo dzi. Ne exe fe la, ŋlɔe ɖi, alo na Ferlance natsɔ eƒe MoMo fexexe asɔ kplii.",
+      "fat": "Ndzɛmba a wɔdze ma na wɔtua ekyir. Sɛ obi fa ndzɛmba ndɛ na ɔbɛtua ekyir a, bue Debt book no na mia New credit sale. Ne dzin na sika dodow no ara na ohia, na ɔkɔ wo nkrataa mu so. Mia Remind na fa WhatsApp anaa SMS a ɔyɛ fɛw kɔma no fi wo ankasa wo fon do, a ɔkyerɛ beebi a ɔbɛtua MoMo. Sɛ ɔtua a, kyerɛw, anaa ma Ferlance mfa no MoMo tua no nhyia ka no."
+    },
+    "invoices": {
+      "en": "Invoices and receipts. When a customer asks for an invoice, a quote or a receipt, open Invoices and tap New. Pick items from your stock, set the quantity and price, and save. Tap Share PDF to send it on WhatsApp. An unpaid invoice waits in the Debt book until it is paid.",
+      "tw": "Invoice ne receipt. Sɛ adetɔfo bi bisa invoice, quote anaa receipt a, bue Invoices na mia New. Yi nneɛma fi wo stock mu, hyɛ dodow ne bo no, na sie. Mia Share PDF de kɔma no wɔ WhatsApp so. Invoice a wɔntuae da so twɛn wɔ Debt book mu kosi sɛ wɔbɛtua.",
+      "ga": "Invoice kɛ receipt. Kɛ mɔ ko bi invoice, quote loo receipt lɛ, gbele Invoices ni omia New. Hala nibii kɛjɛ o-stock lɛ mli, ŋmala abɔ kɛ jara lɛ, ni okpɔ. Mia Share PDF ni okɛmajɛ yɛ WhatsApp nɔ. Invoice ni awooo lɛ miimɛ yɛ Debt book lɛ mli kɛyashi abaawo.",
+      "ee": "Invoice kple receipt. Ne nuƒlela aɖe bia invoice, quote alo receipt la, ʋu Invoices eye nàzi New dzi. Tia nuwo tso wò stock me, ŋlɔ agbɔsɔsɔ kple asi, eye nàdzrae ɖo. Zi Share PDF dzi nàɖoe ɖa le WhatsApp dzi. Invoice si womexe fe na o la anɔ Debt book me vaseɖe esime woaxe fe.",
+      "fat": "Invoice na receipt. Sɛ adzetɔnyi bi bisa invoice, quote anaa receipt a, bue Invoices na mia New. Yi ndzɛmba fi wo stock mu, hyɛ dodow na ne bo, na sie. Mia Share PDF dze kɔma no wɔ WhatsApp do. Invoice a wɔnntuae da do twɛn wɔ Debt book mu kesi sɛ wɔbɛtua."
+    },
+    "notebook": {
+      "en": "From your exercise book. If you keep sales, debtors or spending in a book, open Notebook pages and add a page. Take a photo and Ferlance reads it, or type the lines for free. Check every line, untick anything wrong, then press Add. Nothing is saved before you check.",
+      "tw": "Fi wo nwoma mu. Sɛ wokyerɛw wo nneɛma a woatɔn, wɔn a wɔde wo ka, anaa wo ka a wobɔ wɔ nwoma mu a, bue Notebook pages na fa kratafa foforo ka ho. Twa ne mfonini na Ferlance bɛkenkan, anaa kyerɛw nsensanee no kwa. Hwɛ nsensanee biara, yi nea ɛnteɛ fi mu, na afei mia Add. Wɔnsie hwee nkosi sɛ wobɛhwɛ.",
+      "ga": "Kɛjɛ o-wolo lɛ mli. Kɛ oŋmalaa nɔ ni ohɔɔ, mɛi ni yeɔ bo nyɔmɔ, loo shika ni ofiteɔ yɛ wolo mli lɛ, gbele Notebook pages ni okɛ baafa hee afata he. Ŋmɛɛ e-mfoniri ni Ferlance baakane, loo ŋmala gbɛ́i lɛ yaka. Kwɛ gbɛ fɛɛ gbɛ, jie nɔ ni ja jogbaŋŋ lɛ kɛjɛ mli, ni no sɛɛ omia Add. Akpɛɛɛ nɔ ko kɛyashi okwɛ.",
+      "ee": "Tso wò agbalẽ me. Ne èŋlɔa nu siwo nèdzra, ame siwo le fe ɖem na wò, alo gazazã ɖe agbalẽ me la, ʋu Notebook pages eye nàtsɔ axa yeye kpee. Ɖe axaa ƒe foto eye Ferlance axlẽe, alo ŋlɔ fliwo faa. Kpɔ fli ɖe sia ɖe, ɖe nu si medze o la ɖa, eye emegbe nàzi Add dzi. Womedzraa naneke ɖo hafi nàkpɔe o.",
+      "fat": "Fi wo nwoma mu. Sɛ ekyerɛw wo ndzɛmba a etɔn, hɔn a wɔdze wo ka, anaa wo sika a ebɔ wɔ nwoma mu a, bue Notebook pages na fa kratafa foforɔ ka ho. Tow ne mfonyin na Ferlance bɛkenkan, anaa kyerɛw ntsentsan no kwa. Hwɛ ntsentsan biara, yi dza ɔntsen fi mu, na afei mia Add. Wɔnnsie hwee nkesi sɛ ebɛhwɛ."
+    },
+    "stock": {
+      "en": "Keeping stock right. Add each product you sell in Inventory. When goods arrive or leave, use Stock in or out. Scan invoice reads a delivery note photo. To count the shelves, use Stocktake: photograph your count sheet, check it, and Ferlance shows every difference.",
+      "tw": "Hwɛ wo stock yie. Fa nneɛma biara a wotɔn ka Inventory ho. Sɛ nneɛma ba anaa ɛkɔ a, fa Stock in anaa out. Scan invoice kenkan delivery note mfonini. Sɛ wopɛ sɛ wokan nneɛma a ɛwɔ adaka so a, fa Stocktake: twa wo nkontaabu krataa mfonini, hwɛ mu, na Ferlance bɛkyerɛ nsonsonoe biara.",
+      "ga": "Kwɛ o-stock lɛ jogbaŋŋ. Kɛ nɔ fɛɛ nɔ ni ohɔɔ afata Inventory he. Kɛ nibii ba loo amɛtee lɛ, kɛ Stock in loo out tsu nii. Scan invoice kaneɔ delivery note mfoniri. Kɛ ootao ni okane nibii ni yɔɔ shɛlf lɛ nɔ lɛ, kɛ Stocktake tsu nii: ŋmɛɛ o-kanemɔ wolo lɛ mfoniri, kwɛ mli, ni Ferlance baatsɔɔ bo bɔ ni amɛtsake ha.",
+      "ee": "Kpɔ wò stock dzi nyuie. Tsɔ nu ɖe sia ɖe si nèdzrana kpe Inventory ŋu. Ne nuwo va alo dzo la, zã Stock in alo out. Scan invoice xlẽa delivery note ƒe foto. Be nàxlẽ nu siwo le kplɔ̃wo dzi la, zã Stocktake: ɖe wò xexlẽmegbalẽ ƒe foto, kpɔe, eye Ferlance afia vovototo ɖe sia ɖe.",
+      "fat": "Hwɛ wo stock yie. Fa ndzɛmba biara a etɔn ka Inventory ho. Sɛ ndzɛmba ba anaa ɔkɔ a, fa Stock in anaa out. Scan invoice kenkan delivery note mfonyin. Sɛ epɛ dɛ ekan ndzɛmba a ɔwɔ adaka do a, fa Stocktake: tow wo nkontaabu krataa mfonyin, hwɛ mu, na Ferlance bɛkyerɛ nsonsonee biara."
+    },
+    "books": {
+      "en": "Your books, kept for you. Every import, MoMo message, invoice and stock movement goes into proper books automatically. Books shows profit and loss, what you own and owe, and money in and out. Import your MoMo or bank statement in Reconcile to check every cedi.",
+      "tw": "Wo nkontaabu, yɛhwɛ ma wo. Biribiara a wode ba, MoMo nkra, invoice ne stock nkɔso nyinaa kɔ nkontaabu nhoma mu ankasa. Books kyerɛ mfaso ne ka, nea wowɔ ne nea wode ka, ne sika a ɛba ne nea ɛkɔ. Fa wo MoMo anaa bank statement ba Reconcile mu na hwɛ sidi biara.",
+      "ga": "O-akɔntaa woji lɛ, wɔkwɛɔ ha bo. Nɔ fɛɛ nɔ ni okɛbaa, MoMo saji, invoice kɛ stock tsakemɔ fɛɛ yaa akɔntaa woji lɛ amli diŋŋ. Books tsɔɔ sɛɛnamɔ kɛ hiɛkpatamɔ, nɔ ni yɔɔ bo dɛŋ kɛ nyɔmɔ ni oyeɔ, kɛ shika ni baa kɛ ni yaa. Kɛ o-MoMo loo bank statement aba Reconcile mli ni okwɛ sidi fɛɛ sidi.",
+      "ee": "Wò akɔntabubuwo, míekpɔa wo dzi na wò. Nu sia nu si nètsɔ va, MoMo gbedasiwo, invoice kple stock ƒe ʋuʋuwo katã yina akɔntaagbalẽwo me le eɖokui si. Books fiaa viɖe kple bu, nu siwo le asiwò kple fe siwo le ŋuwò, kple ga si gena kple esi dona. Tsɔ wò MoMo alo bank statement va Reconcile me nàkpɔ sedi ɖe sia ɖe.",
+      "fat": "Wo nkontaabu, yɛhwɛ ma wo. Biribiara a edze ba, MoMo nkra, invoice na stock nkɔdo nyina kɔ nkontaabu nwoma mu ankasa. Books kyerɛ mfaso na ka, dza ewɔ na dza edze ka, na sika a ɔba na dza ɔkɔ. Fa wo MoMo anaa bank statement bra Reconcile mu na hwɛ sedi biara."
+    },
+    "loan": {
+      "en": "Getting ready for a loan. Credit report shows your readiness score and how to raise it. A lender sees your sales and profit, and how much is backed by MoMo and bank statements. Share one link, and withdraw it any time.",
+      "tw": "Siesie wo ho ma bosea. Credit report kyerɛ wo ahosiesie nsɛnkyerɛnne ne sɛnea wobɛma no akɔ soro. Obi a ɔfɛm sika hu wo nneɛma a woatɔn ne wo mfaso, ne dodow a MoMo ne bank statement kyerɛ sɛ ɛyɛ nokware. Fa link baako ma no, na wobɛtumi ayi afi hɔ bere biara.",
+      "ga": "Saa ohe ha nyɔmɔ. Credit report tsɔɔ o-hesaamɔ maakɛ kɛ bɔ ni obaafee ni ewo soro. Mɔ ni ŋɔɔ nyɔmɔ lɛ naa nɔ ni ohɔɔ kɛ o-sɛɛnamɔ, kɛ bɔ ni MoMo kɛ bank statement tsɔɔ akɛ eji anɔkwale. Kɛ link kome ha lɛ, ni obaanyɛ ojie kɛjɛ jɛmɛ be fɛɛ be.",
+      "ee": "Dzra ɖo na agbanyiga. Credit report fiaa wò dzadzraɖo ƒe xexlẽdzesi kple ale si nàna wòakɔ ɖe edzi. Ame si doa ga ɖe ame la kpɔa nu siwo nèdzra kple wò viɖe, kple ale si gbegbe MoMo kple bank statement ɖo kpe edzi. Tsɔ link ɖeka nɛ, eye nàte ŋu aɖee ɖa ɣesiaɣi.",
+      "fat": "Siesie wo ho ma bosea. Credit report kyerɛ wo ahosiesie nsɛnkyerɛnee na mbrɛ ebɛma no akɔ sor. Obi a ɔfɛm sika hu wo ndzɛmba a etɔn na wo mfaso, na dodow a MoMo na bank statement kyerɛ dɛ ɔyɛ nokwar. Fa link kor ma no, na ebotum ayi efi hɔ bere biara."
+    }
+  }
+}

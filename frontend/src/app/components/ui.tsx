@@ -1,6 +1,6 @@
 // Small UI primitives shared by every view. Class names match src/styles/*.css.
 
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, type ChangeEvent, type ReactNode } from 'react';
 import { Icon, type IconName } from '../../lib/icons';
 
 export type Tone = '' | 'success' | 'warning' | 'error' | 'info' | 'ai' | 'dot';
@@ -294,6 +294,59 @@ export function ListHeader({
           </button>
         ) : null}
       </div>
+    </div>
+  );
+}
+
+/**
+ * A photo field with two clear choices: "Take a photo" opens the phone's camera straight away,
+ * "Choose a file" opens the gallery or files (and PDFs where allowed). On a computer both open
+ * the file picker.
+ */
+export function PhotoInput({
+  id,
+  label,
+  file,
+  onFile,
+  allowPdf = false,
+}: {
+  id: string;
+  label: string;
+  file: File | null;
+  onFile: (file: File | null) => void;
+  allowPdf?: boolean;
+}) {
+  const camera = useRef<HTMLInputElement>(null);
+  const files = useRef<HTMLInputElement>(null);
+  const pick = (event: ChangeEvent<HTMLInputElement>) => {
+    onFile(event.target.files?.[0] ?? null);
+    event.target.value = ''; // picking the same photo again still counts
+  };
+  return (
+    <div className="field photo-input" role="group" aria-labelledby={`${id}-label`}>
+      <span id={`${id}-label`}>{label}</span>
+      <div className="button-row">
+        <button className="btn btn-primary btn-sm" type="button" onClick={() => camera.current?.click()}>
+          <Icon name="camera" />
+          Take a photo
+        </button>
+        <button className="btn btn-secondary btn-sm" type="button" onClick={() => files.current?.click()}>
+          <Icon name="upload" />
+          Choose a file
+        </button>
+      </div>
+      <input ref={camera} hidden id={`${id}-camera`} type="file" accept="image/*" capture="environment" onChange={pick} />
+      <input
+        ref={files}
+        hidden
+        id={id}
+        type="file"
+        accept={allowPdf ? 'image/jpeg,image/png,image/webp,application/pdf' : 'image/jpeg,image/png,image/webp'}
+        onChange={pick}
+      />
+      <span className="field-hint" aria-live="polite">
+        {file ? `Ready: ${file.name}` : 'No photo yet.'}
+      </span>
     </div>
   );
 }

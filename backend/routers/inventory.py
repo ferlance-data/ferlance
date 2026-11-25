@@ -169,6 +169,59 @@ def import_template(business: dict = Depends(read_business)) -> Response:
     )
 
 
+# ---------- Stocktake from a count sheet: photo or typed -> check -> apply ----------
+
+class CountText(BaseModel):
+    text: str = Field(min_length=1, max_length=20_000)
+
+
+class CountLine(BaseModel):
+    product_id: str = Field(min_length=1, max_length=64)
+    counted: float = Field(ge=0, le=ocr.MAX_QUANTITY)
+
+
+class CountApply(BaseModel):
+    counts: list[CountLine] = Field(min_length=1, max_length=ocr.MAX_LINES)
+
+
+def _matched_counts(business: dict, lines: list[dict]) -> dict:
+    if not lines:
+        raise HTTPException(422, "No counted products were found. Try a clearer photo, or type the counts in.")
+    products = inventory.list_products(config.DB_PATH, business["id"])["items"]
+    return {"lines": ocr.match_products(lines, products)}
+
+
+@router.post("/counts/read")
+def read_count_sheet(file: UploadFile = File(...), business: dict = Depends(data_writer)) -> dict:
+    """Read a photo of a stock count sheet. Nothing changes until the counts are applied; the photo is not stored."""
+    content = file.file.read(ocr.MAX_BYTES + 1)
+    try:
+        ocr.sniff(content)
+    except ocr.OcrError as error:
+        raise HTTPException(error.status, str(error))
+    spend_ai_call(business["id"])
+    try:
+        lines = ocr.read_counts(content, file.filename or "count sheet")
+    except ocr.OcrError as error:
+        refund_ai_call(business["id"])
+        raise HTTPException(error.status, str(error))
+    return _matched_counts(business, lines)
+
+
+@router.post("/counts/text")
+def read_typed_counts(payload: CountText, business: dict = Depends(data_writer)) -> dict:
+    """Free path: typed counts such as "Rice 5kg 12", read without any AI."""
+    return _matched_counts(business, ocr.parse_counts(payload.text))
+
+
+@router.post("/counts")
+def apply_counts(payload: CountApply, business: dict = Depends(data_writer), user: dict = Depends(current_user)) -> dict:
+    try:
+        return inventory.apply_counts(config.DB_PATH, business["id"], user["id"], [line.model_dump() for line in payload.counts])
+    except inventory.InventoryError as error:
+        raise _error(error)
+
+
 # ---------- Scan an invoice (OCR) -> draft -> review -> confirm ----------
 
 class CaptureText(BaseModel):

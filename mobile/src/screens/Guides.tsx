@@ -4,13 +4,12 @@
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
-import { GUIDES, type Guide } from '../../../frontend/src/lib/guides';
+import { GUIDE_LANGS, GUIDES, VOICE_CREDIT, guideScript, guideVideo, type Guide, type GuideLang } from '../../../frontend/src/lib/guides';
 import { absolute } from '../api';
-import { Body, Card, Screen, Title, useTheme } from '../ui';
+import { Body, Card, Screen, Segmented, Title, useTheme } from '../ui';
 
-function Player({ guide }: { guide: Guide }) {
-  const player = useVideoPlayer(absolute(guide.video), (created) => {
-    created.muted = true;
+function Player({ guide, lang }: { guide: Guide; lang: GuideLang }) {
+  const player = useVideoPlayer(absolute(guideVideo(guide.slug, lang)), (created) => {
     created.play();
   });
   return (
@@ -24,7 +23,7 @@ function Player({ guide }: { guide: Guide }) {
   );
 }
 
-function GuideCard({ guide, open, onToggle }: { guide: Guide; open: boolean; onToggle: () => void }) {
+function GuideCard({ guide, lang, open, onToggle }: { guide: Guide; lang: GuideLang; open: boolean; onToggle: () => void }) {
   const c = useTheme();
   return (
     <Card>
@@ -35,7 +34,12 @@ function GuideCard({ guide, open, onToggle }: { guide: Guide; open: boolean; onT
       </Pressable>
       {open ? (
         <View style={{ gap: 10 }}>
-          <Player guide={guide} />
+          {/* Keyed by language so switching starts the narrated file afresh. */}
+          <Player key={lang} guide={guide} lang={lang} />
+          <Body muted>
+            {GUIDE_LANGS.find((item) => item.code === lang)?.draft ? 'The voice says (draft translation): ' : 'The voice says: '}
+            {guideScript(guide.slug, lang)}
+          </Body>
           <Body>
             <Body style={{ fontWeight: '600' }}>Why: </Body>
             {guide.why}
@@ -53,19 +57,23 @@ function GuideCard({ guide, open, onToggle }: { guide: Guide; open: boolean; onT
 
 export default function Guides() {
   const [open, setOpen] = useState<string | null>(GUIDES[0]?.slug ?? null);
+  const [lang, setLang] = useState<GuideLang>('en');
   return (
     <Screen>
-      <Title sub="Short videos of the real app: when to use each feature, why, and how. Some pages (invoices, stock, books) are on the website.">
+      <Title sub="Short videos of the real app with a voice in your language: when to use each feature, why, and how. Invoices and books are on the website.">
         Guides
       </Title>
+      <Segmented value={lang} options={GUIDE_LANGS.map((item): [GuideLang, string] => [item.code, item.label])} onChange={setLang} />
       {GUIDES.map((guide) => (
         <GuideCard
           key={guide.slug}
           guide={guide}
+          lang={lang}
           open={open === guide.slug}
           onToggle={() => setOpen(open === guide.slug ? null : guide.slug)}
         />
       ))}
+      <Body muted>{VOICE_CREDIT}</Body>
     </Screen>
   );
 }

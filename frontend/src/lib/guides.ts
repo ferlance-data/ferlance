@@ -1,6 +1,9 @@
 // The guides: one per everyday situation, with when to use it, why, how, and a short video.
 // Shared by the landing page ("How it works") and the app (Help & guides, the first-visit tour).
-// Videos are recorded from the real app by tools/demo/record.mjs.
+// Videos are recorded from the real app by tools/demo/record.mjs; tools/demo/voice.py adds the
+// spoken narration (narration.json) in each language.
+
+import narration from './narration.json';
 
 export interface Guide {
   slug: string;
@@ -11,11 +14,10 @@ export interface Guide {
   steps: string[];
   /** Workspace page to open, e.g. 'debts'. */
   page: string;
-  video: string;
   poster: string;
 }
 
-const media = (slug: string) => ({ video: `/assets/demo/${slug}.mp4`, poster: `/assets/demo/${slug}.jpg` });
+const media = (slug: string) => ({ poster: `/assets/demo/${slug}.jpg` });
 
 export const GUIDES: Guide[] = [
   {
@@ -112,3 +114,30 @@ export const GUIDES: Guide[] = [
 ];
 
 export const TOUR_KEY = 'ferlance-tour-seen';
+
+/** Narration languages, in menu order. Drafts still need a native speaker's check. */
+export type GuideLang = 'en' | 'tw' | 'ga' | 'ee' | 'fat';
+export const GUIDE_LANGS: { code: GuideLang; label: string; draft: boolean }[] = Object.entries(narration.languages).map(
+  ([code, info]) => ({
+    code: code as GuideLang,
+    label: info.label,
+    draft: info.draft,
+  }),
+);
+/** Remembers the viewer's narration language (per browser). */
+export const LANG_KEY = 'ferlance-guide-lang';
+
+export const isGuideLang = (value: unknown): value is GuideLang => GUIDE_LANGS.some((lang) => lang.code === value);
+
+/** The guide video with its narration in `lang`. */
+export const guideVideo = (slug: string, lang: GuideLang): string => `/assets/demo/${slug}.${lang}.mp4`;
+
+/** What the narrator says, for reading along (and for anyone who can't play sound). */
+export function guideScript(slug: string, lang: GuideLang): string {
+  const scripts = (narration.guides as Record<string, Partial<Record<GuideLang, string>>>)[slug];
+  return scripts?.[lang] ?? scripts?.en ?? '';
+}
+
+/** Credit the voice models require (Africa TTS is CC BY-NC 4.0: attribution, non-commercial). */
+export const VOICE_CREDIT =
+  'Voices: English by Kokoro (Apache 2.0); Twi, Ga, Ewe and Fante by Africa TTS from AfriSpeech (CC BY-NC 4.0). Translations are drafts being checked by native speakers.';
